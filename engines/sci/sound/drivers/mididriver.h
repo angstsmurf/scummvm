@@ -54,22 +54,24 @@ enum {
 
 /* Special SCI sound stuff */
 
-#define SCI_MIDI_TIME_EXPANSION_PREFIX 0xF8
-#define SCI_MIDI_TIME_EXPANSION_LENGTH 240
+enum {
+	SCI_MIDI_TIME_EXPANSION_PREFIX = 0xF8,
+	SCI_MIDI_TIME_EXPANSION_LENGTH = 240,
 
-#define SCI_MIDI_EOT 0xFC
-#define SCI_MIDI_SET_SIGNAL 0xCF
-#define SCI_MIDI_SET_POLYPHONY 0x4B
-#define SCI_MIDI_RESET_ON_SUSPEND 0x4C
-#define SCI_MIDI_CHANNEL_MUTE 0x4E
-#define SCI_MIDI_SET_REVERB 0x50
-#define SCI_MIDI_HOLD 0x52
-#define SCI_MIDI_CUMULATIVE_CUE 0x60
-#define SCI_MIDI_CHANNEL_SOUND_OFF 0x78 /* all-sound-off for Bn */
-#define SCI_MIDI_CHANNEL_NOTES_OFF 0x7B /* all-notes-off for Bn */
+	SCI_MIDI_EOT = 0xFC,
+	SCI_MIDI_SET_SIGNAL = 0xCF,
+	SCI_MIDI_SET_POLYPHONY = 0x4B,
+	SCI_MIDI_RESET_ON_SUSPEND = 0x4C,
+	SCI_MIDI_CHANNEL_MUTE = 0x4E,
+	SCI_MIDI_SET_REVERB = 0x50,
+	SCI_MIDI_HOLD = 0x52,
+	SCI_MIDI_CUMULATIVE_CUE = 0x60,
+	SCI_MIDI_CHANNEL_SOUND_OFF = 0x78, /* all-sound-off for Bn */
+	SCI_MIDI_CHANNEL_NOTES_OFF = 0x7B, /* all-notes-off for Bn */
 
-#define SCI_MIDI_SET_SIGNAL_LOOP 0x7F
+	SCI_MIDI_SET_SIGNAL_LOOP = 0x7F
 /* If this is the parameter of 0xCF, the loop point is set here */
+};
 
 #define SCI_MIDI_CONTROLLER(status) ((status & 0xF0) == 0xB0)
 

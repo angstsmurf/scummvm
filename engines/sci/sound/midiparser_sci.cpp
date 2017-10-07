@@ -32,15 +32,6 @@ namespace Sci {
 
 static const int nMidiParams[] = { 2, 2, 2, 2, 1, 1, 2, 0 };
 
-enum SciMidiCommands {
-	kSetSignalLoop = 0x7F,
-	kEndOfTrack = 0xFC,
-	kSetReverb = 0x50,
-	kMidiHold = 0x52,
-	kUpdateCue = 0x60,
-	kResetOnPause = 0x4C
-};
-
 //  MidiParser_SCI
 //
 MidiParser_SCI::MidiParser_SCI(SciVersion soundVersion, SciMusic *music) :
@@ -183,7 +174,7 @@ void MidiParser_SCI::midiMixChannels() {
 		if (!validateNextRead(channel))
 			goto end;
 		midiCommand = channel->data[channel->curPos++];
-		if (midiCommand != kEndOfTrack) {
+		if (midiCommand != SCI_MIDI_EOT) {
 			// Write delta
 			while (newDelta > 240) {
 				*outData++ = 0xF8;
@@ -202,7 +193,7 @@ void MidiParser_SCI::midiMixChannels() {
 				*outData++ = midiParam;
 			} while (midiParam != 0xF7);
 			break;
-		case kEndOfTrack: // end of channel
+		case SCI_MIDI_EOT: // end of channel
 			channel->time = -1;
 			break;
 		default: // MIDI command
@@ -278,7 +269,7 @@ void MidiParser_SCI::midiFilterChannels(int channelMask) {
 
 		switch (curByte) {
 		case 0xF0: // sysEx
-		case kEndOfTrack: // end of channel
+		case SCI_MIDI_EOT: // end of channel
 			command = curByte;
 			curChannel = 15;
 			break;
@@ -314,8 +305,8 @@ void MidiParser_SCI::midiFilterChannels(int channelMask) {
 				lastCommand = command;
 				break;
 
-			case kEndOfTrack: // end of channel
-				// At least KQ4 sound 104 has a doubled kEndOfTrack marker at
+			case SCI_MIDI_EOT: // end of channel
+				// At least KQ4 sound 104 has a doubled SCI_MIDI_EOT marker at
 				// the end of the file, which breaks filtering
 				if (channelData.size() < 2)
 					goto end;
@@ -660,7 +651,7 @@ bool MidiParser_SCI::processEvent(const EventInfo &info, bool fireEvents) {
 	switch (info.command()) {
 	case 0xC:
 		if (info.channel() == 0xF) {// SCI special case
-			if (info.basic.param1 != kSetSignalLoop) {
+			if (info.basic.param1 != SCI_MIDI_SET_SIGNAL_LOOP) {
 				// At least in kq5/french&mac the first scene in the intro has
 				// a song that sets signal to 4 immediately on tick 0. Signal
 				// isn't set at that point by sierra sci and it would cause the
@@ -723,7 +714,7 @@ bool MidiParser_SCI::processEvent(const EventInfo &info, bool fireEvents) {
 		// http://wiki.scummvm.org/index.php/SCI/Specifications/Sound/SCI0_Resource_Format#Status_Reference
 		// Handle common special events
 		switch (info.basic.param1) {
-		case kSetReverb:
+		case SCI_MIDI_SET_REVERB:
 			if (info.basic.param2 == 127)		// Set global reverb instead
 				_pSnd->reverb = _music->getGlobalReverb();
 			else
@@ -738,10 +729,10 @@ bool MidiParser_SCI::processEvent(const EventInfo &info, bool fireEvents) {
 		// Handle events sent to the SCI special channel (15)
 		if (info.channel() == 0xF) {
 			switch (info.basic.param1) {
-			case kSetReverb:
+			case SCI_MIDI_SET_REVERB:
 				// Already handled above
 				return true;
-			case kMidiHold:
+			case SCI_MIDI_HOLD:
 				// Check if the hold ID marker is the same as the hold ID
 				// marker set for that song by cmdSetSoundHold.
 				// If it is, loop back, but don't stop notes when jumping.
@@ -751,7 +742,7 @@ bool MidiParser_SCI::processEvent(const EventInfo &info, bool fireEvents) {
 					return true;
 				}
 				return true;
-			case kUpdateCue:
+			case SCI_MIDI_CUMULATIVE_CUE:
 				if (!_jumpingToTick) {
 					int inc;
 					if (_soundVersion <= SCI_VERSION_0_LATE) {
@@ -766,7 +757,7 @@ bool MidiParser_SCI::processEvent(const EventInfo &info, bool fireEvents) {
 
 				}
 				return true;
-			case kResetOnPause:
+			case SCI_MIDI_RESET_ON_SUSPEND:
 				_resetOnPause = info.basic.param2;
 				return true;
 			// Unhandled SCI commands
