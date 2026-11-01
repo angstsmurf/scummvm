@@ -24,8 +24,8 @@
 #include "glk/comprehend/game_data.h"
 #include "glk/comprehend/comprehend.h"
 #include "glk/comprehend/debugger.h"
-#include "common/algorithm.h"
-#include "common/textconsole.h"
+
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
@@ -52,7 +52,7 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 		if (instr->_operand[1] == 0x81)
 			index += 256;
 		if (index >= _functions.size())
-			error("Bad function %.4x >= %.4x\n", index, _functions.size());
+			error("Bad function %.4x >= %.4x\n", index, (uint)_functions.size());
 
 		eval_function(index, sentence);
 		break;
@@ -68,7 +68,7 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 
 	case OPCODE_CLEAR_FLAG40:
 		item = getItem(instr);
-		item->_flags &= ~ITEMF_UNKNOWN;
+		item->_flags &= ~ITEMF_NO_PICTURE;
 		break;
 
 	case OPCODE_CLEAR_INVISIBLE:
@@ -90,13 +90,25 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 		func_set_test_result(func_state, item != nullptr);
 		break;
 
+	case OPCODE_DESCRIBE_CURRENT_OBJECT:
+		// Examine the object the player named: print its long description.
+		// Only used by version 2 games (e.g. The Coveted Mirror). The single
+		// operand's purpose is unknown; the original keys off the noun.
+		item = get_item_by_noun(noun);
+		if (item)
+			// console_println, not a raw print, so a description carrying the
+			// '@' replacement marker is rendered, e.g. Talisman's pharaoh
+			// statue ("@From the top...").
+			console_println(stringLookup(item->_longString).c_str());
+		break;
+
 	case OPCODE_ELSE:
 		func_state->_testResult = func_state->_elseResult;
 		break;
 
 	case OPCODE_HAVE_CURRENT_OBJECT:
 		item = get_item_by_noun(noun);
-		func_set_test_result(func_state, item->_room == ROOM_INVENTORY);
+		func_set_test_result(func_state, item && item->_room == ROOM_INVENTORY);
 		break;
 
 	case OPCODE_HAVE_OBJECT:
@@ -119,8 +131,12 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 		for (uint i = 0; i < _items.size(); i++) {
 			item = &_items[i];
 			if (item->_room == ROOM_INVENTORY)
-				g_comprehend->print("%s\n",
-					stringLookup(item->_stringDesc).c_str());
+				// Route through console_println (not a raw print) so that an
+				// item description carrying the '@' replacement marker is
+				// rendered: Talisman's gold item is "@ glittering gold coins",
+				// where the inventory verb has just set number mode + var 34
+				// so '@' becomes the current coin count.
+				console_println(stringLookup(item->_stringDesc).c_str());
 		}
 		break;
 	}
@@ -161,6 +177,11 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 		func_set_test_result(func_state, item->_room == ROOM_NOWHERE);
 		break;
 
+	case OPCODE_OBJECT_IS_NOT_NOWHERE:
+		item = getItem(instr);
+		func_set_test_result(func_state, item->_room != ROOM_NOWHERE);
+		break;
+
 	case OPCODE_OBJECT_PRESENT:
 		item = getItem(instr);
 		func_set_test_result(func_state, item->_room == _currentRoom);
@@ -193,7 +214,7 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 
 	case OPCODE_SAVE_ACTION:
 		// Causes the next sentence inputed to re-use the first word of the current one.
-		// As far as I'm aware, this is only used for handling responses to questions
+		// This appears to apply only to responses to questions
 		_nounState = NOUNSTATE_QUERY;
 		// fall-through
 
@@ -205,7 +226,8 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 
 	case OPCODE_SET_CAN_TAKE:
 		item = get_item_by_noun(noun);
-		item->_flags |= ITEMF_CAN_TAKE;
+		if (item)
+			item->_flags |= ITEMF_CAN_TAKE;
 		break;
 
 	case OPCODE_SET_FLAG:
@@ -214,7 +236,7 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 
 	case OPCODE_SET_FLAG40:
 		item = getItem(instr);
-		item->_flags |= ITEMF_UNKNOWN;
+		item->_flags |= ITEMF_NO_PICTURE;
 		break;
 
 	case OPCODE_SET_INVISIBLE:
@@ -243,6 +265,13 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 			error("Bad string desc %.2x:%.2x\n", instr->_operand[1], instr->_operand[2]);
 			break;
 		}
+		// Re-render if the current room's description was swapped (e.g. OO-Topos
+		// rewrites the prison cell text as the player removes the bottle and
+		// food), mirroring SET_ROOM_GRAPHIC below. The room description is
+		// persistent in the status window, so without this it stays stale. In
+		// graphics mode there is no such window, and the original doesn't reprint.
+		if (instr->_operand[0] == _currentRoom && g_comprehend->_statusWindow)
+			_updateFlags |= UPDATE_ROOM_DESC;
 		break;
 
 	case OPCODE_SET_ROOM_GRAPHIC:
@@ -253,10 +282,16 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 		break;
 
 	case OPCODE_SET_STRING_REPLACEMENT1:
-		_currentReplaceWord = (instr->_operand[0] & 0x80) - 1;
+		// The original always selects number mode here: '@' renders
+		// variable[operand] as a decimal number (e.g. Talisman's bazaar
+		// prices). The operand is a plain 0..127 variable index, so testing
+		// `operand & 0x80` would never fire.
+		_replaceWordIsNumber = true;
+		_replaceNumberVar = instr->_operand[0] & 0x7f;
 		break;
 
 	case OPCODE_SET_STRING_REPLACEMENT2:
+		_replaceWordIsNumber = false;
 		_currentReplaceWord = instr->_operand[0] - 1;
 		break;
 
@@ -319,15 +354,19 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 			_variables[instr->_operand[1]]);
 		break;
 
-	case OPCODE_VAR_GTE1:
+	// A strict less-than test: the original takes the test-true branch when
+	// vars[a] < vars[b]. E.g. Talisman's FUNC 0x2d gate `var[0x21] <
+	// var[0x05]`: the executioner catches the player while the turn counter
+	// var[0x21] is still below 5.
+	case OPCODE_VAR_LT1:
 		func_set_test_result(func_state,
-			_variables[0] >=
+			_variables[0] <
 			_variables[instr->_operand[0]]);
 		break;
 
-	case OPCODE_VAR_GTE2:
+	case OPCODE_VAR_LT2:
 		func_set_test_result(func_state,
-			_variables[instr->_operand[0]] >=
+			_variables[instr->_operand[0]] <
 			_variables[instr->_operand[1]]);
 		break;
 
@@ -343,6 +382,17 @@ void ComprehendGameOpcodes::execute_opcode(const Instruction *instr, const Sente
 
 	case OPCODE_VAR_SUB:
 		_variables[instr->_operand[0]] -= _variables[instr->_operand[1]];
+		break;
+
+	// Add/subtract the input-number register (variable 0): the count the player
+	// typed, e.g. "PUT 42 COINS". Talisman's bowl uses these to move an exact
+	// number of coins (func 173: var34 -= n; var36 += n; var123 += n).
+	case OPCODE_VAR_ADD1:
+		_variables[instr->_operand[0]] += _variables[0];
+		break;
+
+	case OPCODE_VAR_SUB1:
+		_variables[instr->_operand[0]] -= _variables[0];
 		break;
 
 	default:
@@ -385,8 +435,6 @@ Item *ComprehendGameOpcodes::getItem(const Instruction *instr) {
 	return get_item(instr->_operand[0] - 1);
 }
 
-/*-------------------------------------------------------*/
-
 ComprehendGameV1::ComprehendGameV1() {
 	_opcodeMap[0x01] = OPCODE_HAVE_OBJECT;
 	_opcodeMap[0x02] = OPCODE_VAR_GT2;
@@ -395,7 +443,7 @@ ComprehendGameV1::ComprehendGameV1() {
 	_opcodeMap[0x06] = OPCODE_VAR_EQ2;
 	_opcodeMap[0x08] = OPCODE_CURRENT_IS_OBJECT;
 	_opcodeMap[0x09] = OPCODE_OBJECT_PRESENT;
-	_opcodeMap[0x0a] = OPCODE_VAR_GTE2;
+	_opcodeMap[0x0a] = OPCODE_VAR_LT2;
 	_opcodeMap[0x0c] = OPCODE_ELSE;
 	_opcodeMap[0x0e] = OPCODE_OBJECT_IN_ROOM;
 	_opcodeMap[0x14] = OPCODE_CURRENT_OBJECT_NOT_VALID;
@@ -407,7 +455,7 @@ ComprehendGameV1::ComprehendGameV1() {
 	_opcodeMap[0x24] = OPCODE_CURRENT_OBJECT_PRESENT;
 	_opcodeMap[0x25] = OPCODE_VAR_GT1;
 	_opcodeMap[0x29] = OPCODE_VAR_EQ1;
-	_opcodeMap[0x2d] = OPCODE_VAR_GTE1;
+	_opcodeMap[0x2d] = OPCODE_VAR_LT1;
 	_opcodeMap[0x31] = OPCODE_TEST_ROOM_FLAG;
 	_opcodeMap[0x41] = OPCODE_NOT_HAVE_OBJECT;
 	_opcodeMap[0x45] = OPCODE_NOT_IN_ROOM;
@@ -477,7 +525,7 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 
 		if (g_debugger->_invLimit)
 			func_set_test_result(func_state, _variables[VAR_INVENTORY_WEIGHT] +
-			(item->_flags & ITEMF_WEIGHT_MASK) > _variables[VAR_INVENTORY_LIMIT]);
+			(item ? (item->_flags & ITEMF_WEIGHT_MASK) : 0) > _variables[VAR_INVENTORY_LIMIT]);
 		else
 			// Allow for an unlimited number of items in inventory
 			func_set_test_result(func_state, false);
@@ -489,10 +537,9 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 		break;
 
 	case OPCODE_SET_STRING_REPLACEMENT3:
+		_replaceWordIsNumber = false;
 		_currentReplaceWord = instr->_operand[0] - 1;
 		break;
-
-	/*--------------------------------------*/
 
 	case OPCODE_TEST_NOT_ROOM_FLAG:
 		func_set_test_result(func_state,
@@ -514,17 +561,10 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 		func_set_test_result(func_state, !item || item->_room != _currentRoom);
 		break;
 
-	case OPCODE_DESCRIBE_CURRENT_OBJECT:
-		/*
-		 * This opcode is only used in version 2
-		 * FIXME - unsure what the single operand is for.
-		 */
-		item = get_item_by_noun(noun);
-		g_comprehend->print("%s\n", stringLookup(item->_longString).c_str());
-		break;
-
 	case OPCODE_CURRENT_OBJECT_IN_ROOM: {
-		/* FIXME - use common code for these two ops */
+		// Not the inverse of CURRENT_OBJECT_NOT_IN_ROOM above: this one tests
+		// the operand room (not the current one) and accepts any item sharing
+		// the noun, where the other only looks at the first.
 		bool test = false;
 
 		if (noun) {
@@ -577,11 +617,6 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 		func_set_test_result(func_state, item && item->_room == ROOM_NOWHERE);
 		break;
 
-	case OPCODE_OBJECT_IS_NOT_NOWHERE:
-		item = getItem(instr);
-		func_set_test_result(func_state, item->_room != ROOM_NOWHERE);
-		break;
-
 	case OPCODE_CURRENT_OBJECT_NOT_PRESENT:
 		item = get_item_by_noun(noun);
 		func_set_test_result(func_state, !isItemPresent(item));
@@ -603,8 +638,10 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 		for (uint i = 0; i < _items.size(); i++) {
 			item = &_items[i];
 			if (item->_room == instr->_operand[0])
-				g_comprehend->print("%s\n",
-					stringLookup(item->_stringDesc).c_str());
+				// console_println (not a raw print) so an item description
+				// carrying the '@' replacement marker is rendered, matching
+				// the OPCODE_INVENTORY listing above.
+				console_println(stringLookup(item->_stringDesc).c_str());
 		}
 		break;
 
@@ -640,25 +677,6 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 		func_set_test_result(func_state, false);
 		break;
 
-	case OPCODE_SET_CURRENT_NOUN_STRING_REPLACEMENT:
-#if 1
-		error("TODO: OPCODE_SET_CURRENT_NOUN_STRING_REPLACEMENT");
-#else
-		/*
-		 * FIXME - Not sure what the operand is for,
-		 * maybe capitalisation?
-		 */
-		if (noun && (noun->_type & WORD_TYPE_NOUN_PLURAL))
-			_currentReplaceWord = 3;
-		else if (noun && (noun->_type & WORD_TYPE_FEMALE))
-			_currentReplaceWord = 0;
-		else if (noun && (noun->_type & WORD_TYPE_MALE))
-			_currentReplaceWord = 1;
-		else
-			_currentReplaceWord = 2;
-#endif
-		break;
-
 	case OPCODE_MOVE_DIR:
 		doMovementVerb(instr->_operand[0]);
 		break;
@@ -669,8 +687,6 @@ void ComprehendGameV1::execute_opcode(const Instruction *instr, const Sentence *
 	}
 }
 
-/*-------------------------------------------------------*/
-
 ComprehendGameV2::ComprehendGameV2() {
 	_opcodeMap[0x01] = OPCODE_HAVE_OBJECT;
 	_opcodeMap[0x02] = OPCODE_VAR_GT2;
@@ -679,10 +695,13 @@ ComprehendGameV2::ComprehendGameV2() {
 	_opcodeMap[0x06] = OPCODE_VAR_EQ2;
 	_opcodeMap[0x08] = OPCODE_CURRENT_IS_OBJECT;
 	_opcodeMap[0x09] = OPCODE_VAR_GT1;
-	_opcodeMap[0x0a] = OPCODE_VAR_GTE2;
+	_opcodeMap[0x0a] = OPCODE_VAR_LT2;
 	_opcodeMap[0x0c] = OPCODE_ELSE;
 	_opcodeMap[0x0d] = OPCODE_VAR_EQ1;
-	_opcodeMap[0x11] = OPCODE_OBJECT_IS_NOWHERE;
+	// 0x11 tests "object is not nowhere", so the negated form 0x51 is "object
+	// is nowhere". `51 35` in The Coveted Mirror's FUNC 0002 depends on this
+	// for Brother Jon's tavern visit.
+	_opcodeMap[0x11] = OPCODE_OBJECT_IS_NOT_NOWHERE;
 	_opcodeMap[0x14] = OPCODE_CURRENT_OBJECT_NOT_VALID;
 	_opcodeMap[0x15] = OPCODE_INVENTORY_FULL_X;
 	_opcodeMap[0x19] = OPCODE_TEST_FLAG;
@@ -719,6 +738,7 @@ ComprehendGameV2::ComprehendGameV2() {
 	_opcodeMap[0xa1] = OPCODE_CLEAR_FLAG40;
 	_opcodeMap[0xa2] = OPCODE_MOVE_OBJECT_TO_ROOM;
 	_opcodeMap[0xa5] = OPCODE_SET_FLAG40;
+	_opcodeMap[0xa6] = OPCODE_DESCRIBE_CURRENT_OBJECT;
 	_opcodeMap[0xa9] = OPCODE_CLEAR_INVISIBLE;
 	_opcodeMap[0xad] = OPCODE_SET_INVISIBLE;
 	_opcodeMap[0xc1] = OPCODE_VAR_DEC;
@@ -734,13 +754,15 @@ ComprehendGameV2::ComprehendGameV2() {
 	_opcodeMap[0xe5] = OPCODE_SET_CAN_TAKE;
 	_opcodeMap[0xe9] = OPCODE_CLEAR_CAN_TAKE;
 	_opcodeMap[0xed] = OPCODE_REMOVE_OBJECT;
-
-#if 0
-	_opcodeMap[0x9e] = OPCODE_INVENTORY_ROOM;
 	_opcodeMap[0xc6] = OPCODE_SET_OBJECT_GRAPHIC;
-	_opcodeMap[0xf0] = OPCODE_DROP_CURRENT_OBJECT;
-	_opcodeMap[0xfc] = OPCODE_REMOVE_CURRENT_OBJECT;
-#endif
+	// var[op0] += variable 0 (the entered number) / var[op0] -= variable 0.
+	// Talisman's bowl handlers use these for partial coin deposits/withdrawals.
+	_opcodeMap[0x8d] = OPCODE_VAR_ADD1;
+	_opcodeMap[0x91] = OPCODE_VAR_SUB1;
+
+	// Not mapped for V2: 0x9e (INVENTORY_ROOM), 0xf0 (DROP_CURRENT_OBJECT) and
+	// 0xfc (REMOVE_CURRENT_OBJECT). No V2 game in the corpus emits them, so
+	// they stay unknown opcodes.
 }
 
 void ComprehendGameV2::execute_opcode(const Instruction *instr, const Sentence *sentence,
@@ -768,33 +790,57 @@ void ComprehendGameV2::execute_opcode(const Instruction *instr, const Sentence *
 
 	switch (_opcodeMap[getOpcode(instr)]) {
 	case OPCODE_CLEAR_INVISIBLE:
-		item = get_item_by_noun(noun);
+		// The item is the operand, not the raw sentence noun: for the
+		// noun-substituted forms ((opcode & 0x30) == 0x30) the dispatcher has
+		// already written the noun into operand[0]. A daemon can toggle items
+		// by literal index with no noun in scope, e.g. The Coveted Mirror's
+		// per-turn FUNC 017f.
+		item = getItem(instr);
 		item->_flags &= ~ITEMF_INVISIBLE;
 		break;
 
+	case OPCODE_SET_INVISIBLE:
+		// See OPCODE_CLEAR_INVISIBLE.
+		item = getItem(instr);
+		item->_flags |= ITEMF_INVISIBLE;
+		break;
+
 	case OPCODE_DRAW_OBJECT:
+		// Let the game note which item picture is about to be drawn: The
+		// Coveted Mirror records its collected mirror pieces this way so they
+		// stay in the right-hand panel (see
+		// CovetedMirrorGame::recordItemPictureDrawn).
+		recordItemPictureDrawn(instr->_operand[0] - 1);
 		g_comprehend->drawItemPicture(instr->_operand[0] - 1);
 		break;
 
 	case OPCODE_DRAW_ROOM:
+		// Draw the picture only. The bytecode emits its own OPCODE_WAIT_KEY
+		// (0x90) when it wants a pause, e.g. The Coveted Mirror's astrologer
+		// sequence is three DRAW_ROOM/WAIT_KEY pairs.
 		g_comprehend->drawLocationPicture(instr->_operand[0] - 1);
-		g_comprehend->readChar();
+		// These are transient full-screen pictures drawn over the room; force a
+		// room repaint at end of turn, the way the original redraws the room
+		// after the action.
+		_updateFlags |= UPDATE_GRAPHICS;
 		break;
 
 	case OPCODE_INVENTORY_FULL:
 		item = get_item_by_noun(noun);
 
 		weighInventory();
-		func_set_test_result(func_state, _totalInventoryWeight + (item->_flags & ITEMF_WEIGHT_MASK) >
+		func_set_test_result(func_state, _totalInventoryWeight +
+			(item ? (item->_flags & ITEMF_WEIGHT_MASK) : 0) >
 			_variables[VAR_INVENTORY_LIMIT]);
 		break;
 
 	case OPCODE_INVENTORY_FULL_X:
-		item = get_item_by_noun(noun);
-
+		// "Inventory weight exceeds variables[operand 0]": a bare weight limit
+		// test with no noun involved, e.g. The Coveted Mirror's Perilous Pass
+		// squeeze is "15 09": weight > variables[9].
 		weighInventory();
-		func_set_test_result(func_state, _totalInventoryWeight + (item->_flags & ITEMF_WEIGHT_MASK) >
-			_variables[instr->_operand[1]]);
+		func_set_test_result(func_state,
+			_totalInventoryWeight > _variables[instr->_operand[0]]);
 		break;
 
 	case OPCODE_MOVE_DIR:
@@ -805,7 +851,8 @@ void ComprehendGameV2::execute_opcode(const Instruction *instr, const Sentence *
 		break;
 
 	case OPCODE_OBJECT_TAKEABLE:
-		// WORKAROUND: Trying to get non-items in OO-Topos
+		// WORKAROUND: Trying to get non-items in OO-Topos gives operand 0,
+		// which has no item to look up.
 		func_set_test_result(func_state, instr->_operand[0]
 			&& (getItem(instr)->_flags & ITEMF_WEIGHT_MASK) != ITEMF_WEIGHT_MASK);
 		break;
@@ -828,14 +875,28 @@ void ComprehendGameV2::execute_opcode(const Instruction *instr, const Sentence *
 		break;
 
 	case OPCODE_SET_STRING_REPLACEMENT3: {
-		int articleNum, bits = _wordFlags;
-		for (articleNum = 3; articleNum >= 0; --articleNum, bits <<= 1) {
-			if (bits >= 0x100)
-				break;
-		}
-		if (articleNum == -1)
+		// Pick the article-agreeing replacement word from the current noun's
+		// gender/number flags. As in the original, the highest set bit among
+		// 7..4 maps to articleNum 3..0, with 2 as the default when none is set.
+		// _wordFlags is that nibble (_type & 0xf0) of the command's first noun,
+		// latched in ComprehendGame::read_sentence.
+		int articleNum;
+		if (_wordFlags & 0x80)
+			articleNum = 3;
+		else if (_wordFlags & 0x40)
+			articleNum = 2;
+		else if (_wordFlags & 0x20)
+			articleNum = 1;
+		else if (_wordFlags & 0x10)
+			articleNum = 0;
+		else
 			articleNum = 2;
 
+		// Selecting a word replacement clears number mode, as the original
+		// does. A stale number-mode flag from OPCODE_SET_STRING_REPLACEMENT1
+		// would make the '@' marker render as a decimal variable instead of the
+		// word.
+		_replaceWordIsNumber = false;
 		_currentReplaceWord = instr->_operand[0] + articleNum - 1;
 		break;
 	}
@@ -865,7 +926,6 @@ byte ComprehendGameV2::getOpcode(const Instruction *instr) {
 void ComprehendGameV2::func_set_test_result(FunctionState *func_state, bool value) {
 	ComprehendGameOpcodes::func_set_test_result(func_state, value ^ func_state->_notComparison);
 }
-
 
 } // namespace Comprehend
 } // namespace Glk

@@ -53,8 +53,6 @@ DebuggerDumper::DebuggerDumper() : _game(nullptr) {
 	_opcodes[OPCODE_VAR_EQ2] = "var_eq2";
 	_opcodes[OPCODE_VAR_GT1] = "var_gt1";
 	_opcodes[OPCODE_VAR_GT2] = "var_gt2";
-	_opcodes[OPCODE_VAR_GTE1] = "var_gte1";
-	_opcodes[OPCODE_VAR_GTE2] = "var_gte2";
 	_opcodes[OPCODE_CURRENT_OBJECT_NOT_VALID] = "current_object_not_valid";
 	_opcodes[OPCODE_INVENTORY_FULL] = "inventory_full";
 	_opcodes[OPCODE_INVENTORY_FULL_X] = "inventory_full_x";
@@ -103,7 +101,6 @@ DebuggerDumper::DebuggerDumper() : _game(nullptr) {
 	_opcodes[OPCODE_SET_STRING_REPLACEMENT1] = "set_string_replacement1";
 	_opcodes[OPCODE_SET_STRING_REPLACEMENT2] = "set_string_replacement2";
 	_opcodes[OPCODE_SET_STRING_REPLACEMENT3] = "set_string_replacement3";
-	_opcodes[OPCODE_SET_CURRENT_NOUN_STRING_REPLACEMENT] = "set_current_noun_string_replacement";
 	_opcodes[OPCODE_DRAW_ROOM] = "draw_room";
 	_opcodes[OPCODE_DRAW_OBJECT] = "draw_object";
 	_opcodes[OPCODE_WAIT_KEY] = "wait_key";

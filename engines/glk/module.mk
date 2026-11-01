@@ -162,21 +162,35 @@ MODULE_OBJS := \
 	archetype/sys_object.o \
 	archetype/timestamp.o \
 	archetype/token.o \
-	comprehend/charset.o \
+	comprehend/apple2.o \
 	comprehend/comprehend.o \
+	comprehend/comprehend_gfx.o \
+	comprehend/comprehend_io.o \
+	comprehend/comprehend_state.o \
 	comprehend/debugger.o \
 	comprehend/debugger_dumper.o \
 	comprehend/dictionary.o \
+	comprehend/disk_image.o \
 	comprehend/draw_surface.o \
 	comprehend/file_buf.o \
 	comprehend/game.o \
 	comprehend/game_cc.o \
+	comprehend/game_cm.o \
 	comprehend/game_data.o \
 	comprehend/game_oo.o \
 	comprehend/game_opcodes.o \
 	comprehend/game_tm.o \
+	comprehend/game_tm_load.o \
 	comprehend/game_tr1.o \
 	comprehend/game_tr2.o \
+	comprehend/game_traits.o \
+	comprehend/gm_artifact.o \
+	comprehend/gm_backend.o \
+	comprehend/gm_vector.o \
+	comprehend/graphics_magician.o \
+	comprehend/graphics_magician_cga.o \
+	comprehend/graphics_magician_dhgr.o \
+	comprehend/graphics_magician_pcjr.o \
 	comprehend/pics.o \
 	glulx/accel.o \
 	glulx/exec.o \

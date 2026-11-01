@@ -79,19 +79,20 @@ void Item::synchronize(Common::Serializer &s) {
 void Word::clear() {
 	WordIndex::clear();
 	Common::fill(&_word[0], &_word[7], '\0');
+	_len = 0;
 }
 
 Word &Word::operator=(const WordIndex &src) {
 	_index = src._index;
 	_type = src._type;
 	Common::fill(&_word[0], &_word[7], '\0');
+	_len = 0;
 	return *this;
 }
 
 void Word::load(FileBuffer *fb) {
 	fb->read(_word, 6);
 
-	// Decode
 	for (int j = 0; j < 6; j++)
 		_word[j] = tolower((char)(_word[j] ^ 0xaa));
 
@@ -99,6 +100,8 @@ void Word::load(FileBuffer *fb) {
 	_word[6] = '\0';
 	for (int j = 5; j > 0 && _word[j] == ' '; --j)
 		_word[j] = '\0';
+
+	_len = (uint8)strlen(_word);
 
 	_index = fb->readByte();
 	_type = fb->readByte();
@@ -166,9 +169,10 @@ void GameData::clearGame() {
 	_startRoom = 0;
 	_currentRoom = 0;
 	_currentReplaceWord = 0;
+	_replaceWordIsNumber = false;
+	_replaceNumberVar = 0;
 	_wordFlags = 0;
 	_updateFlags = 0;
-	_colorTable = 0;
 	_itemCount = 0;
 	_totalInventoryWeight = 0;
 
@@ -194,11 +198,9 @@ uint8 GameData::parse_vm_instruction(FileBuffer *fb,
 								  Instruction *instr) {
 	uint i;
 
-	/* Get the opcode */
 	instr->_opcode = fb->readByte();
 	instr->_nr_operands = opcode_nr_operands(instr->_opcode);
 
-	/* Get the operands */
 	for (i = 0; i < instr->_nr_operands; i++)
 		instr->_operand[i] = fb->readByte();
 
@@ -234,7 +236,9 @@ void GameData::parse_function(FileBuffer *fb, Function *func) {
 void GameData::parse_vm(FileBuffer *fb) {
 	fb->seek(_header.addr_vm);
 
-	while (1) {
+	// The action tables follow the functions. Talisman's table has no empty
+	// function to end it, so stop there as well.
+	while (fb->pos() < _header.addr_actions[0]) {
 		Function func;
 
 		parse_function(fb, &func);
@@ -242,10 +246,6 @@ void GameData::parse_vm(FileBuffer *fb) {
 			break;
 
 		_functions.push_back(func);
-
-		// WORKAROUND: Parsing functions for Talisman
-		if (_functions.size() == 0x1d8 && g_vm->getGameID() == "talisman")
-			break;
 	}
 }
 
@@ -347,7 +347,7 @@ void GameData::parse_items(FileBuffer *fb) {
 	if (_comprehendVersion == 2) {
 		/* Comprehend version 2 adds long string descriptions */
 		fb->seek(_header.addr_item_strings +
-		         (_items.size() * sizeof(uint16)));
+				 (_items.size() * sizeof(uint16)));
 		file_buf_get_array_le16(fb, 0, _items, _longString, nr_items);
 	}
 
@@ -412,11 +412,9 @@ char GameData::decode_string_elem(uint8 c, bool capital, bool special) {
 			c = CHARSET[c];
 			if (capital) {
 				/*
-				* A capital space means that the character
-				* is dynamically replaced by at runtime.
-				* We use the character '@' since it cannot
-				* otherwise appear in strings.
-				*/
+				 * A capital space means the character is replaced at runtime.
+				 * '@' stands for it since it cannot otherwise appear in strings.
+				 */
 				if (c == ' ')
 					return '@';
 				return c - 0x20;
@@ -465,7 +463,7 @@ Common::String GameData::parseString(FileBuffer *fb) {
 				special_next = true;
 			} else {
 				c = decode_string_elem(elem, capital_next,
-				                       special_next);
+									   special_next);
 				special_next = false;
 				capital_next = false;
 				string += c;
@@ -516,10 +514,26 @@ void GameData::parse_replace_words(FileBuffer *fb) {
 	size_t len;
 	bool eof;
 
-	/* FIXME - Rename addr_strings_end */
+	// Despite its name, addr_strings_end is where the replace-word table starts.
 	fb->seek(_header.addr_strings_end);
 
-	/* FIXME - what is this for */
+	if (g_comprehend->traits().stringsOnlyInFiles) {
+		// Talisman keeps its strings in separate files, so this header field points straight
+		// at the replace-word table. Bytecode operands are consumed as (operand - 1) as in other
+		// games, so the leading "empty" entry 0 is dropped. The table also has empty slots that
+		// are real indices, so every entry is read through to the end of the data.
+		len = fb->strlen(&eof);
+		fb->skip(len + (eof ? 0 : 1));
+
+		while (!eof && fb->pos() < fb->size()) {
+			len = fb->strlen(&eof);
+			_replaceWords.push_back(Common::String((const char *)fb->dataPtr(), len));
+			fb->skip(len + (eof ? 0 : 1));
+		}
+		return;
+	}
+
+	// Two bytes of unknown purpose precede the table.
 	fb->skip(2);
 
 	for (;;) {
@@ -549,9 +563,23 @@ void GameData::parse_header(FileBuffer *fb) {
 		_magicWord = (uint16)(-0x5a00 + 0x4);
 		break;
 
+	case 0x8cba: /* Transylvania (Apple II) */
+	case 0x84fe: /* Crimson Crown disk one (Apple II) */
+	case 0x7dec: /* Crimson Crown disk two (Apple II) */
+		// The Apple II releases of the version 1 games (v1 item layout and
+		// bytecode) are packaged like the version 2 files: the action table
+		// begins at the very start of the file and the address base is 0x5a00
+		// (no +4, as there is no 2-byte field before the actions).
+		_comprehendVersion = 1;
+		_magicWord = (uint16)-0x5a00;
+		fb->seek(0);
+		break;
+
 	case 0x8bc3: /* Transylvania v2 */
 	case 0x93f0: /* OO-Topos */
-	case 0xa429: /* Talisman */
+	case 0xa429: /* Talisman (part 1: Boot disk g0) */
+	case 0x94c6: /* Talisman (part 2: Lands Beyond disk g0) */
+	case 0x9f8b: /* The Coveted Mirror */
 		_comprehendVersion = 2;
 		_magicWord = (uint16)-0x5a00;
 
@@ -601,7 +629,7 @@ void GameData::parse_header(FileBuffer *fb) {
 		parse_header_le16(fb, &header->addr_item_graphics);
 
 		header->nr_items = (header->addr_item_word -
-		                    header->addr_item_flags);
+							header->addr_item_flags);
 
 	} else {
 		parse_header_le16(fb, &header->addr_item_strings);
@@ -611,13 +639,17 @@ void GameData::parse_header(FileBuffer *fb) {
 		parse_header_le16(fb, &header->addr_item_graphics);
 
 		header->nr_items = (header->addr_item_flags -
-		                    header->addr_item_locations);
+							header->addr_item_locations);
 	}
 
 	parse_header_le16(fb, &header->addr_strings);
 	parse_header_le16(fb, &dummy);
 	parse_header_le16(fb, &header->addr_strings_end);
 
+	// The initial game state follows the header. The original loads the header (30 LE16
+	// pointers) and this block contiguously into RAM, so the current-room global is the
+	// second byte of the block and the LE16 variables[] array starts two bytes later. For
+	// Talisman this byte is 5 (the prison cell, string id 55).
 	fb->skip(1);
 	_startRoom = fb->readByte();
 	fb->skip(1);
@@ -629,7 +661,7 @@ void GameData::parse_header(FileBuffer *fb) {
 	_itemCount = fb->readByte();
 
 	_rooms.resize(header->room_direction_table[DIRECTION_SOUTH] -
-	                    header->room_direction_table[DIRECTION_NORTH] + 1);
+						header->room_direction_table[DIRECTION_NORTH] + 1);
 
 	_words.resize((addr_dictionary_end - header->addr_dictionary) / 8);
 }
@@ -645,9 +677,18 @@ void GameData::load_extra_string_file(const StringFile &stringFile) {
 
 		parse_string_table(&fb, stringFile._baseOffset, endOffset, &_strings2);
 	} else {
-		// Standard strings file. Has a 4-byte header we can ignore,
-		// followed by 64 2-byte string offsets
-		fb.seek(4);
+		// Standard strings file: a 4-byte header to ignore, then 64 2-byte string offsets.
+		// The Coveted Mirror's MA-ML banks have no header, so the index starts at byte 0
+		// (e.g. MJ begins 82 00 84 00 ...). Seeking past a non-existent header would read two
+		// index entries as garbage at each bank's tail and corrupt the next bank's first two
+		// strings.
+		const bool noHeader = DiskImageFS::active() &&
+							  g_comprehend->traits().appleStringBanksHeaderless;
+		// For an embedded structured segment the whole layout (header, index and
+		// the string offsets) is shifted to _structOffset within the file; for a
+		// standalone string file this is 0 and nothing changes.
+		const uint hdr = stringFile._structOffset;
+		fb.seek(hdr + (noHeader ? 0 : 4));
 		uint fileSize = fb.size();
 
 		// Read in the index
@@ -662,10 +703,14 @@ void GameData::load_extra_string_file(const StringFile &stringFile) {
 			index[i] = v;
 		}
 
+		// The Apple II string files store absolute offsets to each string,
+		// whereas the DOS/PC files measure them from past the 4-byte header.
+		const uint stringBase = DiskImageFS::active() ? 0 : 4;
+
 		// Iterate through parsing the strings
 		for (int i = 0; i < STRING_FILE_COUNT; ++i) {
 			if (index[i]) {
-				fb.seek(index[i] + 4);
+				fb.seek(hdr + index[i] + stringBase);
 				_strings2.push_back(parseString(&fb));
 			} else {
 				_strings2.push_back("");
@@ -676,11 +721,25 @@ void GameData::load_extra_string_file(const StringFile &stringFile) {
 
 void GameData::load_extra_string_files() {
 	_strings2.clear();
-	_strings2.reserve(STRING_FILE_COUNT * _stringFiles.size() + 1);
+	_strings2.reserve(STRING_FILE_COUNT * _stringFiles.size() + 2);
+
+	// The Apple II OO-Topos string files (MA-ME) are one entry short at the front compared
+	// to the DOS novel.exe segments the hardcoded _strings2 indices were derived from. The
+	// Apple II Transylvania (v1) files MA-ME are two short of the indices its instructions
+	// use, which would also desynchronise the kill actions' messages from their effect.
+	// Leading placeholders line _strings2 up; both counts are GameTraits::appleStringLead.
+	if (DiskImageFS::active())
+		for (uint i = 0; i < g_comprehend->traits().appleStringLead; i++)
+			_strings2.push_back("");
+
+	// The Coveted Mirror needs no placeholders: its MA-ML banks have no 4-byte header,
+	// so load_extra_string_file reads the CM index from byte 0.
 
 	for (uint i = 0; i < _stringFiles.size(); i++) {
-		// TODO: Is this needed for other than OO-Topos?
-		if (_comprehendVersion == 2 && (i == 0 || i == 4))
+		// OO-Topos pads two banks so its string indices line up; other v2
+		// games (e.g. the Apple II Transylvania) must not get that padding.
+		if (_comprehendVersion == 2 && (i == 0 || i == 4) &&
+				g_comprehend->traits().padsStringBanks)
 			_strings2.push_back("");
 
 		load_extra_string_file(_stringFiles[i]);
@@ -692,12 +751,24 @@ void GameData::loadGameData() {
 
 	clearGame();
 
+	// A usable main data file needs at least a header (magic + address table). If it is
+	// missing or empty, e.g. only one disk side was supplied so the loader never extracted
+	// "g0", bail out cleanly. Otherwise parse_header reads a 0000 magic, every downstream
+	// error() (non-fatal here) soft-returns, and parsing empty data eventually trips the
+	// assert in parse_function. FileBuffer's ctor already reports the failed open.
+	if (fb.size() < 4) {
+		error("No usable game data in '%s' -- is a disk side missing?",
+			  _gameDataFile.c_str());
+		g_comprehend->glk_exit();
+		return;
+	}
+
 	parse_header(&fb);
 	parse_rooms(&fb);
 	parse_items(&fb);
 	parse_dictionary(&fb);
 	parse_word_map(&fb);
-	if (g_comprehend->getGameID() != "talisman")
+	if (!g_comprehend->traits().stringsOnlyInFiles)
 		parse_string_table(&fb, _header.addr_strings, _header.addr_strings_end, &_strings);
 	load_extra_string_files();
 	parse_vm(&fb);
@@ -705,22 +776,38 @@ void GameData::loadGameData() {
 	parse_replace_words(&fb);
 }
 
+bool GameData::hasAnyGraphicsFile() const {
+	for (uint i = 0; i < _locationGraphicFiles.size(); ++i)
+		if (FileBuffer::exists(_locationGraphicFiles[i]))
+			return true;
+	for (uint i = 0; i < _itemGraphicFiles.size(); ++i)
+		if (FileBuffer::exists(_itemGraphicFiles[i]))
+			return true;
+	if (!_titleGraphicFile.empty() && FileBuffer::exists(_titleGraphicFile))
+		return true;
+	return false;
+}
+
 void GameData::loadGame() {
 	/* Load the main game data file */
 	loadGameData();
 
 	if (g_comprehend->isGraphicsEnabled()) {
-		// Set up the picture archive
-		g_comprehend->_pics->load(_locationGraphicFiles,
-		                          _itemGraphicFiles, _titleGraphicFile);
-
-		if (_colorTable)
-			g_comprehend->_drawSurface->setColorTable(_colorTable);
+		// A game may be supplied without its graphics archives (only the main
+		// data file). Rather than open an empty picture window and print a
+		// "Could not open" error for every missing file, detect that none of the
+		// graphics files are present and fall back to a plain text-only layout.
+		if (hasAnyGraphicsFile()) {
+			g_comprehend->_pics->load(_locationGraphicFiles,
+									  _itemGraphicFiles, _titleGraphicFile);
+		} else {
+			g_comprehend->hideGraphics();
+		}
 	}
 
-	// FIXME: This can be merged, don't need to keep start room around
 	_currentRoom = _startRoom;
 }
+
 
 } // namespace Comprehend
 } // namespace Glk

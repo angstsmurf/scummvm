@@ -36,6 +36,36 @@ CrimsonCrownGame::CrimsonCrownGame() : ComprehendGameV1(),
 void CrimsonCrownGame::setupDisk(uint diskNum) {
 	assert(diskNum == 1 || diskNum == 2);
 
+	if (DiskImageFS::active()) {
+		// Apple II: both disks name their files identically (g0, MA, RA...), so
+		// switch the active disk image by its g0 magic word. Disk one is
+		// 0x84fe, disk two is 0x7dec.
+		DiskImageFS::selectDiskByGameMagic(diskNum == 1 ? 0x84fe : 0x7dec);
+
+		_gameDataFile = "g0";
+
+		_stringFiles.clear();
+		_stringFiles.push_back("MA");
+
+		_locationGraphicFiles.clear();
+		// Disk one has a third room-picture file.
+		addLetteredFiles(_locationGraphicFiles, "R", 'A', diskNum == 1 ? 'C' : 'B');
+
+		_itemGraphicFiles.clear();
+		addLetteredFiles(_itemGraphicFiles, "O", 'A', 'B');
+
+		// Both disks share the restart-prompt string index (0x9). _gameStrings
+		// must stay valid on disk two or handle_restart() dereferences null on
+		// death.
+		_gameStrings = &CC1_STRINGS;
+		// The Apple II title ("Crimson Crown" + sun) is a Graphics Magician
+		// vector image inside T0, after the disk-protection / loader stub;
+		// Pics::ImageFile starts it at the right offset (0x100).
+		_titleGraphicFile = "t0";
+		_diskNum = diskNum;
+		return;
+	}
+
 	_gameDataFile = Common::String::format("cc%u.gda", diskNum);
 
 	_stringFiles.clear();
@@ -51,19 +81,35 @@ void CrimsonCrownGame::setupDisk(uint diskNum) {
 	_itemGraphicFiles.push_back(Common::String::format("oa.ms%u", diskNum));
 	_itemGraphicFiles.push_back(Common::String::format("ob.ms%u", diskNum));
 
-	if (diskNum == 1)
-		_gameStrings = &CC1_STRINGS;
-	else
-		_gameStrings = nullptr;
+	// Valid on both disks; see the Apple II branch above.
+	_gameStrings = &CC1_STRINGS;
 
 	_titleGraphicFile = "cctitle.ms1";
 	_diskNum = diskNum;
 }
 
 void CrimsonCrownGame::beforeGame() {
-	// Draw the title
+	// The title is a picture and nothing else: with nowhere to show it (the
+	// Glk library has no graphics windows), waiting for a key would leave the
+	// player looking at a blank window.
+	if (!g_comprehend->hasPictureTarget())
+		return;
+
 	g_comprehend->drawPicture(TITLE_IMAGE);
 	g_comprehend->readChar();
+}
+
+bool CrimsonCrownGame::prepareRestore(const Common::Array<byte> &payload) {
+	// The payload starts with the disk number (see synchronizeSave)
+	if (payload.empty() || (payload[0] != 1 && payload[0] != 2))
+		return false;
+
+	if (payload[0] != _diskNum) {
+		_newDiskNum = payload[0];
+		setupDisk(_newDiskNum);
+		loadGame();
+	}
+	return true;
 }
 
 void CrimsonCrownGame::synchronizeSave(Common::Serializer &s) {
@@ -82,7 +128,6 @@ void CrimsonCrownGame::synchronizeSave(Common::Serializer &s) {
 void CrimsonCrownGame::handleSpecialOpcode() {
 	switch (_specialOpcode) {
 	case 1:
-		// Crystyal ball cutscene
 		if (_diskNum == 1) {
 			crystalBallCutscene();
 		} else {
@@ -108,11 +153,17 @@ void CrimsonCrownGame::handleSpecialOpcode() {
 			console_println(_strings[407].c_str());
 
 		} else {
-			// Won the game
+			// Won the game: the merchant ship plucks the party off the beach,
+			// then the epilogue ending "...THE END." These strings are
+			// 0x21a/0x21b on the Apple II disks and 0x21c/0x21d in the DOS
+			// data; each index is wrong on the other platform. The adjacent
+			// string 0x219 ("...Your completion code is @.") is a dead contest
+			// stub the original never prints.
 			g_comprehend->drawLocationPicture(29, false);
 			g_comprehend->drawItemPicture(20);
-			console_println(stringLookup(0x21c).c_str());
-			console_println(stringLookup(0x21d).c_str());
+			const bool apple2 = DiskImageFS::active();
+			console_println(stringLookup(apple2 ? 0x21a : 0x21c).c_str());
+			console_println(stringLookup(apple2 ? 0x21b : 0x21d).c_str());
 
 			g_comprehend->readChar();
 			g_comprehend->quitGame();
@@ -134,6 +185,10 @@ void CrimsonCrownGame::handleSpecialOpcode() {
 
 void CrimsonCrownGame::crystalBallCutscene() {
 	g_comprehend->showGraphics();
+	// Three pictures, each waiting for a key; without a picture window those
+	// would be three silent pauses.
+	if (!g_comprehend->hasPictureTarget())
+		return;
 
 	for (int screenNum = 38; screenNum <= 40; ++screenNum) {
 		g_comprehend->drawLocationPicture(screenNum);
@@ -144,7 +199,6 @@ void CrimsonCrownGame::crystalBallCutscene() {
 }
 
 void CrimsonCrownGame::throneCutscene() {
-	// Show the screen
 	update();
 	console_println(stringLookup(0x20A).c_str());
 
@@ -164,17 +218,13 @@ void CrimsonCrownGame::beforeTurn() {
 		loadGame();
 		move_to(_currentRoom);
 	}
-
-	ComprehendGameV1::beforeTurn();
 }
 
-bool CrimsonCrownGame::handle_restart() {
-	if (_diskNum != 1) {
+void CrimsonCrownGame::restartGame() {
+	// The game spans multiple disks; a restart must return to disk 1 first.
+	if (_diskNum != 1)
 		setupDisk(1);
-		loadGame();
-	}
-
-	return ComprehendGame::handle_restart();
+	ComprehendGame::restartGame();
 }
 
 } // namespace Comprehend

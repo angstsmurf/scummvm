@@ -30,15 +30,47 @@ namespace Comprehend {
 class TalismanGame : public ComprehendGameV2 {
 private:
 	Common::String _savedAction;
+
+	// Saved room for the special-opcode 3/4 pair. Special 3 stores the current
+	// room here; special 4 returns to it.
+	uint8 _savedRoom = 0;
+
+	// True once the player has crossed into part 2 (the desert). Talisman is a
+	// two-part game: part 2 is an entirely separate game database living in its
+	// own "g0" on the Lands Beyond disk (magic 0x94c6), with its own rooms,
+	// items, functions and string banks. enterPart2() swaps it in.
+	bool _inPart2 = false;
+private:
+	/**
+	 * Switch from part 1 to part 2 (the desert): make the Lands Beyond disk
+	 * active, reload its game data and strings, carry over the player's flags
+	 * and variables, and drop the player onto the ship's deck (room 51).
+	 */
+	void enterPart2();
 private:
 	/**
 	 * Load strings from the executable
 	 */
 	void loadStrings();
+
+	/**
+	 * Load strings from the Apple II disk's MA-MO bank files instead of
+	 * novel.exe (15 banks of 64; banks 0-7 -> _strings, 8-14 -> _strings2).
+	 */
+	void loadStringsApple();
+
+	/**
+	 * Apple II part-2 (desert) string loader: places the room banks (MA,MB) in
+	 * _strings and the message banks (MQ-MW) into _strings2 at offset 0x200, the
+	 * gapped layout the part-2 bytecode addresses via string tables 0x84/0x85.
+	 */
+	void loadStringsApplePart2();
 public:
 	TalismanGame();
 	~TalismanGame() override {}
 
+	bool prepareRestore(const Common::Array<byte> &payload) override;
+	void synchronizeSave(Common::Serializer &s) override;
 	void playGame() override;
 	void beforeGame() override;
 	void beforeTurn() override;
@@ -46,6 +78,23 @@ public:
 	void afterPrompt() override;
 	void handleAction(Sentence *sentence) override;
 	void handleSpecialOpcode() override;
+	void restartGame() override;
+
+private:
+	/**
+	 * Present the death / game-over menu (special opcode 2): Quit, restart
+	 * ("a new adventure"), or restore a saved game.
+	 */
+	void deathMenu();
+
+	// The other special opcodes that do something, one method each
+	// (handleSpecialOpcode() is just the dispatch).
+	void specialSaveRoom();          // 3
+	void specialRestoreRoom();       // 4
+	void specialTextMode();          // 15
+	void specialBoatDeparture();     // 16
+	void specialGraphicsMode();      // 17
+	void specialNpcConversation();   // 20
 };
 
 } // namespace Comprehend

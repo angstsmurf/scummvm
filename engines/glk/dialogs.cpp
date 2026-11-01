@@ -31,6 +31,7 @@
 #include "gui/widgets/list.h"
 #include "gui/widgets/popup.h"
 
+#include "glk/comprehend/detection.h"
 #include "glk/conf.h"
 #include "glk/fonts.h"
 #include "glk/screen.h"
@@ -205,6 +206,15 @@ GlkOptionsWidget::GlkOptionsWidget(GuiObject *boss, const Common::String &name, 
 	for (int f = MONOR; f <= PROPZ; ++f) {
 		_tfontPopUps[f] = nullptr;
 		_gfontPopUps[f] = nullptr;
+	}
+
+	_comprehendSlowDraw = nullptr;
+	_comprehendMoreColours = nullptr;
+	if (Comprehend::ComprehendMetaEngine::findGame(ConfMan.get("gameid", domain).c_str())._description) {
+		NEW_LABEL_CHECKBOX("GlkOptionsDialog.comprehendslowlbl", _("Draw pictures gradually:"), _comprehendSlowDraw,
+			"GlkOptionsDialog.comprehendslow", _("Reveal each picture stroke by stroke, like the original game"));
+		NEW_LABEL_CHECKBOX("GlkOptionsDialog.comprehendmorelbl", _("More colors:"), _comprehendMoreColours,
+			"GlkOptionsDialog.comprehendmore", _("Use Apple II double hi-res or PCjr graphics when the game has them"));
 	}
 
 	_fontHeadinglbl = createHeading(widgetsBoss(), "GlkOptionsDialog.FontHeading", _("Font"));
@@ -635,6 +645,13 @@ void GlkOptionsWidget::load() {
 	INIT_POPUP(_morealign, g_conf->_propInfo._moreAlign);
 	INIT_POPUP(_morefont, g_conf->_propInfo._moreFont);
 
+	if (_comprehendSlowDraw) {
+		_comprehendSlowDraw->setState(!ConfMan.hasKey("comprehend_slow_draw", _domain) ||
+			ConfMan.getBool("comprehend_slow_draw", _domain));
+		_comprehendMoreColours->setState(!ConfMan.hasKey("comprehend_more_colours", _domain) ||
+			ConfMan.getBool("comprehend_more_colours", _domain));
+	}
+
 	if (tempConfCreated)
 		delete g_conf;
 }
@@ -877,6 +894,16 @@ void GlkOptionsWidget::defineLayout(GUI::ThemeEval &layouts,
 						.addWidget("graphicslbl", "OptionsLabel")
 						.addWidget("graphics", "Checkbox", baseScale * 5)
 					.closeLayout()
+					.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+						.addPadding(0, 0, 0, 0)
+						.addWidget("comprehendslowlbl", "OptionsLabel")
+						.addWidget("comprehendslow", "Checkbox", baseScale * 5)
+					.closeLayout()
+					.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+						.addPadding(0, 0, 0, 0)
+						.addWidget("comprehendmorelbl", "OptionsLabel")
+						.addWidget("comprehendmore", "Checkbox", baseScale * 5)
+					.closeLayout()
 				.closeLayout()
 				.addSpace()
 			.closeLayout()
@@ -1078,6 +1105,11 @@ bool GlkOptionsWidget::save() {
 			savePropColorPopUp(opt.popup, opt.hexInput, *opt.propInfo, opt.confKey, _domain);
 		else
 			saveColorPopUp(opt.popup, opt.hexInput, opt.styles, opt.confKey, _domain);
+	}
+
+	if (_comprehendSlowDraw) {
+		ConfMan.setBool("comprehend_slow_draw", _comprehendSlowDraw->getState(), _domain);
+		ConfMan.setBool("comprehend_more_colours", _comprehendMoreColours->getState(), _domain);
 	}
 
 	for (auto &opt : intOptions)

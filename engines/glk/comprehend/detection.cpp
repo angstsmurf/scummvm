@@ -73,14 +73,30 @@ GameDescriptor ComprehendMetaEngine::findGame(const char *gameId) {
 }
 
 bool ComprehendMetaEngine::detectGames(const Common::FSList &fslist, DetectedGames &gameList) {
-	// Loop through the files of the folder
 	for (Common::FSList::const_iterator file = fslist.begin(); file != fslist.end(); ++file) {
-		// Check for a recognised filename
 		if (file->isDirectory())
 			continue;
 
-		// Check if file occurs in the list
 		Common::String filename = file->getName();
+
+		if (filename.hasSuffixIgnoreCase(".woz") || filename.hasSuffixIgnoreCase(".dsk") ||
+				filename.hasSuffixIgnoreCase(".do") || filename.hasSuffixIgnoreCase(".nib")) {
+			Common::File diskFile;
+			if (!diskFile.open(*file))
+				continue;
+			Common::String diskMd5 = Common::computeStreamMD5AsString(diskFile);
+			diskFile.close();
+
+			for (const ComprehendDiskEntry *d = COMPREHEND_DISKS; d->_gameId; ++d) {
+				if (diskMd5 == d->_md5) {
+					PlainGameDescriptor gameDesc = findGame(d->_gameId);
+					GlkDetectedGame gd(d->_gameId, gameDesc.description, filename);
+					gameList.push_back(gd);
+				}
+			}
+			continue;
+		}
+
 		bool isPossible = false;
 		const ComprehendDetectionEntry *p = COMPREHEND_GAMES;
 		for (; p->_gameId && !isPossible; ++p)
@@ -89,20 +105,16 @@ bool ComprehendMetaEngine::detectGames(const Common::FSList &fslist, DetectedGam
 		if (!isPossible)
 			continue;
 
-		// Get the file's MD5
 		Common::File gameFile;
 		if (!gameFile.open(*file))
 			continue;
 		Common::String md5 = Common::computeStreamMD5AsString(gameFile, 5000);
 		gameFile.close();
 
-		// Iterate through the known games
 		p = COMPREHEND_GAMES;
 		for (; p->_gameId; ++p) {
 			if (filename.equalsIgnoreCase(p->_filename)) {
-				// Check for an md5 match
 				if (p->_md5 == md5) {
-					// Found a match
 					PlainGameDescriptor gameDesc = findGame(p->_gameId);
 					GlkDetectedGame gd(p->_gameId, gameDesc.description, filename);
 					gameList.push_back(gd);

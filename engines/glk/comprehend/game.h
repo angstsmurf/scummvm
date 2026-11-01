@@ -23,8 +23,7 @@
 #define GLK_COMPREHEND_GAME_H
 
 #include "glk/comprehend/game_data.h"
-#include "common/array.h"
-#include "common/serializer.h"
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
@@ -46,6 +45,10 @@ struct Sentence {
 	size_t _nr_words;
 	byte _formattedWords[6];
 	byte _specialOpcodeVal2;
+	// Gender/number nibble (_type & 0xf0) of the first noun, captured by format().
+	// Copied into GameData::_wordFlags so OPCODE_SET_STRING_REPLACEMENT3 can pick the
+	// article-agreeing @-replacement word.
+	byte _wordFlags;
 
 	Sentence() {
 		clear();
@@ -76,11 +79,18 @@ struct Sentence {
 class ComprehendGame : public GameData {
 protected:
 	bool _ended;
+	bool _silentRestart = false;
 	NounState _nounState;
 	Sentence _sentence;
 	char _inputLine[INPUT_LINE_SIZE];
 	int _inputLineIndex;
 	int _currentRoomCopy;
+	// Room the player occupied at the start of the current turn, before any
+	// move this turn. Unlike _currentRoomCopy (which move_to() updates so the
+	// graphics path can draw the room just moved into), this is left alone by
+	// move_to, so Talisman's special-opcode 3 can remember where the player
+	// came from, e.g. the tunnel the magic lamp whisks them out of.
+	int _roomBeforeTurn;
 	int _functionNum;
 	int _specialOpcode;
 	RedoLine _redoLine;
@@ -96,6 +106,7 @@ private:
 	void skip_non_whitespace(const char **p);
 	bool handle_sentence(Sentence *sentence);
 	bool handle_sentence(uint tableNum, Sentence *sentence, Common::Array<byte> &words);
+	Common::String expandLetterShortcut(char letter);
 	void read_sentence(Sentence *sentence);
 	void parse_sentence_word_pairs(Sentence *sentence);
 	void read_input();
@@ -103,18 +114,50 @@ private:
 
 protected:
 	void game_save();
-	void game_restore();
-	void game_restart() {
+	bool game_restore();
+	// End play and have the main loop call handle_restart(). A silent restart
+	// reloads at once; otherwise the player is shown restartPrompt() and
+	// chooses between restarting, undoing and quitting.
+	void game_restart(bool silent = false) {
 		_ended = true;
+		_silentRestart = silent;
 	}
-	virtual bool handle_restart();
+	bool handle_restart();
+	virtual Common::String restartPrompt();
+	// Forced restart used by the #restart metacommand: reload from the start
+	// without the in-game RESTART/RESTORE/QUIT prompt.
+	virtual void restartGame();
+
+	// Shared "U to undo" handling for a game-over / restart prompt. Call with the
+	// key the player pressed at the prompt: if it is the undo key and there is a
+	// turn to step back to, restores that turn, clears the ended state, refreshes
+	// the display and returns true (the caller should resume play). Steps back a
+	// single turn: these games' deaths are immediate, unlike Talisman's delayed
+	// countdowns (which undo two; see TalismanGame::deathMenu). Returns false
+	// otherwise, leaving restart/quit to the caller.
+	bool undoAfterDeath(int key);
+	// Advertises the undo key on its own line, alongside the game's restart prompt.
+	void printUndoAfterDeathHint();
 
 	virtual void execute_opcode(const Instruction *instr, const Sentence *sentence,
 		FunctionState *func_state) = 0;
 
 	int console_get_key();
 	void console_println(const char *text);
+	// Expand '@' string-replacement markers (the current replacement word or
+	// number) the same way console_println does, but return the result rather
+	// than printing it, so the room-description status window shows the
+	// substituted text instead of a literal '@'.
+	Common::String expandReplacementWords(const Common::String &text);
 	void move_object(Item *item, int new_room);
+
+	/*
+	 * V2 interpreters (e.g. Talisman) reserve variable 0 as the input-number register:
+	 * it is zeroed each turn, a numeric token fills it, and the VAR_*1 opcodes compare
+	 * against it. V1 interpreters use variable 0 as the persisted inventory weight. This
+	 * predicate gates the per-turn reset, numeric token capture and the move_object weight.
+	 */
+	virtual bool hasNumberRegister() const { return false; }
 
 	/*
 	 * Comprehend functions consist of test and command instructions (if the MSB
@@ -178,6 +221,30 @@ public:
 
 	virtual void synchronizeSave(Common::Serializer &s);
 
+	// Hook run just before a saved game's payload is deserialized over the live
+	// state, given the raw payload bytes. Lets a game swap in a different static
+	// database first (Talisman uses it to load its part-2 desert database when
+	// restoring a desert save while part 1 is loaded). Default: nothing to do.
+	virtual bool prepareRestore(const Common::Array<byte> &payload) { (void)payload; return true; }
+
+	// Called for every OPCODE_DRAW_OBJECT, with the 0-based item-picture number
+	// just drawn. The Coveted Mirror uses it to remember which mirror pieces have
+	// been collected so its persistent right-hand panel can keep showing them
+	// (the originals are drawn once and never repainted); other games ignore it.
+	virtual void recordItemPictureDrawn(int /*itemPic*/) {}
+
+	// Bitmask of The Coveted Mirror's collected mirror pieces, in panel bit order
+	// (see CM_PIECE_PICS). 0 for every other game; the graphics layer composites
+	// the set pieces into the panel snapshot.
+	virtual uint8 cmMirrorPieceMask() const { return 0; }
+
+	// True if the just-restored state is self-consistent enough to keep playing
+	// (mainly: the current room is in range). Rejects a corrupt restore
+	// before the bad state crashes the renderer.
+	bool saveStateLooksValid() const {
+		return _currentRoom >= 1 && _currentRoom < _rooms.size();
+	}
+
 	virtual ScriptOpcode getScriptOpcode(const Instruction *instr) = 0;
 
 	Common::String stringLookup(uint16 index);
@@ -189,6 +256,7 @@ public:
 	Room *get_room(uint16 index);
 	Item *get_item(uint16 index);
 	void updateRoomDesc();
+	void transcribeCurrentRoom();
 	void update();
 	void update_graphics();
 

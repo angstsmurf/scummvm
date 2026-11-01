@@ -20,21 +20,26 @@
  */
 
 #include "glk/comprehend/file_buf.h"
-#include "common/algorithm.h"
-#include "common/file.h"
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
 
 FileBuffer::FileBuffer(const Common::String &filename) : _pos(0) {
-	// Open the file
 	Common::File f;
-	if (!f.open(Common::Path(filename)))
+	if (!f.open(Common::Path(filename))) {
 		error("Could not open - %s", filename.c_str());
+	}
 
-	_data.resize(f.size());
-	_readBytes.resize(f.size());
-	f.read(&_data[0], f.size());
+	int64 size = f.size();
+	if (size < 0) {
+		error("Could not determine size of - %s", filename.c_str());
+		return;
+	}
+
+	_data.resize(size);
+	_readBytes.resize(size);
+	f.read(&_data[0], size);
 }
 
 FileBuffer::FileBuffer(Common::ReadStream *stream, size_t size) : _pos(0) {
@@ -42,7 +47,6 @@ FileBuffer::FileBuffer(Common::ReadStream *stream, size_t size) : _pos(0) {
 	_readBytes.resize(size);
 	stream->read(&_data[0], size);
 }
-
 
 bool FileBuffer::exists(const Common::String &filename) {
 	return Common::File::exists(Common::Path(filename));
@@ -69,13 +73,20 @@ bool FileBuffer::seek(int64 offset, int whence) {
 		break;
 	}
 
+	// Keep the position within [0, size] so subsequent reads never index past
+	// the buffer (a string offset can legitimately point at the EOF byte).
+	if (_pos < 0)
+		_pos = 0;
+	if (_pos > (int)_data.size())
+		_pos = (int)_data.size();
+
 	return true;
 }
 
 uint32 FileBuffer::read(void *dataPtr, uint32 dataSize) {
 	int32 bytesRead = CLIP((int32)dataSize, (int32)0, (int32)_data.size() - _pos);
 	if (bytesRead) {
-		Common::fill(&_readBytes[_pos], &_readBytes[_pos] + bytesRead, true);
+		Common::fill(_readBytes.begin() + _pos, _readBytes.begin() + _pos + bytesRead, true);
 		Common::copy(&_data[_pos], &_data[_pos] + bytesRead, (byte *)dataPtr);
 		_pos += bytesRead;
 	}
@@ -88,6 +99,15 @@ size_t FileBuffer::strlen(bool *eof) {
 
 	if (eof)
 		*eof = false;
+
+	// A string offset may point exactly at the end of the buffer (an empty
+	// trailing string); indexing _data there would trip libc++'s hardened
+	// bounds check, so treat it as a zero-length string at EOF.
+	if (_pos >= (int)_data.size()) {
+		if (eof)
+			*eof = true;
+		return 0;
+	}
 
 	end = (uint8 *)memchr(&_data[_pos], '\0', size() - _pos);
 	if (!end) {
@@ -109,7 +129,7 @@ void FileBuffer::showUnmarked() {
 
 		if ((_readBytes[i] || i == (int)_data.size() - 1) && start != -1) {
 			warning("%.4x - %.4x unmarked (%d bytes)\n",
-			        start, i - 1, i - start);
+					start, i - 1, i - start);
 			start = -1;
 		}
 	}

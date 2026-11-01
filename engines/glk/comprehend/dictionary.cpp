@@ -28,11 +28,18 @@ namespace Glk {
 namespace Comprehend {
 
 static bool word_match(Word *word, const char *string) {
+	/* _len is the pre-computed strlen(word->_word), cached at load time so this
+	 * hot path (scanned linearly for every input word) avoids re-strlen-ing the
+	 * dictionary word two or three times per comparison. */
+	uint8 wlen = word->_len;
+
 	/* Words less than 6 characters must match exactly */
-	if (strlen(word->_word) < 6 && strlen(string) != strlen(word->_word))
+	if (wlen < 6 && strlen(string) != wlen)
 		return false;
 
-	return strncmp(word->_word, string, strlen(word->_word)) == 0;
+	/* Dictionary words are stored lower-case; match the player's input
+	 * case-insensitively so e.g. "BOW" and "bow" both parse. */
+	return scumm_strnicmp(word->_word, string, wlen) == 0;
 }
 
 Word *dict_find_word_by_string(ComprehendGame *game,
@@ -55,7 +62,7 @@ Word *dict_find_word_by_index_type(ComprehendGame *game,
 
 	for (i = 0; i < game->_words.size(); i++) {
 		if (game->_words[i]._index == index &&
-		        game->_words[i]._type == type)
+				game->_words[i]._type == type)
 			return &game->_words[i];
 	}
 
@@ -68,7 +75,7 @@ Word *find_dict_word_by_index(ComprehendGame *game,
 
 	for (i = 0; i < game->_words.size(); i++) {
 		if (game->_words[i]._index == index &&
-		        (game->_words[i]._type & type_mask) != 0)
+				(game->_words[i]._type & type_mask) != 0)
 			return &game->_words[i];
 	}
 
@@ -81,8 +88,8 @@ bool dict_match_index_type(ComprehendGame *game, const char *word,
 
 	for (i = 0; i < game->_words.size(); i++)
 		if (game->_words[i]._index == index &&
-		        ((game->_words[i]._type & type_mask) != 0) &&
-		        word_match(&game->_words[i], word))
+				((game->_words[i]._type & type_mask) != 0) &&
+				word_match(&game->_words[i], word))
 			return true;
 
 	return false;

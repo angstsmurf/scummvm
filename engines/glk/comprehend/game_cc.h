@@ -44,7 +44,7 @@ private:
 	void throneCutscene();
 
 protected:
-	bool handle_restart() override;
+	void restartGame() override;
 public:
 	CrimsonCrownGame();
 	~CrimsonCrownGame() override {}
@@ -54,6 +54,7 @@ public:
 	void beforeTurn() override;
 	void handleSpecialOpcode() override;
 	void synchronizeSave(Common::Serializer &s) override;
+	bool prepareRestore(const Common::Array<byte> &payload) override;
 
 	void setupDisk(uint diskNum);
 };

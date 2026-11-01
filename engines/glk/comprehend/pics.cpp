@@ -20,85 +20,22 @@
  */
 
 #include "glk/comprehend/pics.h"
-#include "common/memstream.h"
-#include "glk/comprehend/charset.h"
+#include "glk/comprehend/graphics_magician.h"
+#include "glk/comprehend/graphics_magician_cga.h"
+#include "glk/comprehend/graphics_magician_dhgr.h"
+#include "glk/comprehend/graphics_magician_pcjr.h"
+#include "glk/comprehend/disk_image.h"
 #include "glk/comprehend/comprehend.h"
 #include "glk/comprehend/draw_surface.h"
 #include "glk/comprehend/file_buf.h"
 #include "glk/comprehend/game.h"
+#include "glk/comprehend/game_cm.h"   // CM_PIECE_PICS
 #include "glk/comprehend/game_data.h"
 
 namespace Glk {
 namespace Comprehend {
 
 #define IMAGES_PER_FILE 16
-
-enum Opcode {
-	OPCODE_END = 0,
-	OPCODE_SET_TEXT_POS = 1,
-	OPCODE_SET_PEN_COLOR = 2,
-	OPCODE_TEXT_CHAR = 3,
-	OPCODE_SET_SHAPE = 4,
-	OPCODE_TEXT_OUTLINE = 5,
-	OPCODE_SET_FILL_COLOR = 6,
-	OPCODE_END2 = 7,
-	OPCODE_MOVE_TO = 8,
-	OPCODE_DRAW_BOX = 9,
-	OPCODE_DRAW_LINE = 10,
-	OPCODE_DRAW_CIRCLE = 11,
-	OPCODE_DRAW_SHAPE = 12,
-	OPCODE_DELAY = 13,
-	OPCODE_PAINT = 14,
-	OPCODE_RESET = 15
-};
-
-enum SpecialOpcode {
-	RESETOP_0 = 0,
-	RESETOP_RESET = 1,
-	RESETOP_OO_TOPOS_UNKNOWN = 3
-};
-
-/*-------------------------------------------------------*/
-
-uint32 Pics::ImageContext::getFillColor() const {
-	uint color = _fillColor;
-
-	// FIXME: Properly display text color in Crimson Crown
-	if (g_vm->getGameID() == "crimsoncrown" && color == 0x000000ff)
-		color = G_COLOR_WHITE;
-
-	return color;
-}
-
-void Pics::ImageContext::lineFixes() {
-	// WORKAROUND: Fix lines on title screens so floodfill works correctly
-	if (g_vm->getGameID() == "transylvania" && _picIndex == 9999) {
-		_drawSurface->drawLine(191, 31, 192, 31, G_COLOR_BLACK); // v
-		_drawSurface->drawLine(196, 50, 197, 50, G_COLOR_BLACK); // a
-		_drawSurface->drawLine(203, 49, 204, 49, G_COLOR_BLACK);
-		_drawSurface->drawLine(197, 53, 202, 53, G_COLOR_BLACK);
-		_drawSurface->drawLine(215, 51, 220, 51, G_COLOR_BLACK); // n
-		_drawSurface->drawLine(221, 51, 222, 51, G_COLOR_BLACK);
-		_drawSurface->drawLine(228, 50, 229, 50, G_COLOR_BLACK);
-		_drawSurface->drawLine(217, 59, 220, 59, G_COLOR_BLACK);
-		_drawSurface->drawLine(212, 49, 212, 50, G_COLOR_BLACK);
-		_drawSurface->drawLine(213, 49, 213, 52, G_COLOR_WHITE);
-		_drawSurface->drawLine(235, 52, 236, 61, G_COLOR_BLACK); // i
-		_drawSurface->drawLine(237, 61, 238, 61, G_COLOR_BLACK);
-	}
-
-	if (g_vm->getGameID() == "crimsoncrown" && _picIndex == 9999 && _x == 67 && _y == 55) {
-		_drawSurface->drawLine(78, 28, 77, 29, G_COLOR_WHITE);
-		_drawSurface->drawLine(71, 43, 69, 47, G_COLOR_WHITE);
-		_drawSurface->drawLine(67, 57, 68, 56, G_COLOR_WHITE);
-		_drawSurface->drawLine(79, 101, 80, 101, G_COLOR_WHITE);
-		_drawSurface->drawLine(183, 101, 184, 100, G_COLOR_WHITE);
-		_drawSurface->drawLine(193, 47, 193, 48, G_COLOR_WHITE);
-		_drawSurface->drawLine(68, 48, 71, 48, G_COLOR_BLACK);
-	}
-}
-
-/*-------------------------------------------------------*/
 
 Pics::ImageFile::ImageFile(const Common::String &filename, bool isSingleImage) : _filename(filename) {
 	Common::File f;
@@ -110,9 +47,23 @@ Pics::ImageFile::ImageFile(const Common::String &filename, bool isSingleImage) :
 
 	if (isSingleImage) {
 		// It's a title image file, which has only a single image with no
-		// table of image offsets
+		// table of image offsets.
 		_imageOffsets.resize(1);
-		_imageOffsets[0] = 4;
+		if (DiskImageFS::active()) {
+			// Apple II title (T0). Talisman's T0 is a pure Graphics Magician
+			// vector image (offset 0). For the others the T0 file opens with a
+			// disk copy-protection and loader stub, and the title vector image
+			// starts just past it, at a fixed game-specific offset.
+			_imageOffsets[0] = g_comprehend->traits().appleTitleOffset;
+		} else {
+			// DOS title files. The v1 releases (TRTITLE.MS1 / CCTITLE.MS1) have
+			// a 4-byte header (00 63 xx xx) before the vector stream. The v2 T0
+			// files are a raw stream from byte 0, opening with op15/3 (fill
+			// with the startup pattern, white) and a MOVE_TO that must not be
+			// skipped. A leading 0x00 would be op0 (END), which no real stream
+			// starts with, so it means a header.
+			_imageOffsets[0] = (f.readByte() == 0) ? 4 : 0;
+		}
 		return;
 	}
 
@@ -122,7 +73,6 @@ Pics::ImageFile::ImageFile(const Common::String &filename, bool isSingleImage) :
 	else
 		f.seek(0);
 
-	// Get the image offsets in the file
 	_imageOffsets.resize(IMAGES_PER_FILE);
 	for (i = 0; i < IMAGES_PER_FILE; i++) {
 		_imageOffsets[i] = f.readUint16LE();
@@ -131,201 +81,86 @@ Pics::ImageFile::ImageFile(const Common::String &filename, bool isSingleImage) :
 	}
 }
 
-void Pics::ImageFile::draw(uint index, ImageContext *ctx) const {
-	if (!ctx->_file.open(_filename))
+void Pics::ImageFile::renderGm(uint index, const GmBackend &gm) const {
+	Common::File f;
+	if (!f.open(_filename))
 		error("Opening image file");
 
-	ctx->_file.seek(_imageOffsets[index]);
+	int64 start = _imageOffsets[index];
+	int64 fsize = f.size();
+	if (start < 0 || start >= fsize)
+		return;
 
-	for (bool done = false; !done;) {
-		done = doImageOp(ctx);
-	}
+	// The renderer stops at op0 (END), so it gets everything from the image's
+	// offset to end of file.
+	size_t len = (size_t)(fsize - start);
+	Common::Array<byte> buf(len);
+	f.seek(start);
+	f.read(buf.data(), (uint32)len);
+
+	gm.drawImage(buf.data(), len);
 }
 
-bool Pics::ImageFile::doImageOp(Pics::ImageContext *ctx) const {
-	uint8 opcode;
-	uint16 a, b;
-
-	opcode = ctx->_file.readByte();
-	debugCN(kDebugGraphics, "  %.4x [%.2x]: ", (int)ctx->_file.pos() - 1, opcode);
-
-	byte param = opcode & 0xf;
-	opcode >>= 4;
-
-	switch (opcode) {
-	case OPCODE_END:
-	case OPCODE_END2:
-		// End of the rendering
-		debugC(kDebugGraphics, "End of image");
-		return true;
-
-	case OPCODE_SET_TEXT_POS:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-		debugC(kDebugGraphics, "set_text_pos(%d, %d)", a, b);
-
-		ctx->_textX = a;
-		ctx->_textY = b;
-		break;
-
-	case OPCODE_SET_PEN_COLOR:
-		debugC(kDebugGraphics, "set_pen_color(%.2x)", opcode);
-		if (!(ctx->_drawFlags & IMAGEF_NO_FILL))
-			ctx->_penColor = ctx->_drawSurface->getPenColor(param);
-		break;
-
-	case OPCODE_TEXT_CHAR:
-	case OPCODE_TEXT_OUTLINE:
-		// Text outline mode draws a bunch of pixels that sort of looks like the char
-		// TODO: See if the outline mode is ever used
-		if (opcode == OPCODE_TEXT_OUTLINE)
-			warning("TODO: Implement drawing text outlines");
-
-		a = imageGetOperand(ctx);
-		if (a < 0x20 || a >= 0x7f) {
-			warning("Invalid character - %c", a);
-			a = '?';
-		}
-
-		debugC(kDebugGraphics, "draw_char(%c)", a);
-		ctx->_font->drawChar(ctx->_drawSurface, a, ctx->_textX, ctx->_textY, ctx->getFillColor());
-		ctx->_textX += ctx->_font->getCharWidth(a);
-		break;
-
-	case OPCODE_SET_SHAPE:
-		debugC(kDebugGraphics, "set_shape_type(%.2x)", param);
-
-		if (param == 8) {
-			// FIXME: This appears to be a _shape type. Only used by OO-Topos
-			warning("TODO: Shape type 8");
-			ctx->_shape = SHAPE_PIXEL;
-		} else {
-			ctx->_shape = (Shape)param;
+// Read a whole file, trying each of the given names; empty if none opens.
+static Common::Array<byte> readWholeFile(const char *name1, const char *name2 = nullptr) {
+	Common::Array<byte> buf;
+	Common::File f;
+	const char *const names[2] = { name1, name2 };
+	for (uint i = 0; i < 2 && names[i]; ++i) {
+		if (!f.open(names[i]))
+			continue;
+		int64 sz = f.size();
+		if (sz > 0) {
+			buf.resize((size_t)sz);
+			if (f.read(buf.data(), (uint32)sz) != (uint32)sz)
+				buf.clear();
 		}
 		break;
-
-	case OPCODE_SET_FILL_COLOR:
-		a = imageGetOperand(ctx);
-		debugC(kDebugGraphics, "set_fill_color(%.2x)", a);
-		ctx->_fillColor = ctx->_drawSurface->getFillColor(a);
-		break;
-
-	case OPCODE_MOVE_TO:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-
-		debugC(kDebugGraphics, "move_to(%d, %d)", a, b);
-		ctx->_x = a;
-		ctx->_y = b;
-		break;
-
-	case OPCODE_DRAW_BOX:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-
-		debugC(kDebugGraphics, "draw_box (%d, %d) - (%d, %d)",
-		       ctx->_x, ctx->_y, a, b);
-
-		ctx->_drawSurface->drawBox(ctx->_x, ctx->_y, a, b, ctx->_penColor);
-		break;
-
-	case OPCODE_DRAW_LINE:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-
-		debugC(kDebugGraphics, "draw_line (%d, %d) - (%d, %d)",
-		       ctx->_x, ctx->_y, a, b);
-		ctx->_drawSurface->drawLine(ctx->_x, ctx->_y, a, b, ctx->_penColor);
-
-		ctx->_x = a;
-		ctx->_y = b;
-		break;
-
-	case OPCODE_DRAW_CIRCLE:
-		a = imageGetOperand(ctx);
-		debugC(kDebugGraphics, "draw_circle (%d, %d) diameter=%d",
-		       ctx->_x, ctx->_y, a);
-
-		ctx->_drawSurface->drawCircle(ctx->_x, ctx->_y, a, ctx->_penColor);
-		break;
-
-	case OPCODE_DRAW_SHAPE:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-		debugC(kDebugGraphics, "draw_shape(%d, %d), style=%.2x, fill=%.2x",
-		       a, b, ctx->_shape, ctx->_fillColor);
-
-		if (!(ctx->_drawFlags & IMAGEF_NO_FILL))
-			ctx->_drawSurface->drawShape(a, b, ctx->_shape, ctx->_fillColor);
-		break;
-
-	case OPCODE_DELAY:
-		// The original allowed for rendering to be paused briefly. We don't do
-		// that in ScummVM, and just show the finished rendered image
-		(void)imageGetOperand(ctx);
-		break;
-
-	case OPCODE_PAINT:
-		a = imageGetOperand(ctx) + (param & 1 ? 256 : 0);
-		b = imageGetOperand(ctx);
-		if (opcode & 0x1)
-			a += 255;
-
-		debugC(kDebugGraphics, "paint(%d, %d)", a, b);
-		ctx->lineFixes();
-		if (!(ctx->_drawFlags & IMAGEF_NO_FILL))
-			ctx->_drawSurface->floodFill(a, b, ctx->_fillColor);
-		break;
-
-	#if 0
-	// FIXME: The reset case was causing room outside cell to be drawn all white
-	case OPCODE_RESET:
-		a = imageGetOperand(ctx);
-		doResetOp(ctx, a);
-		break;
-	#endif
 	}
-
-	//ctx->_drawSurface->dumpToScreen();
-
-	return false;
+	return buf;
 }
 
-void Pics::ImageFile::doResetOp(ImageContext *ctx, byte param) const {
-	switch (param) {
-	case RESETOP_0:
-		// In Transylvania this sub-opcode is a do nothing
-		break;
+// [standard, double hi-res]
+static bool s_cmPanelBuilt[2];
+static uint8 s_cmPanelMask[2];
 
-	case RESETOP_RESET:
-		// TODO: Calls same reset that first gets called when rendering starts.
-		// Figure out what the implication of resetting the variables does
-		break;
+Pics::Pics() {
+	s_cmPanelBuilt[0] = s_cmPanelBuilt[1] = false;
+	s_cmPanelMask[0] = s_cmPanelMask[1] = 0;
 
-	case RESETOP_OO_TOPOS_UNKNOWN:
-		// TODO: This is called for some scenes in OO-Topis. Figure out what it does
-		break;
+	// DOS releases: load the CGA drawing tables (fill patterns, brushes, font)
+	// from NOVEL.EXE. The loader finds them by signature, which works for every
+	// v2 game. The v1 games (Crimson Crown, Transylvania v1) keep the fill and
+	// subindex tables in PC_GRAPH.OVR and the brushes in NOVEL.EXE, so they
+	// need the v1 loader. A folder lacking those files gets the built-in
+	// tables; CHARSET.GDA, which only the v1 games ship, selects which set.
+	if (!DiskImageFS::active()) {
+		const Common::Array<byte> exeBuf = readWholeFile("novel.exe", "novel1.exe");
+		// v1 NOVEL.EXE has no embedded picture font; the op3/op5 glyphs (map
+		// labels) of those games come from CHARSET.GDA.
+		const Common::Array<byte> charset = readWholeFile("charset.gda");
 
-	default:
-		break;
+		if (exeBuf.empty() || !gmcgaInstallDrawingTables(exeBuf.data(), exeBuf.size())) {
+			// v2 tables absent -> try the v1 split layout (needs PC_GRAPH.OVR).
+			const Common::Array<byte> ovrBuf = readWholeFile("pc_graph.ovr");
+			if (exeBuf.empty() || ovrBuf.empty() ||
+				!gmcgaInstallV1DrawingTables(ovrBuf.data(), ovrBuf.size(),
+											 exeBuf.data(), exeBuf.size()))
+				gmcgaInstallBuiltinDrawingTables(!charset.empty());
+			if (!charset.empty())
+				gmcgaSetV1Font(charset.data(), charset.size());
+		}
+
+		// IBM PCjr / Tandy 16-colour mode (DOS v1 games, opt-in via #pcjr).
+		// JR_GRAPH.OVR ships alongside PC_GRAPH.OVR; its 4bpp tables are
+		// installed in parallel with the CGA tables. Comprehend::gfxBackend()
+		// selects the renderer per picture.
+		const Common::Array<byte> jrBuf = readWholeFile("jr_graph.ovr");
+		if (!exeBuf.empty() && !jrBuf.empty() &&
+			gmpcjrInstallDrawingTables(jrBuf.data(), jrBuf.size(), exeBuf.data(), exeBuf.size()) &&
+			!charset.empty())
+			gmpcjrSetFont(charset.data(), charset.size());
 	}
-}
-
-uint16 Pics::ImageFile::imageGetOperand(ImageContext *ctx) const {
-	return ctx->_file.readByte();
-}
-
-/*-------------------------------------------------------*/
-
-Pics::Pics() : _font(nullptr) {
-	if (Common::File::exists("charset.gda"))
-		_font = new CharSet();
-	else if (g_comprehend->getGameID() == "talisman")
-		_font = new TalismanFont();
-}
-
-Pics::~Pics() {
-	delete _font;
 }
 
 void Pics::clear() {
@@ -338,109 +173,113 @@ void Pics::load(const Common::StringArray &roomFiles,
 				const Common::String &titleFile) {
 	clear();
 
+	// Picture numbers select a file by list position ((graphic-1) /
+	// IMAGES_PER_FILE), so a missing file must keep its slot or later files
+	// shift down. Talisman numbers its item art against OA..OF but ships no
+	// OC/OD. Missing entries get an empty placeholder.
 	for (uint idx = 0; idx < roomFiles.size(); ++idx)
-		_rooms.push_back(ImageFile(roomFiles[idx]));
+		_rooms.push_back(Common::File::exists(Common::Path(roomFiles[idx]))
+						 ? ImageFile(roomFiles[idx]) : ImageFile());
 	for (uint idx = 0; idx < itemFiles.size(); ++idx)
-		_items.push_back(ImageFile(itemFiles[idx]));
+		_items.push_back(Common::File::exists(Common::Path(itemFiles[idx]))
+						 ? ImageFile(itemFiles[idx]) : ImageFile());
 
-	if (!titleFile.empty())
+	// A game may ship no title image, and the ImageFile constructor error()s on
+	// a failed open. Leave _title empty then.
+	if (!titleFile.empty() && Common::File::exists(Common::Path(titleFile)))
 		_title = ImageFile(titleFile, true);
 }
 
-int Pics::getPictureNumber(const Common::String &filename) const {
-	// Ensure prefix and suffix
-	if (!filename.hasPrefixIgnoreCase("pic") ||
-	    !filename.hasSuffixIgnoreCase(".raw"))
-		return -1;
+// Draw one picture through a Graphics Magician renderer. Pictures are decoded
+// onto the renderer's persistent page, so item overlays compose onto the room
+// already drawn there, then the whole page is converted to RGBA and blitted to
+// the draw surface. The renderers (Apple II hi-res and double hi-res, DOS CGA
+// and PCjr) take the same vector streams and image offsets; only the rasteriser
+// differs.
+void Pics::drawPictureGm(int pictureNum, const GmBackend &gm, uint drawFlags,
+						 DrawSurface *ds) const {
+	const bool apple = gm.cm != nullptr;
+	const bool dhgr = gm.id == GFX_APPLE_DHGR;
 
-	// Get the number part
-	Common::String num(filename.c_str() + 3, filename.size() - 7);
-	if (num.empty() || !Common::isDigit(num[0]))
-		return -1;
+	// The Coveted Mirror (Apple II only) has a persistent right-hand panel in
+	// screen columns 24..39, drawn once at boot. Room images here span the full
+	// width, so the panel is snapshotted and composited over every in-game
+	// picture. The snapshot is RG image 0 (logo), OG image 0 (hourglass frame
+	// and static bottom mound) and the mirror pieces found so far, in the black
+	// band left of the hourglass. It is built once per hi-res mode, since the
+	// pages are independent, and rebuilt when the piece mask changes.
+	// drawHourglass() stamps the draining sand on top.
+	const bool isCM = apple && g_comprehend->traits().hasHourglassPanel;
+	uint8 pieceMask = 0;
+	if (isCM)
+		if (ComprehendGame *game = g_comprehend->getGame())
+			pieceMask = game->cmMirrorPieceMask();
+	if (isCM && pictureNum != TITLE_IMAGE && !_rooms.empty() && !_items.empty() &&
+		(!s_cmPanelBuilt[dhgr] || s_cmPanelMask[dhgr] != pieceMask)) {
+		gm.cm->beginPanelRebuild();
+		_rooms[_rooms.size() - 1].renderGm(0, gm); // RG = last location file: logo
+		_items[_items.size() - 1].renderGm(0, gm); // OG = last item file: hourglass frame
+		for (int i = 0; i < 4; i++) {
+			if (!(pieceMask & (1 << i)))
+				continue;
+			int p = CM_PIECE_PICS[i];
+			if (p / IMAGES_PER_FILE < (int)_items.size())
+				_items[p / IMAGES_PER_FILE].renderGm(p % IMAGES_PER_FILE, gm);
+		}
+		gm.cm->endPanelRebuild();
+		s_cmPanelBuilt[dhgr] = true;
+		s_cmPanelMask[dhgr] = pieceMask;
+	}
 
-	return atoi(num.c_str());
-}
+	if (pictureNum == DARK_ROOM) {
+		gm.resetScreen(false);
+	} else if (pictureNum == BRIGHT_ROOM) {
+		gm.resetScreen(true);
+	} else if (pictureNum == TITLE_IMAGE) {
+		// The title is a vector image on a white background, like a bright
+		// room. The Apple II OO-Topos title starts from black instead: its
+		// lettering blends with the page, so a white start corrupts it. The DOS
+		// v2 titles fill the whole picture themselves with op15/3.
+		gm.resetScreen(!(apple && g_comprehend->traits().appleTitleOnBlack));
+		if (_title.isLoaded())
+			_title.renderGm(0, gm);
+	} else if (pictureNum >= ITEMS_OFFSET) {
+		// Item overlay: draw on top of the existing room page.
+		int n = pictureNum - ITEMS_OFFSET;
+		_items[n / IMAGES_PER_FILE].renderGm(n % IMAGES_PER_FILE, gm);
+	} else {
+		// Room picture. Background variants start from a fresh page; the
+		// no-background variant composes onto whatever is already shown.
+		if (pictureNum < LOCATIONS_NO_BG_OFFSET)
+			gm.resetScreen(!(drawFlags & IMAGEF_REVERSE));
+		int n = pictureNum < LOCATIONS_NO_BG_OFFSET
+					? pictureNum : pictureNum - LOCATIONS_NO_BG_OFFSET;
+		_rooms[n / IMAGES_PER_FILE].renderGm(n % IMAGES_PER_FILE, gm);
+	}
 
-bool Pics::hasFile(const Common::Path &path) const {
-	Common::String name = path.baseName();
-	int num = getPictureNumber(name);
-	if (num == -1)
-		return false;
+	// Re-apply The Coveted Mirror's persistent panel on top of the room/item
+	// just drawn (the title screen has no panel), then stamp the hourglass
+	// sand pile for the current sand level (VM variable 0x11): the engine
+	// shows that many grains and drains one per turn.
+	if (isCM && pictureNum != TITLE_IMAGE) {
+		int sand = 0;
+		if (ComprehendGame *game = g_comprehend->getGame())
+			sand = game->_variables[0x11];
+		gm.cm->overlayPanel();
+		gm.cm->drawHourglass(sand);
+	}
 
-	if (num == DARK_ROOM || num == BRIGHT_ROOM || num == TITLE_IMAGE)
-		return true;
-	if (num >= ITEMS_OFFSET && num < (int)(ITEMS_OFFSET + _items.size() * IMAGES_PER_FILE))
-		return true;
-	if (num < ITEMS_OFFSET && (num % 100) < (int)(_rooms.size() * IMAGES_PER_FILE))
-		return true;
-
-	return false;
-}
-
-int Pics::listMembers(Common::ArchiveMemberList &list) const {
-	return list.size();
-}
-
-const Common::ArchiveMemberPtr Pics::getMember(const Common::Path &path) const {
-	if (!hasFile(path))
-		return Common::ArchiveMemberPtr();
-
-	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
-}
-
-Common::SeekableReadStream *Pics::createReadStreamForMember(const Common::Path &path) const {
-	Common::String name = path.baseName();
-	// Get the picture number
-	int num = getPictureNumber(name);
-	if (num == -1 || !hasFile(path))
-		return nullptr;
-
-	// Draw the image
-	drawPicture(num);
-
-	// Create a stream with the data for the surface
-	Common::MemoryReadWriteStream *stream =
-	    new Common::MemoryReadWriteStream(DisposeAfterUse::YES);
-	const DrawSurface &ds = *g_comprehend->_drawSurface;
-	stream->writeUint16LE(ds.w);
-	stream->writeUint16LE(ds.h);
-	stream->writeUint16LE(0); // Palette size
-	stream->write(ds.getPixels(), ds.w * ds.h * 4);
-
-	return stream;
+	// With slow-draw active the page is revealed a chunk at a time by the host
+	// (Comprehend::tickSlowDraw), so blit only what is on the visible page so
+	// far. Otherwise blit the finished page.
+	gm.blitVisible((uint32 *)ds->getPixels(), ds->w, ds->h);
 }
 
 void Pics::drawPicture(int pictureNum) const {
-	ImageContext ctx(g_comprehend->_drawSurface, _font, g_comprehend->_drawFlags, pictureNum);
-
-	if (pictureNum == DARK_ROOM) {
-		ctx._drawSurface->clearScreen(G_COLOR_BLACK);
-
-	} else if (pictureNum == BRIGHT_ROOM) {
-		ctx._drawSurface->clearScreen(G_COLOR_WHITE);
-
-	} else if (pictureNum == TITLE_IMAGE) {
-		ctx._drawSurface->clearScreen(G_COLOR_WHITE);
-		_title.draw(0, &ctx);
-
-	} else if (pictureNum >= ITEMS_OFFSET) {
-		pictureNum -= ITEMS_OFFSET;
-		ctx._drawSurface->clear(0);
-		_items[pictureNum / IMAGES_PER_FILE].draw(
-		    pictureNum % IMAGES_PER_FILE, &ctx);
-
-	} else {
-		if (pictureNum < LOCATIONS_NO_BG_OFFSET) {
-			ctx._drawSurface->clearScreen((ctx._drawFlags & IMAGEF_REVERSE) ? G_COLOR_BLACK : G_COLOR_WHITE);
-			if (ctx._drawFlags & IMAGEF_REVERSE)
-				ctx._penColor = RGB(255, 255, 255);
-		} else {
-			ctx._drawSurface->clear(0);
-		}
-		pictureNum %= 100;
-		_rooms[pictureNum / IMAGES_PER_FILE].draw(
-		    pictureNum % IMAGES_PER_FILE, &ctx);
-	}
+	// Every picture goes through a Graphics Magician renderer; see Pics::Pics
+	// for the DOS tables.
+	drawPictureGm(pictureNum, *gmBackend(g_comprehend->gfxBackend()),
+				  g_comprehend->_drawFlags, g_comprehend->_drawSurface);
 }
 
 } // namespace Comprehend

@@ -22,9 +22,7 @@
 #ifndef GLK_COMPREHEND_FILE_BUF_H
 #define GLK_COMPREHEND_FILE_BUF_H
 
-#include "common/array.h"
-#include "common/memstream.h"
-#include "common/stream.h"
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
@@ -56,7 +54,10 @@ public:
 	uint32 read(void *dataPtr, uint32 dataSize) override;
 
 	const byte *dataPtr() const {
-		return &_data[_pos];
+		// Use data()+_pos rather than &_data[_pos] so a position at the very
+		// end of the buffer yields a valid past-the-end pointer instead of
+		// tripping libc++'s hardened operator[] bounds check.
+		return _data.data() + _pos;
 	}
 	size_t strlen(bool *eof = nullptr);
 
@@ -78,7 +79,6 @@ public:
 
 #define file_buf_get_array_le16(fb, base, array, member, size) \
 	file_buf_get_array(fb, Uint16LE, base, array, member, size)
-
 
 } // namespace Comprehend
 } // namespace Glk

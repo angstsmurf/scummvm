@@ -27,13 +27,11 @@
 namespace Glk {
 namespace Comprehend {
 
-enum RestartMode { RESTART_IMMEDIATE, RESTART_WITH_MSG, RESTART_WITHOUT_MSG };
 
 enum YesNo { NO, YES, UNSET };
 
 class OOToposGame : public ComprehendGameV2 {
 private:
-	RestartMode _restartMode;
 	YesNo _noFloodfill;
 	int _stringVal1, _stringVal2;
 	bool _printComputerMsg, _shipNotWorking;
@@ -70,7 +68,7 @@ private:
 
 	/**
 	 * A wrapped version of console_println that only prints the passed string
-	 * if the _addStringFlag is set
+	 * if _printComputerMsg is set
 	 */
 	void printComputerMsg(const char *str);
 public:
@@ -83,7 +81,6 @@ public:
 	void afterPrompt() override;
 	int roomIsSpecial(uint room_index, uint *room_desc_string) override;
 	void handleSpecialOpcode() override;
-	bool handle_restart() override;
 	void synchronizeSave(Common::Serializer &s) override;
 };
 

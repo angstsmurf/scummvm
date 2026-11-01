@@ -23,7 +23,7 @@
 #include "glk/comprehend/comprehend.h"
 #include "glk/comprehend/draw_surface.h"
 #include "glk/comprehend/pics.h"
-#include "common/md5.h"
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
@@ -60,59 +60,68 @@ static const GameStrings OO_STRINGS = {
 	EXTRA_STRING_TABLE(154)
 };
 
-OOToposGame::OOToposGame() : ComprehendGameV2(), _restartMode(RESTART_IMMEDIATE),
+OOToposGame::OOToposGame() : ComprehendGameV2(),
 		_noFloodfill(UNSET), _stringVal1(0), _stringVal2(0),
 		_printComputerMsg(true), _shipNotWorking(false) {
 	_gameDataFile = "g0";
 
-	// Extra strings are (annoyingly) stored in the game binary
-	Common::File f;
-	if (!f.open("novel.exe"))
-		error("novel.exe is a required file");
-
-	Common::String md5 = Common::computeStreamMD5AsString(f, 1024);
-	f.close();
-
-	if (md5 == "3fc2072f6996b17d2f21f0a92e53cdcc") {
-		// DOS version from if-archive
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x16564, 0x17640));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x17702, 0x18600));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x186b2, 0x19b80));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x19c62, 0x1a590));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x1a634, 0x1b080));
-	} else if (md5 == "e26858f2aaa9dcc28f468b07902813c5") {
-		// DOS version from graphicsmagician.com
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x164c4, 0x175a0));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x17662, 0x18560));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x18612, 0x19ae0));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x19bc2, 0x1a4f0));
-		_stringFiles.push_back(StringFile("NOVEL.EXE", 0x1a594, 0x1afe0));
+	if (DiskImageFS::active()) {
+		// Apple II release: the extra strings live in separate files (MA-ME)
+		// rather than in novel.exe.
+		addLetteredFiles(_stringFiles, "M", 'A', 'E');
 	} else {
-		error("Unrecognised novel.exe encountered");
+		// Extra strings are (annoyingly) stored in the game binary
+		Common::File f;
+		if (!f.open("novel.exe"))
+			error("novel.exe is a required file");
+
+		Common::String md5 = Common::computeStreamMD5AsString(f, 1024);
+		f.close();
+
+		if (md5 == "3fc2072f6996b17d2f21f0a92e53cdcc" ||
+			md5 == "5732b346183f85fdd51eb5a75d02196e") {
+			// DOS version from if-archive. The second hash is the same release
+			// with the copy-protection cracked: only five bytes in the loader
+			// header differ, so the string segments are byte-identical and use
+			// the same offsets.
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x16564, 0x17640));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x17702, 0x18600));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x186b2, 0x19b80));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x19c62, 0x1a590));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x1a634, 0x1b080));
+		} else if (md5 == "e26858f2aaa9dcc28f468b07902813c5") {
+			// DOS version from graphicsmagician.com
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x164c4, 0x175a0));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x17662, 0x18560));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x18612, 0x19ae0));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x19bc2, 0x1a4f0));
+			_stringFiles.push_back(StringFile("NOVEL.EXE", 0x1a594, 0x1afe0));
+		} else {
+			error("Unrecognised novel.exe encountered");
+		}
 	}
 
-	_locationGraphicFiles.push_back("RA");
-	_locationGraphicFiles.push_back("RB");
-	_locationGraphicFiles.push_back("RC");
-	_locationGraphicFiles.push_back("RD");
-	_locationGraphicFiles.push_back("RE");
-	_itemGraphicFiles.push_back("OA");
-	_itemGraphicFiles.push_back("OB");
-	_itemGraphicFiles.push_back("OC");
-	_itemGraphicFiles.push_back("OD");
+	addLetteredFiles(_locationGraphicFiles, "R", 'A', 'E');
+	addLetteredFiles(_itemGraphicFiles, "O", 'A', 'D');
 
-	_colorTable = 1;
 	_gameStrings = &OO_STRINGS;
+	// Both releases keep the title in T0. On Apple II it is a Graphics Magician
+	// vector image after the disk-protection / loader stub (Pics::ImageFile
+	// starts it at offset 0x100); on DOS it is a plain vector image.
 	_titleGraphicFile = "t0";
 }
 
 void OOToposGame::beforeGame() {
-	// Draw the title
 	g_comprehend->drawPicture(TITLE_IMAGE);
 
-	// Print game information
-	console_println("Story by Michael and Muffy Berlyn, graphics by Raim und Redlich and Brian Poff");
-	console_println("IBM version by Jeffrey A. Jay. Copyright 1987  POLARWARE, Inc.");
+	// Print game information, centred as on the original title screen.
+	g_comprehend->setCentered(true);
+	console_println("Story by Michael and Muffy Berlyn");
+	console_println("graphics by Raimund Redlich");
+	console_println("and Brian Poff");
+	console_println("IBM version by Jeffrey A. Jay");
+	console_println("Copyright 1987  POLARWARE, Inc.");
+	g_comprehend->setCentered(false);
 	g_comprehend->readChar();
 
 	g_comprehend->glk_window_clear(g_comprehend->_bottomWindow);
@@ -121,17 +130,15 @@ void OOToposGame::beforeGame() {
 int OOToposGame::roomIsSpecial(uint room_index, uint *roomDescString) {
 	Room *room = &_rooms[room_index];
 
-	// Is the room dark
 	if ((room->_flags & OO_ROOM_FLAG_DARK) &&
-	        !(_flags[OO_FLAG_FLASHLIGHT_ON])) {
+			!(_flags[OO_FLAG_FLASHLIGHT_ON])) {
 		if (roomDescString)
 			*roomDescString = 0xb3;
 		return ROOM_IS_DARK;
 	}
 
-	// Is the room too bright
 	if (room_index == OO_BRIGHT_ROOM &&
-	        !_flags[OO_FLAG_WEARING_GOGGLES]) {
+			!_flags[OO_FLAG_WEARING_GOGGLES]) {
 		if (roomDescString)
 			*roomDescString = 0x1c;
 		return ROOM_IS_TOO_BRIGHT;
@@ -141,8 +148,8 @@ int OOToposGame::roomIsSpecial(uint room_index, uint *roomDescString) {
 }
 
 void OOToposGame::beforeTurn() {
-	ComprehendGameV2::beforeTurn();
-
+	// The each-turn daemon is not run here (see ComprehendGame::beforeTurn());
+	// this is only the graphics setup the original does ahead of the prompt.
 	if (_flags[OO_FLAG_TOO_DARK]) {
 		// Show placeholder room if room is too dark
 		_currentRoom = 55;
@@ -174,7 +181,8 @@ void OOToposGame::beforePrompt() {
 void OOToposGame::afterPrompt() {
 	ComprehendGameV2::afterPrompt();
 
-	// WORKAROUND: Allow for the Apple 2 password in the DOS version
+	// WORKAROUND: Also accept VUG957A, which the game data doesn't know.
+	// The DOS and Apple II dictionaries only have tse957x.
 	if (!scumm_stricmp(_inputLine, "vug957a"))
 		Common::strcpy_s(_inputLine, "tse957x");
 
@@ -186,23 +194,24 @@ void OOToposGame::afterPrompt() {
 void OOToposGame::handleSpecialOpcode() {
 	switch (_specialOpcode) {
 	case 1:
-		// Update guard location
 		randomizeGuardLocation();
 		break;
 
 	case 2:
-		_restartMode = RESTART_IMMEDIATE;
-		game_restart();
+		// Internal restart (no prompt, no keypress)
+		game_restart(true);
 		break;
 
 	case 3:
-		_restartMode = RESTART_WITH_MSG;
+		// Game over: show the "Press 'R' to restart the novel." prompt
+		// and wait for the player's choice
 		game_restart();
 		break;
 
 	case 4:
-		_restartMode = RESTART_WITHOUT_MSG;
-		game_restart();
+		// The RESTART verb: the original reloads at once, with no prompt and no
+		// keypress
+		game_restart(true);
 		break;
 
 	case 5:
@@ -211,53 +220,35 @@ void OOToposGame::handleSpecialOpcode() {
 		break;
 
 	case 6:
-		// Save game
 		game_save();
 		break;
 
 	case 7:
-		// Restore game
 		game_restore();
 		break;
 
 	case 8:
-		// Computer response
 		computerResponse();
 		randomizeGuardLocation();
 		break;
 
 	case 9:
-		// Checks the ship fuel
 		checkShipFuel();
 		randomizeGuardLocation();
 		break;
 
 	case 10:
-		// Checks whether the ship is working
 		checkShipWorking();
+		randomizeGuardLocation();
 		break;
 
 	default:
+		// The original interpreter rolls the guard location for any
+		// special opcode it doesn't otherwise handle (the bytecode only
+		// ever emits 1-10, so this branch is normally unreached).
+		randomizeGuardLocation();
 		break;
 	}
-}
-
-bool OOToposGame::handle_restart() {
-	_ended = false;
-
-	if (_restartMode != RESTART_IMMEDIATE) {
-		if (_restartMode == RESTART_WITH_MSG)
-			console_println(stringLookup(_gameStrings->game_restart).c_str());
-
-		if (tolower(console_get_key()) != 'r') {
-			g_comprehend->quitGame();
-			return false;
-		}
-	}
-
-	loadGame();
-	_updateFlags = UPDATE_ALL;
-	return true;
 }
 
 void OOToposGame::synchronizeSave(Common::Serializer &s) {
@@ -365,7 +356,7 @@ void OOToposGame::checkShipFuel() {
 
 	FunctionState funcState;
 	Instruction test(2, 75, 76);
-	execute_opcode(&test, nullptr, nullptr);
+	execute_opcode(&test, nullptr, &funcState);
 
 	if (funcState._testResult) {
 		// Computer: "We should now have enough

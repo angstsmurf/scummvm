@@ -22,6 +22,8 @@
 #ifndef GLK_COMPREHEND_DICTIONARY_H
 #define GLK_COMPREHEND_DICTIONARY_H
 
+#include "common/scummsys.h"
+
 namespace Glk {
 namespace Comprehend {
 

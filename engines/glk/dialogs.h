@@ -123,6 +123,9 @@ private:
     GUI::StaticTextWidget *_propsizeVal;
 	GUI::PopUpWidget *_morealign;
 	GUI::PopUpWidget *_morefont;
+	// Only created for Comprehend games
+	GUI::CheckboxWidget *_comprehendSlowDraw;
+	GUI::CheckboxWidget *_comprehendMoreColours;
 	GUI::StaticTextWidget *_fontHeadinglbl;
 	GUI::StaticTextWidget *_colorHeadinglbl;
 	GUI::StaticTextWidget *_borderHeadinglbl;

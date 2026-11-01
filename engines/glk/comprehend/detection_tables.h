@@ -30,6 +30,7 @@ const PlainGameDescriptor COMPREHEND_GAME_LIST[] = {
 	{"crimsoncrown", "Crimson Crown"},
 	{"ootopos", "OO-Topos"},
 
+	{"covetedmirror", "The Coveted Mirror"},
 	{"transylvaniav2", "Transylvania (V2)"},
 	{"talisman", "Talisman: Challenging the Sands of Time"},
 
@@ -51,6 +52,25 @@ const ComprehendDetectionEntry COMPREHEND_GAMES[] = {
 	{ "talisman", "g0", "35770d4815e610b5252e3fcd9f11def3" },
 
 	{nullptr, nullptr, nullptr}
+};
+
+/**
+ * Apple II disk images, by the MD5 of the whole file. Each game is listed by the
+ * side it boots from; the engine finds the other sides in the same directory.
+ */
+struct ComprehendDiskEntry {
+	const char *const _gameId;
+	const char *const _md5;
+};
+
+const ComprehendDiskEntry COMPREHEND_DISKS[] = {
+	{ "transylvania", "925e76655c6710adb80e362b20208b01" },
+	{ "crimsoncrown", "e74cc9988f4800bab960fed92a24d717" },
+	{ "ootopos", "54d8fad3084e513aee4db06a5464e07e" },
+	{ "talisman", "819c09ad7a5b2233af2951bef8d704da" },
+	{ "covetedmirror", "64e66ce16594cc745852c3abddbaf19c" },
+
+	{nullptr, nullptr}
 };
 
 } // End of namespace Comprehend

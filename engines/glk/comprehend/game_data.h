@@ -23,8 +23,7 @@
 #define GLK_COMPREHEND_GAME_DATA_H
 
 #include "glk/comprehend/file_buf.h"
-#include "common/serializer.h"
-#include "common/str-array.h"
+#include "glk/comprehend/disk_image.h"
 
 namespace Glk {
 namespace Comprehend {
@@ -46,7 +45,6 @@ enum {
 	NR_DIRECTIONS
 };
 
-
 enum ScriptOpcode {
 	OPCODE_UNKNOWN,
 	OPCODE_HAVE_OBJECT,
@@ -56,8 +54,8 @@ enum ScriptOpcode {
 	OPCODE_VAR_EQ2,
 	OPCODE_VAR_GT1,
 	OPCODE_VAR_GT2,
-	OPCODE_VAR_GTE1,
-	OPCODE_VAR_GTE2,
+	OPCODE_VAR_LT1,
+	OPCODE_VAR_LT2,
 	OPCODE_CURRENT_IS_OBJECT,
 	OPCODE_OBJECT_PRESENT,
 	OPCODE_ELSE,
@@ -119,7 +117,6 @@ enum ScriptOpcode {
 	OPCODE_SET_STRING_REPLACEMENT1,
 	OPCODE_SET_STRING_REPLACEMENT2,
 	OPCODE_SET_STRING_REPLACEMENT3,
-	OPCODE_SET_CURRENT_NOUN_STRING_REPLACEMENT,
 	OPCODE_DRAW_ROOM,
 	OPCODE_DRAW_OBJECT,
 	OPCODE_WAIT_KEY,
@@ -136,7 +133,13 @@ enum ScriptOpcode {
 	OPCODE_SET_FLAG40,
 	OPCODE_RANDOM_MSG,
 	OPCODE_SET_WORD,
-	OPCODE_CLEAR_WORD
+	OPCODE_CLEAR_WORD,
+	// V2-only: add/subtract the input-number register (variable 0) to/from a
+	// variable. Used by Talisman's counterweight bowl (funcs 170/173) to deposit
+	// or remove an exact "PUT/TAKE n COINS" count. Mirror of the VAR_GT1/EQ1
+	// family that takes variable 0 as the implicit second operand.
+	OPCODE_VAR_ADD1,
+	OPCODE_VAR_SUB1
 };
 
 /* Game state update flags */
@@ -181,7 +184,11 @@ enum {
 enum ItemFlag {
 	ITEMF_WEIGHT_MASK = 0x7,
 	ITEMF_CAN_TAKE    = 1 << 3,
-	ITEMF_UNKNOWN     = 1 << 6,
+	// Bit 6: suppress this item's picture. The per-turn presentation draws an
+	// item's picture only when this bit is clear (set/cleared by the
+	// SET_FLAG40/CLEAR_FLAG40 opcodes). Distinct from ITEMF_INVISIBLE, which
+	// only hides the item from the text listing.
+	ITEMF_NO_PICTURE  = 1 << 6,
 	ITEMF_INVISIBLE   = 1 << 7
 };
 
@@ -264,6 +271,8 @@ struct WordIndex {
 
 struct Word : public WordIndex {
 	char _word[7];
+	uint8 _len;   // cached strlen(_word); set by load()/clear() so the parser's
+				  // hot word_match() need not re-strlen the word every compare.
 
 	Word() : WordIndex() {
 		Word::clear();
@@ -323,11 +332,23 @@ struct StringFile {
 	Common::String _filename;
 	uint32 _baseOffset;
 	uint32 _endOffset;
+	// For extra-string banks that are an embedded *structured* segment (a
+	// 4-byte header + 64-entry uint16 index + data, the same layout as a
+	// standalone Apple/DOS string file) located partway into a larger file
+	// such as a DOS novel.exe. 0 means "not a structured segment"; use
+	// _baseOffset for the raw-sequential variant instead.
+	uint32 _structOffset;
 
-	StringFile() : _baseOffset(0), _endOffset(0) {
+	StringFile() : _baseOffset(0), _endOffset(0), _structOffset(0) {
 	}
 	StringFile(const char *fname, uint32 baseOfs = 0, uint32 endO = 0) :
-		_filename(fname), _baseOffset(baseOfs), _endOffset(endO) {
+		_filename(fname), _baseOffset(baseOfs), _endOffset(endO), _structOffset(0) {
+	}
+	// Named constructor for an embedded structured segment at headerOfs.
+	static StringFile structuredSegment(const char *fname, uint32 headerOfs) {
+		StringFile sf(fname);
+		sf._structOffset = headerOfs;
+		return sf;
 	}
 };
 
@@ -355,7 +376,7 @@ struct GameHeader {
 
 	uint16 addr_actions[7];
 
-	uint16 addr_vm; // FIXME - functions
+	uint16 addr_vm; // start of the functions (bytecode) block
 
 	GameHeader() {
 		clear();
@@ -375,7 +396,18 @@ protected:
 	Common::StringArray _locationGraphicFiles;
 	Common::StringArray _itemGraphicFiles;
 	Common::String _titleGraphicFile;
-	uint _colorTable;
+
+	// The data files come in lettered runs (string banks MA, MB, ..., room
+	// pictures RA, RB, ..., item pictures OA, OB, ...) whose length is the
+	// only thing that varies per game, and whose suffix is the only thing that
+	// varies per platform ("" on Apple II, ".MS1" on DOS). Append
+	// prefix + first..last + suffix to one of the three file lists.
+	template <class FileList>
+	static void addLetteredFiles(FileList &files, const char *prefix, char first,
+								 char last, const char *suffix = "") {
+		for (char c = first; c <= last; c++)
+			files.push_back(Common::String::format("%s%c%s", prefix, c, suffix).c_str());
+	}
 
 public:
 	GameHeader _header;
@@ -398,6 +430,8 @@ public:
 	uint16 _variables[MAX_VARIABLES];
 
 	uint8 _currentReplaceWord;
+	bool _replaceWordIsNumber;	// '@' renders a number instead of a word
+	uint8 _replaceNumberVar;	// variable index whose value is rendered
 	uint8 _wordFlags;
 	uint _updateFlags;
 
@@ -440,6 +474,10 @@ private:
 	void loadGameData();
 
 protected:
+	// True if at least one of the game's graphics files (room, item or title)
+	// is actually present, so it is worth opening the picture window.
+	bool hasAnyGraphicsFile() const;
+
 	/**
 	 * Game strings are stored using 5-bit characters. By default a character
 	 * value maps to the lower-case letter table. If a character has the value 0x1e
@@ -466,6 +504,8 @@ public:
 
 	void clearGame();
 	void loadGame();
+	// Write every decoded string of both tables, one per line, as
+	// "S1 <index> <text>" / "S2 <index> <text>" (newlines escaped as \n).
 };
 
 } // namespace Comprehend
