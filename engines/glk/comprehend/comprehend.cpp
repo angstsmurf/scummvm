@@ -60,12 +60,12 @@ void Comprehend::createDebugger() {
 }
 
 void Comprehend::initGraphicsMode() {
-	// A 320 pixel high picture leaves no room for the status grid and the text
-	// below it at the 400 pixel height the other interpreters use.
-	_conf->_width = _conf->_imageW = 640;
-	_conf->_height = _conf->_imageH = 480;
+	// A picture takes half the width in height, which leaves too little room for
+	// the text at the 16:10 shape the other interpreters use, so use 4:3.
+	_conf->_width = _conf->_imageW = MAX<uint>(_conf->_width, 640);
+	_conf->_height = _conf->_imageH = _conf->_width * 3 / 4;
 	Graphics::PixelFormat pixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0);
-	initGraphics(640, 480, &pixelFormat);
+	initGraphics(_conf->_width, _conf->_height, &pixelFormat);
 }
 
 bool Comprehend::loadLauncherSavegameIfNeeded() {

@@ -65,7 +65,7 @@ Conf::Conf(InterpreterType interpType) : _interpType(interpType), _graphics(true
 #ifndef USE_HIGHRES
 		_width(320), _height(200),
 #else
-		_width(640), _height(400),
+		_width(1280), _height(800),
 #endif
 		_screenFormat(2, 5, 6, 5, 0, 11, 5, 0, 0),
 #ifndef USE_HIGHRES
@@ -92,8 +92,16 @@ Conf::Conf(InterpreterType interpType) : _interpType(interpType), _graphics(true
 	_propInfo._moreAlign = 0;
 	_monoInfo._aspect = 1.0;
 	_propInfo._aspect = 1.0;
-	_monoInfo._size = 11;
-	_propInfo._size = 12;
+#ifndef USE_HIGHRES
+	const int scale = 1;
+#else
+	// The sizes below were chosen for 640x400
+	const int scale = _width / 640;
+#endif
+	_tMarginX *= scale;
+	_tMarginY *= scale;
+	_monoInfo._size = 11 * scale;
+	_propInfo._size = 12 * scale;
 	_propInfo._linkColor = parseColor(BLUE);
 	_monoInfo._linkColor = _propInfo._linkColor;
 	_propInfo._linkSave = _propInfo._linkColor;
@@ -108,8 +116,8 @@ Conf::Conf(InterpreterType interpType) : _interpType(interpType), _graphics(true
 	_propInfo._spaces = 0;
 	_propInfo._caps = 0;
 
-	const int DEFAULT_MARGIN_X = (_interpType == INTERPRETER_ZCODE) ? 0 : 15;
-	const int DEFAULT_MARGIN_Y = (_interpType == INTERPRETER_ZCODE) ? 0 : 15;
+	const int DEFAULT_MARGIN_X = (_interpType == INTERPRETER_ZCODE) ? 0 : 15 * scale;
+	const int DEFAULT_MARGIN_Y = (_interpType == INTERPRETER_ZCODE) ? 0 : 15 * scale;
 	_wMarginX = _wMarginSaveX = DEFAULT_MARGIN_X;
 	_wMarginY = _wMarginSaveY = DEFAULT_MARGIN_Y;
 
@@ -134,6 +142,11 @@ Conf::Conf(InterpreterType interpType) : _interpType(interpType), _graphics(true
 }
 
 void Conf::synchronize() {
+	// Sizes saved before the default resolution was raised were meant for 640x400
+	if (_isLoading && !exists("width") && exists("monosize")) {
+		_width = 640;
+		_height = 400;
+	}
 	syncAsInt("width", _width);
 	syncAsInt("height", _height);
 	syncAsString("moreprompt", _propInfo._morePrompt);

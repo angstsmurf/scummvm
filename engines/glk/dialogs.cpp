@@ -189,6 +189,19 @@ static GUI::StaticTextWidget *createHeading(GUI::GuiObject *boss, const char *id
 	return h;
 }
 
+// The resolution a game's saved settings are for; see Conf::synchronize()
+static Common::Point savedResolution(const Common::String &domain) {
+	if (ConfMan.hasKey("width", domain) && ConfMan.hasKey("height", domain))
+		return Common::Point(ConfMan.getInt("width", domain), ConfMan.getInt("height", domain));
+	if (ConfMan.hasKey("monosize", domain))
+		return Common::Point(640, 400);
+#ifndef USE_HIGHRES
+	return Common::Point(320, 200);
+#else
+	return Common::Point(1280, 800);
+#endif
+}
+
 GlkOptionsWidget::GlkOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain)
 	: GUI::OptionsContainerWidget(boss, name, "GlkOptionsDialog", domain) {
 
@@ -292,6 +305,9 @@ GlkOptionsWidget::GlkOptionsWidget(GuiObject *boss, const Common::String &name, 
 	_caretShape->appendEntry("2", 2);
 	_caretShape->appendEntry("3", 3);
 	_caretShape->appendEntry("4", 4);
+
+	NEW_LABEL_POPUP("GlkOptionsDialog.resolutionlbl", _("Resolution:"), _resolution, "GlkOptionsDialog.resolution",
+		_("Higher resolutions give sharper text. Changing it also scales the font sizes, leading, baseline and margins. It can only be changed from the launcher"));
 
 	NEW_LABEL_EDIT("GlkOptionsDialog.moreprompt", _("More prompt:"), _morePrompt, "GlkOptionsDialog.morePrompt", _("Custom marker in place of the \"More...\" marker for eg. \"continue\". Leave it blank to use the game's default"));
 
@@ -543,7 +559,11 @@ void GlkOptionsWidget::load() {
 		tempConfCreated = true;
 		// instantiate a global g_conf so the dialog can read values from it
 		new Conf(INTERPRETER_GLULX);
+		// The launcher has no active domain, so it would read the defaults
+		const Common::String activeDomain = ConfMan.getActiveDomainName();
+		ConfMan.setActiveDomain(_domain);
 		g_conf->load();
+		ConfMan.setActiveDomain(activeDomain);
 	}
 
 	BoolOption boolOptions[] = {
@@ -638,8 +658,8 @@ void GlkOptionsWidget::load() {
 	INIT_NUM(_tmarginy, _tMarginY);
 	INIT_INT(_leading, g_conf->_propInfo._leading);
 	INIT_INT(_baseline, g_conf->_propInfo._baseLine);
-	INIT_SLIDER_FLOAT(_monosize, g_conf->_monoInfo._size, 10, 25);
-	INIT_SLIDER_FLOAT(_propsize, g_conf->_propInfo._size, 10, 25);
+	INIT_SLIDER_FLOAT(_monosize, g_conf->_monoInfo._size, 10, 60);
+	INIT_SLIDER_FLOAT(_propsize, g_conf->_propInfo._size, 10, 60);
 	_monosizeVal->setValue(_monosize->getValue());
 	_propsizeVal->setValue(_propsize->getValue());
 	INIT_POPUP(_morealign, g_conf->_propInfo._moreAlign);
@@ -651,6 +671,22 @@ void GlkOptionsWidget::load() {
 		_comprehendMoreColours->setState(!ConfMan.hasKey("comprehend_more_colours", _domain) ||
 			ConfMan.getBool("comprehend_more_colours", _domain));
 	}
+
+	// A running game can't change its resolution, as its windows and fonts are
+	// already laid out for it.
+	Common::Point res = savedResolution(_domain);
+	const bool comprehend = _comprehendSlowDraw != nullptr;
+	static const int RES_WIDTHS[] = { 640, 1280, 1920 };
+	bool listed = false;
+	_resolution->clearEntries();
+	for (int width : RES_WIDTHS) {
+		_resolution->appendEntry(Common::String::format("%dx%d", width, comprehend ? width * 3 / 4 : width * 5 / 8), width);
+		listed = listed || width == res.x;
+	}
+	if (!listed)
+		_resolution->appendEntry(Common::String::format("%dx%d", res.x, res.y), res.x);
+	_resolution->setSelectedTag(res.x);
+	_resolution->setEnabled(tempConfCreated);
 
 	if (tempConfCreated)
 		delete g_conf;
@@ -813,6 +849,11 @@ void GlkOptionsWidget::defineLayout(GUI::ThemeEval &layouts,
 						.addPadding(0, 0, 0, 0)
 						.addWidget("moreprompt", "OptionsLabel")
 						.addWidget("morePrompt", "EditTextWidget", baseScale * 10)
+					.closeLayout()
+					.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+						.addPadding(0, 0, 0, 0)
+						.addWidget("resolutionlbl", "OptionsLabel")
+						.addWidget("resolution", "PopUp", baseScale * 10)
 					.closeLayout()
 					.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
 						.addPadding(0, 0, 0, 0)
@@ -1057,7 +1098,11 @@ bool GlkOptionsWidget::save() {
 		tempConfCreated = true;
 		// instantiate a global g_conf so the dialog can save values into it
 		new Conf(INTERPRETER_GLULX);
+		// The launcher has no active domain, so it would read the defaults
+		const Common::String activeDomain = ConfMan.getActiveDomainName();
+		ConfMan.setActiveDomain(_domain);
 		g_conf->load();
+		ConfMan.setActiveDomain(activeDomain);
 	}
 
 	BoolOption boolOptions[] = {
@@ -1129,6 +1174,27 @@ bool GlkOptionsWidget::save() {
 
 	g_conf->_propInfo._leading = g_conf->_monoInfo._leading;
 	g_conf->_monoInfo._baseLine = g_conf->_propInfo._baseLine;
+
+	if (!tempConfCreated) {
+		// A running game keeps its resolution, and its popup is disabled. Record
+		// it, or the sizes just saved would be taken for 640x400 ones.
+		ConfMan.setInt("width", g_conf->_width, _domain);
+		ConfMan.setInt("height", g_conf->_height, _domain);
+	} else {
+		Common::Point oldRes = savedResolution(_domain);
+		int newWidth = _resolution->getSelectedTag();
+		ConfMan.setInt("width", newWidth, _domain);
+		ConfMan.setInt("height", newWidth == oldRes.x ? oldRes.y : newWidth * 5 / 8, _domain);
+		if (newWidth != oldRes.x) {
+			// Keep the text the same size relative to the screen
+			static const char *const FLOAT_KEYS[] = { "monosize", "propsize" };
+			static const char *const INT_KEYS[] = { "leading", "baseline", "wmarginx", "wmarginy", "tmarginx", "tmarginy" };
+			for (const char *key : FLOAT_KEYS)
+				ConfMan.setFloat(key, ConfMan.getFloat(key, _domain) * newWidth / oldRes.x, _domain);
+			for (const char *key : INT_KEYS)
+				ConfMan.setInt(key, (ConfMan.getInt(key, _domain) * newWidth + oldRes.x / 2) / oldRes.x, _domain);
+		}
+	}
 
 	Common::String WHexStr = _manualWColorHexInput->getEditString().encode();
 	Common::String BHexStr = _manualBColorHexInput->getEditString().encode();

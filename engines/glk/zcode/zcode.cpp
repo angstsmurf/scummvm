@@ -19,6 +19,7 @@
  *
  */
 
+#include "glk/conf.h"
 #include "glk/zcode/zcode.h"
 #include "glk/zcode/frotz_types.h"
 #include "glk/zcode/screen.h"
@@ -47,6 +48,8 @@ void ZCode::initGraphicsMode() {
 
 	if (version == 6) {
 		// The V6 games have graphics that expect 320x200 mode
+		_conf->_width = _conf->_imageW = 640;
+		_conf->_height = _conf->_imageH = 400;
 		Graphics::PixelFormat pixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0);
 		initGraphics(320, 200, &pixelFormat);
 	} else {

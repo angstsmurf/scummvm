@@ -97,6 +97,7 @@ private:
 	GUI::PopUpWidget *_linkStyle;
 	GUI::PopUpWidget *_caretShape;
 	GUI::EditTextWidget *_morePrompt;
+	GUI::PopUpWidget *_resolution;
 	GUI::CheckboxWidget *_styleHint;
 	GUI::CheckboxWidget *_safeClicks;
 	GUI::EditTextWidget *_cols;
