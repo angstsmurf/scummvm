@@ -131,8 +131,16 @@ static bool decodeTrack(Common::SeekableReadStream &stream, uint trackLen, bool 
 		if (pos >= trackLen + firstGoodTrackPos)
 			break;
 
+		byte syncByte = buffer[pos++ % trackLen];
+
+		// Some copy-protected disks (the Apple II Talisman, on its odd tracks)
+		// start the DOS 3.3 address field with d4 instead of d5. The check for
+		// the whole prologue leaves other d4 bytes for the sync search below.
+		if (dos33 && syncByte == 0xd4 && buffer[pos % trackLen] == 0xaa && buffer[(pos + 1) % trackLen] == 0x96)
+			syncByte = 0xd5;
+
 		// Read until we find two sync bytes.
-		if (buffer[pos++ % trackLen] != 0xd5 || buffer[pos++ % trackLen] != 0xaa)
+		if (syncByte != 0xd5 || buffer[pos++ % trackLen] != 0xaa)
 			continue;
 
 		byte prologue = buffer[pos++ % trackLen];
