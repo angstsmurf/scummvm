@@ -50,7 +50,7 @@ bool MacPopUp::draw(ManagedSurface *g, bool forceRedraw) {
 		g->transBlitFrom(*_composeSurface, _wm->_colorGreen);
 
 	if (!(_wm->_mode & kWMModeNoSystemRedraw) && !(_wm->_mode & kWMModalMenuMode) && g)
-		g_system->copyRectToScreen(g->getPixels(), g->pitch, 0, 0, g->w, g->h);
+		_wm->copyRectToScreen(g->getPixels(), g->pitch, 0, 0, g->w, g->h);
 
 	return true;
 }

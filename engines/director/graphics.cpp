@@ -244,7 +244,9 @@ void DirectorEngine::shiftPalette(int startIndex, int endIndex, bool reverse) {
 
 void DirectorEngine::syncPalette() {
 	byte paletteBuf[768];
-	if (_gammaCorrection) {
+	// In true color mode, gamma correction is applied to the screen output
+	// instead, see DirectorEngine::run()
+	if (_gammaCorrection && _pixelformat.bytesPerPixel == 1) {
 		for (size_t i = 0; i < (size_t)_currentPaletteLength*3; i++) {
 			paletteBuf[i] = Graphics::macGammaCorrectionLookUp[_currentPalette[i]];
 		}

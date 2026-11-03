@@ -1156,7 +1156,7 @@ bool MacMenu::draw(ManagedSurface *g, bool forceRedraw) {
 
 	if (!(_wm->_mode & kWMModeNoSystemRedraw)) {
 		if ((_wm->_mode & kWMModalMenuMode) || !_wm->_screen)
-			g_system->copyRectToScreen(_composeSurface->getBasePtr(_bbox.left, _bbox.top), _composeSurface->pitch, _bbox.left, _bbox.top, _bbox.width(), _bbox.height());
+			_wm->copyRectToScreen(_composeSurface->getBasePtr(_bbox.left, _bbox.top), _composeSurface->pitch, _bbox.left, _bbox.top, _bbox.width(), _bbox.height());
 	}
 
 	for (uint i = 0; i < _menustack.size(); i++) {
@@ -1167,7 +1167,7 @@ bool MacMenu::draw(ManagedSurface *g, bool forceRedraw) {
 		g->transBlitFrom(*_composeSurface, _wm->_colorGreen);
 
 	if (!(_wm->_mode & kWMModeNoSystemRedraw) && !(_wm->_mode & kWMModalMenuMode) && g)
-		g_system->copyRectToScreen(g->getPixels(), g->pitch, 0, 0, g->w, g->h);
+		_wm->copyRectToScreen(g->getPixels(), g->pitch, 0, 0, g->w, g->h);
 
 	return true;
 }
@@ -1329,7 +1329,7 @@ void MacMenu::renderSubmenu(MacMenuSubMenu *menu, bool recursive) {
 		Graphics::ManagedSurface g;
 		g.copyFrom(*_wm->_screenCopy);
 		g.transBlitFrom(*_composeSurface, _wm->_colorGreen);
-		g_system->copyRectToScreen(g.getBasePtr(r->left, r->top), g.pitch, r->left, r->top, w, h);
+		_wm->copyRectToScreen(g.getBasePtr(r->left, r->top), g.pitch, r->left, r->top, w, h);
 	}
 }
 
@@ -1422,7 +1422,7 @@ bool MacMenu::mouseClick(int x, int y) {
 				if (_activeItem != -1) { // Restore background
 					if (_items[_activeItem]->submenu != nullptr) {
 						if (_wm->_mode & kWMModalMenuMode)
-							g_system->copyRectToScreen(_wm->_screenCopy->getPixels(), _wm->_screenCopy->pitch, 0, 0, _wm->_screenCopy->w, _wm->_screenCopy->h);
+							_wm->copyRectToScreen(_wm->_screenCopy->getPixels(), _wm->_screenCopy->pitch, 0, 0, _wm->_screenCopy->w, _wm->_screenCopy->h);
 
 						_menustack.pop_back(); // Drop previous submenu
 						_contentIsDirty = true;
@@ -1463,7 +1463,7 @@ bool MacMenu::mouseClick(int x, int y) {
 		if (numSubItem != _activeSubItem) {
 			if (_wm->_mode & kWMModalMenuMode) {
 				if (_activeSubItem == -1 || (topMenuEnabled && menu->items[_activeSubItem]->enabled && menu->items[_activeSubItem]->submenu != nullptr))
-					g_system->copyRectToScreen(_wm->_screenCopy->getPixels(), _wm->_screenCopy->pitch, 0, 0, _wm->_screenCopy->w, _wm->_screenCopy->h);
+					_wm->copyRectToScreen(_wm->_screenCopy->getPixels(), _wm->_screenCopy->pitch, 0, 0, _wm->_screenCopy->w, _wm->_screenCopy->h);
 			}
 
 			int maxVis = menu->bbox.height() / _menuDropdownItemHeight;
@@ -1545,7 +1545,7 @@ bool MacMenu::mouseClick(int x, int y) {
 				if (y1 + (int)h > _wm->_screenCopy->h)
 					h = _wm->_screenCopy->h - 1 - y1;
 
-				g_system->copyRectToScreen(_wm->_screenCopy->getBasePtr(x1, y1), _wm->_screenCopy->pitch, x1, y1, w, h);
+				_wm->copyRectToScreen(_wm->_screenCopy->getBasePtr(x1, y1), _wm->_screenCopy->pitch, x1, y1, w, h);
 			}
 
 			_menustack.pop_back();
