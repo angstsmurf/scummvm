@@ -1890,38 +1890,23 @@ bool compareStringEquality(const Common::String &s1, const Common::String &s2) {
 	return (c1 == 0) && (c2 == 0);
 }
 
-const char *d_strstr(const char *str, const char *substr) {
-	while (*str && *substr) {
-		uint32 c1 = getCharEquality(*str);
-		uint32 c2 = getCharEquality(*substr);
+int findStringEquality(const Common::String &str, const Common::String &substr) {
+	// Returns the 0-based character index of the first occurrence of substr
+	// in str, comparing characters as Lingo does, or -1 if not found.
+	Common::U32String u32Str = str.decode(Common::kUtf8);
+	Common::U32String u32Sub = substr.decode(Common::kUtf8);
+	int strLen = u32Str.size();
+	int subLen = u32Sub.size();
 
-		if (c1 == c2) {
-			// inner loop, keep track of the starting character
-			const char *baseptr = str;
-			const char *ref = substr;
-			while (*baseptr && *ref) {
-				c1 = getCharEquality(*baseptr);
-				c2 = getCharEquality(*ref);
-
-				// characters equal, increment substring
-				if (c1 == c2) {
-					ref++;
-				} else {
-					break;
-				}
-
-				// reached the end of the substring, success
-				if (!*ref)
-					return str;
-
-				baseptr++;
-			}
-		}
-
-		str++;
+	for (int i = 0; i + subLen <= strLen; i++) {
+		int j = 0;
+		while (j < subLen && getCharEquality(u32Str[i + j]) == getCharEquality(u32Sub[j]))
+			j++;
+		if (j == subLen)
+			return i;
 	}
 
-	return nullptr;
+	return -1;
 }
 
 void DirectorEngine::delayMillis(uint32 delay) {

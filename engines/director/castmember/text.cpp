@@ -429,8 +429,9 @@ void TextCastMember::setRawText(const Common::String &text) {
 	if (_ptext.equals(Common::U32String(text)))
 		return;
 
-	_rtext = text;
 	_ptext = Common::U32String(text);
+	// Keep the raw text in the field's native encoding, as loaded from STXT
+	_rtext = _ptext.encode(detectFontEncoding(_cast->_platform, _fontId));
 
 	// If text has changed, use the cached formatting from first STXT in this castmember.
 	Common::U32String formatting = Common::String::format("\001\016%04x%02x%04x%04x%04x%04x", _fontId, _textSlant, _fontSize, _fgpalinfo1, _fgpalinfo2, _fgpalinfo3);
