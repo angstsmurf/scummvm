@@ -82,9 +82,14 @@ SIIII mGetInstruction, node, hotspot, condition, i --  return ith instruction
 
 namespace Director {
 
-const char *const MapNavigatorXObj::xlibName = "MapNav";
+const char *const MapNavigatorXObj::xlibNames[] = {
+	"MapNav",			// Jewels of the Oracle - Win
+	"MapNavigator",		// Jewels of the Oracle - Mac
+	nullptr
+};
 const XlibFileDesc MapNavigatorXObj::fileNames[] = {
 	{ "MAPNAV",				nullptr }, // Jewels of the Oracle - Win
+	{ "MapNavigator",		nullptr }, // Jewels of the Oracle - Mac (XCOD resource name)
 	{ "MapNavigator.XObj",	nullptr }, // Jewels of the Oracle - Mac
 	{ nullptr,				nullptr },
 };
@@ -119,14 +124,16 @@ void MapNavigatorXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		MapNavigatorXObject::initMethods(xlibMethods);
 		MapNavigatorXObject *xobj = new MapNavigatorXObject(kXObj);
-		g_lingo->exposeXObject(xlibName, xobj);
+		for (uint i = 0; xlibNames[i]; i++)
+			g_lingo->exposeXObject(xlibNames[i], xobj);
 	}
 }
 
 void MapNavigatorXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		MapNavigatorXObject::cleanupMethods();
-		g_lingo->_globalvars[xlibName] = Datum();
+		for (uint i = 0; xlibNames[i]; i++)
+			g_lingo->_globalvars[xlibNames[i]] = Datum();
 	}
 }
 
