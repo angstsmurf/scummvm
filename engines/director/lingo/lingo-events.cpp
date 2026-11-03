@@ -662,6 +662,10 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 			queue.push(LingoEvent(event, eventId, kMovieHandler, false, pos, channelId));
 			break;
 
+		// Already queued as an event script above
+		case kEventMenuCallback:
+			break;
+
 		default:
 			warning("registerEvent: Unhandled event %s", _lingo->_eventHandlerTypes[event]);
 		}
