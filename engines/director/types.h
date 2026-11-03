@@ -124,6 +124,11 @@ enum TextType {
 	kTextTypeAdjustToFit,
 	kTextTypeScrolling,
 	kTextTypeFixed
+	// TODO: D4 and later have a fourth field type, "limit to field size" (3).
+	// D3 projectors only know types 0-2. When the user types at the end of a
+	// type 3 field, the D4 projector drops the key if the line would grow
+	// wider than the field. Lingo exposes the type as #limit through
+	// `the boxType` from D5 on. It isn't handled yet.
 };
 
 enum TextAlignType {
