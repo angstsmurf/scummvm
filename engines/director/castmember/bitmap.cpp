@@ -448,12 +448,20 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 	// 4bpp - if using a builtin palette, use one of the corresponding 4-bit ones.
 	case 4:
 		{
-			const auto pals = g_director->getLoaded16Palettes();
-			// in D4 you aren't allowed to use custom palettes for 4-bit images, so uh...
-			// I guess default to the mac palette?
-			CastMemberID palIndex = pals.contains(castPaletteId) ? castPaletteId : CastMemberID(kClutSystemMac, -1);
-			const PaletteV4 &srcPal = pals.getVal(palIndex);
-			dither = _picture->_surface.convertTo(g_director->_wm->_pixelformat, srcPal.palette, srcPal.length, dstPalette, dstPaletteCount, Graphics::kDitherNaive);
+			const auto &pals = g_director->getLoaded16Palettes();
+			const PaletteV4 *srcPal = nullptr;
+			if (pals.contains(castPaletteId)) {
+				srcPal = &pals.getVal(castPaletteId);
+			} else {
+				// D3 movies may use a custom 16-colour palette cast member
+				// for 4-bit images. Anything larger falls back to the Mac palette.
+				PaletteV4 *custom = g_director->getPalette(castPaletteId);
+				if (custom && custom->length <= 16)
+					srcPal = custom;
+				else
+					srcPal = &pals.getVal(CastMemberID(kClutSystemMac, -1));
+			}
+			dither = _picture->_surface.convertTo(g_director->_wm->_pixelformat, srcPal->palette, srcPal->length, dstPalette, dstPaletteCount, Graphics::kDitherNaive);
 		}
 		break;
 	// 8bpp - if using a different palette, and we're not doing a color cycling operation, convert using nearest colour matching
