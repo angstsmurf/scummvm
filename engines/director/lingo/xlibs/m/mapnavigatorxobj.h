@@ -22,58 +22,53 @@
 #ifndef DIRECTOR_LINGO_XLIBS_MAPNAVIGATORXOBJ_H
 #define DIRECTOR_LINGO_XLIBS_MAPNAVIGATORXOBJ_H
 
+#include "common/rect.h"
+
+namespace Common {
+class SeekableReadStream;
+}
+
 namespace Director {
-
-struct NavInstruction {
-	byte instruction_type;
-	byte reserved;
-	Common::String text;
-};
-struct NavCondition {
-	uint16 record_size;
-	uint16 destination_node;
-	uint16 condition_id;
-	uint16 instruction_count;
-
-	Common::Array<NavInstruction> instructions;
-};
-
-struct NavHotSpot {
-	uint16 record_size;
-	int16 left;
-	int16 top;
-	int16 right;
-	int16 bottom;
-	uint16 cursor_id;
-	byte initially_hidden;
-	byte unknown_0d;
-	uint16 condition_count;
-	Common::String evaluation_name;
-
-	bool isHidden; // Not part of the original data, used to track current hidden state in ScummVM
-
-	Common::Array<NavCondition> conditions;
-};
-
-struct NavNode {
-	uint16 background_picture;
-	uint16 hotspot_count;
-	uint16 unknown_04;
-	uint16 hotspot_list_offset;
-	Common::String name;
-
-	Common::Array<NavHotSpot> hotspots;
-};
 
 class MapNavigatorXObject : public Object<MapNavigatorXObject> {
 public:
 	MapNavigatorXObject(ObjectType objType);
 
-	Common::String _filename;
-	int16 _nodeCount;
-	int16 _hotspotCount;
-	int16 _firstNodeIndex;
-	Common::Array<NavNode> _nodes;
+	struct Instruction {
+		char type;					// 'Q' (QuickTime movie) or 'L' (Lingo)
+		Common::String text;
+	};
+
+	struct Condition {
+		uint16 number;
+		int16 destinationNode;
+		Common::Array<Instruction> instructions;
+	};
+
+	struct HotSpot {
+		Common::Rect rect;
+		int16 cursor;
+		bool initialHidden;
+		bool hidden;
+		Common::String evaluationFcn;
+		Common::Array<Condition> conditions;
+	};
+
+	struct Node {
+		Common::String name;
+		int16 backgroundPicture;
+		Common::Array<HotSpot> hotSpots;
+	};
+
+	bool loadMap(Common::SeekableReadStream *stream);
+	Node *getNode(int index);
+	HotSpot *getHotSpot(int node, int hotSpot);
+	HotSpot *getHiddenHotSpot(int node, int hotSpot);
+	Condition *getCondition(int node, int hotSpot, int condition);
+	Instruction *getInstruction(int node, int hotSpot, int condition, int index);
+
+	int _firstNode = 0;
+	Common::Array<Node> _nodes;
 };
 
 namespace MapNavigatorXObj {
