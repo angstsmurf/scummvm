@@ -391,7 +391,11 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 		break;
 	case 6: // field
 		if (g_director->getVersion() < 500) {
-			res = id.asMemberID();
+			// A script and a field may share a name, so prefer fields
+			CastMemberID memberID = id.asMemberID(kCastText);
+			if (memberID.member == -1 && id.type == STRING)
+				memberID = id.asMemberID();
+			res = memberID;
 		} else {
 			Datum member = g_lingo->pop();
 			res = g_lingo->toCastMemberID(member, id);
