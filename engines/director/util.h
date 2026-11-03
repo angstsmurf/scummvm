@@ -110,7 +110,7 @@ int compareStringOrder(const Common::String &s1, const Common::String &s2);
 bool compareStringEquality(const Common::String &s1, const Common::String &s2);
 
 // Our implementation of strstr() with Director character order
-const char *d_strstr(const char *str, const char *substr);
+int findStringEquality(const Common::String &str, const Common::String &substr);
 
 Common::String encodePathForDump(const Common::String &path);
 

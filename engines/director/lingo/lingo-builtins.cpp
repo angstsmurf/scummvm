@@ -804,15 +804,16 @@ void LB::b_offset(int nargs) {
 		b_offsetRect(nargs);
 		return;
 	}
-	Common::String source = Common::U32String(g_lingo->pop().asString()).encode(g_director->getPlatformEncoding());
-	Common::String target = Common::U32String(g_lingo->pop().asString()).encode(g_director->getPlatformEncoding());
+	// Both are UTF-8, which findStringEquality decodes
+	Common::String source = g_lingo->pop().asString();
+	Common::String target = g_lingo->pop().asString();
 
-	const char *str = d_strstr(source.c_str(), target.c_str());
-
-	if (str == nullptr)
+	if (target.empty()) {
 		g_lingo->push(Datum(0));
-	else
-		g_lingo->push(Datum(int(str - source.c_str() + 1)));
+		return;
+	}
+	// Lingo character positions count characters, not UTF-8 bytes
+	g_lingo->push(Datum(findStringEquality(source, target) + 1));
 }
 
 void LB::b_string(int nargs) {
