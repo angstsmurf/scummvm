@@ -115,6 +115,7 @@ public:
 
 	uint16 _frameRate;
 	bool _getFirstFrame;
+	bool _frameStale;	// the last rendered frame doesn't match the current movie position
 	bool _startPending;
 
 	Video::VideoDecoder *_video;
