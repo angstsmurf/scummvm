@@ -52,9 +52,14 @@ XIIIIIIIIS mPlay, filesOffset, startTime, duration, interruptable, h, v, hideCur
 
 namespace Director {
 
-const char *const QTCatMoviePlayerXObj::xlibName = "CatPlayr";
+const char *const QTCatMoviePlayerXObj::xlibNames[] = {
+	"CatPlayr",			// Jewels of the Oracle - Win
+	"QTCatMov",			// Jewels of the Oracle - Mac
+	nullptr
+};
 const XlibFileDesc QTCatMoviePlayerXObj::fileNames[] = {
 	{ "CATPLAYR",				nullptr }, // Jewels of the Oracle - Win
+	{ "QTCatMov",				nullptr }, // Jewels of the Oracle - Mac (XCOD resource name)
 	{ "QTCatMoviePlayer.XObj",	nullptr }, // Jewels of the Oracle - Mac
 	{ nullptr,					nullptr },
 };
@@ -74,14 +79,16 @@ void QTCatMoviePlayerXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		QTCatMoviePlayerXObject::initMethods(xlibMethods);
 		QTCatMoviePlayerXObject *xobj = new QTCatMoviePlayerXObject(kXObj);
-		g_lingo->exposeXObject(xlibName, xobj);
+		for (uint i = 0; xlibNames[i]; i++)
+			g_lingo->exposeXObject(xlibNames[i], xobj);
 	}
 }
 
 void QTCatMoviePlayerXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		QTCatMoviePlayerXObject::cleanupMethods();
-		g_lingo->_globalvars[xlibName] = Datum();
+		for (uint i = 0; xlibNames[i]; i++)
+			g_lingo->_globalvars[xlibNames[i]] = Datum();
 	}
 }
 

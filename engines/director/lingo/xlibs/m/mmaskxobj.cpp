@@ -42,9 +42,10 @@ II	mMask, state
 
 namespace Director {
 
-const char *const MMaskXObj::xlibName = "mmaskxobj";
+const char *const MMaskXObj::xlibName = "mouse";
 const XlibFileDesc MMaskXObj::fileNames[] = {
 	{ "MMASK.XOB",	nullptr },
+	{ "mouse",		"jewels1" },	// XCOD resource name
 	{ nullptr,		nullptr },
 };
 
