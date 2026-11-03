@@ -4526,11 +4526,17 @@ void LB::b_getVolumes(int nargs) {
 void LB::b_beginRecording(int nargs) {
 	g_lingo->printSTUBWithArglist("b_beginRecording", nargs);
 	g_lingo->dropStack(nargs);
+	Score *score = g_director->getCurrentMovie()->getScore();
+	if (score)
+		score->_recording = true;
 }
 
 void LB::b_endRecording(int nargs) {
 	g_lingo->printSTUBWithArglist("b_endRecording", nargs);
 	g_lingo->dropStack(nargs);
+	Score *score = g_director->getCurrentMovie()->getScore();
+	if (score)
+		score->_recording = false;
 }
 
 // Shockwave D6
