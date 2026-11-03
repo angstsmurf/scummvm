@@ -2343,6 +2343,7 @@ Datum Lingo::getTheField(Datum &id1, int field) {
 		return d;
 	}
 
+	// A script and a field may share a name, so only look for fields
 	CastMemberID id = id1.asMemberID(kCastText);
 
 	CastMember *member = movie->getCastMember(id);
@@ -2376,7 +2377,8 @@ void Lingo::setTheField(Datum &id1, int field, Datum &d) {
 		return;
 	}
 
-	CastMemberID id = id1.asMemberID();
+	// A script and a field may share a name, so only look for fields
+	CastMemberID id = id1.asMemberID(kCastText);
 
 	CastMember *member = movie->getCastMember(id);
 	if (!member) {
