@@ -88,6 +88,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId)
 	_channel = nullptr;
 
 	_getFirstFrame = false;
+	_frameStale = false;
 
 	_vflags = 0;
 	_frameRate = 0;
@@ -123,6 +124,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 	_channel = nullptr;
 
 	_getFirstFrame = false;
+	_frameStale = false;
 
 	_initialRect = Movie::readRect(stream);
 	_vflags = stream.readUint32();
@@ -196,6 +198,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 
 	_frameRate = source._frameRate;
 	_getFirstFrame = source._getFirstFrame;
+	_frameStale = source._frameStale;
 
 	_video = nullptr;
 	_lastFrame = nullptr;
@@ -534,6 +537,7 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 		if (frame->getPixels()) {
 			// Video should have the dithering palette set, decode using whatever palette we have now
 			_lastFrame = frame->convertTo(g_director->_pixelformat, _ditheringPalette);
+			_frameStale = false;
 		} else {
 			warning("DigitalVideoCastMember::createWidget(): frame has no pixel data");
 		}
@@ -624,6 +628,11 @@ void DigitalVideoCastMember::seekMovie(int stamp) {
 
 	if (_channel->_movieRate == 0.0) {
 		_getFirstFrame = true;
+	} else {
+		// If playback gets paused before the next frame has been
+		// rendered, setMovieRate() needs to show the frame at the
+		// new position
+		_frameStale = true;
 	}
 
 	_dirty = true;
@@ -665,6 +674,11 @@ void DigitalVideoCastMember::setMovieTime(int units) {
 
 	if (_channel->_movieRate == 0.0) {
 		_getFirstFrame = true;
+	} else {
+		// If playback gets paused before the next frame has been
+		// rendered, setMovieRate() needs to show the frame at the
+		// new position
+		_frameStale = true;
 	}
 
 	_dirty = true;
@@ -686,7 +700,15 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 
 	if (rate < 0.0)
 		warning("STUB: DigitalVideoCastMember::setMovieRate(%g)", rate);
-	else {
+	else if (rate == 0.0) {
+		// The video was seeked or reloaded but has not been drawn since,
+		// so render the frame at the current position once (e.g. a script
+		// that sets the fileName, then movieTime and movieRate to 0
+		// to show a still)
+		if (_frameStale)
+			_getFirstFrame = true;
+		_video->setRate(0);
+	} else {
 		if (_getFirstFrame && rate != 0.0) {
 			// playback got started before we rendered the first
 			// frame in pause mode, keep going
@@ -944,6 +966,14 @@ void DigitalVideoCastMember::reloadVideo() {
 		return;
 
 	debugC(2, kDebugLoading, "DigitalVideoCastMember::reloadVideo(): cast %d now uses %s", _castId, _filename.c_str());
+
+	// The last frame belongs to the previous file
+	if (_lastFrame) {
+		_lastFrame->free();
+		delete _lastFrame;
+		_lastFrame = nullptr;
+	}
+	_frameStale = true;
 
 	if (_channel) {
 		// Restart playback on the new file; scripts usually set
