@@ -26,6 +26,7 @@
 #include "common/debug-channels.h"
 #include "common/tokenizer.h"
 
+#include "graphics/macgamma.h"
 #include "graphics/macgui/macwindowmanager.h"
 #include "graphics/wincursor.h"
 
@@ -129,8 +130,7 @@ DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gam
 
 	// Enable Macintosh gamma correction. This resolves the issue of Mac games appearing too dark.
 	// Enabled by default for Macintosh and Pippin games in the detection code.
-	// Right now only used in 8-bit mode to adjust the palette.
-	// FIXME: How do we add this to true color rendering without a heap of workarounds?
+	// In 8-bit mode it adjusts the palette, in true color mode the screen output.
 	if ((getPlatform() == Common::kPlatformMacintosh) || (getPlatform() == Common::kPlatformPippin)) {
 		_gammaCorrection = ConfMan.getBool("gamma_correction");
 	} else {
@@ -330,6 +330,11 @@ Common::Error DirectorEngine::run() {
 	_wm->setDesktopMode(_wmMode);
 
 	_wm->printWMMode();
+
+	// Apply gamma correction to everything drawn in true color mode, including
+	// true color images and video, which don't go through the palette
+	if (_gammaCorrection && _pixelformat.bytesPerPixel != 1)
+		_wm->setOutputColorTable(Graphics::macGammaCorrectionLookUp);
 
 	debugC(1, kDebugImages, "Director pixelformat is: %s", _pixelformat.toString().c_str());
 

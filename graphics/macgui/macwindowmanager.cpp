@@ -190,6 +190,7 @@ public:
 MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::Language language, const Graphics::PixelFormat &pixelformat) {
 	_screen = nullptr;
 	_screenCopy = nullptr;
+	_outputColorTable = nullptr;
 	_desktopBmp = nullptr;
 	_desktop = nullptr;
 	_lastId = 0;
@@ -303,6 +304,7 @@ MacWindowManager::~MacWindowManager() {
 
 	delete _fontMan;
 	delete _screenCopy;
+	_outputColorBuf.free();
 
 	delete _desktop;
 
@@ -545,7 +547,10 @@ void MacWindowManager::disableScreenCopy() {
 	if (_screen)
 		_screen->copyFrom(*_screenCopy); // restore screen
 
-	g_system->copyRectToScreen(_screenCopy->getBasePtr(0, 0), _screenCopy->pitch, 0, 0, _screenCopy->w, _screenCopy->h);
+	if (_screen)
+		copyRectToScreen(_screenCopy->getBasePtr(0, 0), _screenCopy->pitch, 0, 0, _screenCopy->w, _screenCopy->h);
+	else
+		g_system->copyRectToScreen(_screenCopy->getBasePtr(0, 0), _screenCopy->pitch, 0, 0, _screenCopy->w, _screenCopy->h);
 }
 
 void MacWindowManager::setMenuItemCheckMark(MacMenuItem *menuItem, bool checkMark) {
@@ -1013,10 +1018,10 @@ void MacWindowManager::draw() {
 
 			if (_screen) {
 				_screen->blitFrom(*_desktop, Common::Point(0, 0));
-				g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, _screen->w, _screen->h);
+				copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, _screen->w, _screen->h);
 			} else {
 				_screenCopyPauseToken = new PauseToken(pauseEngine());
-				g_system->copyRectToScreen(_desktop->getPixels(), _desktop->pitch, 0, 0, _desktop->w, _desktop->h);
+				copyRectToScreen(_desktop->getPixels(), _desktop->pitch, 0, 0, _desktop->w, _desktop->h);
 			}
 		}
 		if (_redrawEngineCallback != nullptr)
@@ -1078,12 +1083,12 @@ void MacWindowManager::draw() {
 
 						g_system->unlockScreen();
 					} else {
-						g_system->copyRectToScreen(w->getBorderSurface()->getBasePtr(MAX(clip.left - outerDims.left, 0), MAX(clip.top - outerDims.top, 0)), w->getBorderSurface()->pitch, clip.left, clip.top, adjWidth, adjHeight);
+						copyRectToScreen(w->getBorderSurface()->getBasePtr(MAX(clip.left - outerDims.left, 0), MAX(clip.top - outerDims.top, 0)), w->getBorderSurface()->pitch, clip.left, clip.top, adjWidth, adjHeight);
 					}
 				}
 
 				adjustDimensions(clip, innerDims, adjWidth, adjHeight);
-				g_system->copyRectToScreen(w->getWindowSurface()->getBasePtr(MAX(clip.left - innerDims.left, 0), MAX(clip.top - innerDims.top, 0)), w->getWindowSurface()->pitch,MAX(innerDims.left, (int16)0), MAX(innerDims.top, (int16)0), adjWidth, adjHeight);
+				copyRectToScreen(w->getWindowSurface()->getBasePtr(MAX(clip.left - innerDims.left, 0), MAX(clip.top - innerDims.top, 0)), w->getWindowSurface()->pitch,MAX(innerDims.left, (int16)0), MAX(innerDims.top, (int16)0), adjWidth, adjHeight);
 
 				dirtyRects.push_back(clip);
 			}
@@ -1095,7 +1100,7 @@ void MacWindowManager::draw() {
 			}
 		} else if (w->draw(_screen, forceRedraw)) {
 			w->setDirty(false);
-			g_system->copyRectToScreen(_screen->getBasePtr(clip.left, clip.top), _screen->pitch, clip.left, clip.top, clip.width(), clip.height());
+			copyRectToScreen(_screen->getBasePtr(clip.left, clip.top), _screen->pitch, clip.left, clip.top, clip.width(), clip.height());
 			dirtyRects.push_back(clip);
 		}
 	}
@@ -1327,7 +1332,7 @@ void MacWindowManager::renderZoomBox(bool redraw) {
 	box->nextTime = box->startTime + 1000 * box->step * box->delay / 60;
 
 	if (redraw) {
-		g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, _screen->getBounds().width(), _screen->getBounds().height()); // zoomBox
+		copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, _screen->getBounds().width(), _screen->getBounds().height()); // zoomBox
 	}
 
 	if (box->step >= numSteps) {
@@ -1547,6 +1552,55 @@ void MacWindowManager::passPalette(const byte *pal, uint size) {
 
 	drawDesktop();
 	setFullRefresh(true);
+}
+
+void MacWindowManager::setOutputColorTable(const byte *table) {
+	_outputColorTable = table;
+
+	if (table && _pixelformat.bytesPerPixel == 4) {
+		// Precompute the shifted value of every channel, so that remapping
+		// a pixel is only three lookups
+		for (int i = 0; i < 256; i++) {
+			_outputColorLUT[0][i] = _pixelformat.RGBToColor(table[i], 0, 0) & (_pixelformat.rMax() << _pixelformat.rShift);
+			_outputColorLUT[1][i] = _pixelformat.RGBToColor(0, table[i], 0) & (_pixelformat.gMax() << _pixelformat.gShift);
+			_outputColorLUT[2][i] = _pixelformat.RGBToColor(0, 0, table[i]) & (_pixelformat.bMax() << _pixelformat.bShift);
+		}
+		_outputColorKeepMask = ~((uint32)(_pixelformat.rMax() << _pixelformat.rShift) |
+			(uint32)(_pixelformat.gMax() << _pixelformat.gShift) | (uint32)(_pixelformat.bMax() << _pixelformat.bShift));
+	}
+
+	setFullRefresh(true);
+}
+
+void MacWindowManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
+	if (!_outputColorTable || _pixelformat.bytesPerPixel != 4 || w <= 0 || h <= 0) {
+		g_system->copyRectToScreen(buf, pitch, x, y, w, h);
+		return;
+	}
+
+	if (_outputColorBuf.w < w || _outputColorBuf.h < h) {
+		int bufW = MAX<int>(w, _outputColorBuf.w);
+		int bufH = MAX<int>(h, _outputColorBuf.h);
+		_outputColorBuf.free();
+		_outputColorBuf.create(bufW, bufH, _pixelformat);
+	}
+
+	const uint32 *lutR = _outputColorLUT[0];
+	const uint32 *lutG = _outputColorLUT[1];
+	const uint32 *lutB = _outputColorLUT[2];
+	const uint32 keepMask = _outputColorKeepMask;
+	const byte rShift = _pixelformat.rShift, gShift = _pixelformat.gShift, bShift = _pixelformat.bShift;
+
+	for (int j = 0; j < h; j++) {
+		const uint32 *src = (const uint32 *)((const byte *)buf + j * pitch);
+		uint32 *dst = (uint32 *)((byte *)_outputColorBuf.getPixels() + j * _outputColorBuf.pitch);
+		for (int i = 0; i < w; i++) {
+			uint32 p = src[i];
+			dst[i] = (p & keepMask) | lutR[(p >> rShift) & 0xff] | lutG[(p >> gShift) & 0xff] | lutB[(p >> bShift) & 0xff];
+		}
+	}
+
+	g_system->copyRectToScreen(_outputColorBuf.getPixels(), _outputColorBuf.pitch, x, y, w, h);
 }
 
 uint32 MacWindowManager::findBestColor(byte cr, byte cg, byte cb) {

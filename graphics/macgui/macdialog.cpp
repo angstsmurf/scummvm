@@ -158,7 +158,7 @@ void MacDialog::paint() {
 void MacDialog::blit() {
 	paint();
 
-	g_system->copyRectToScreen(_screen->getBasePtr(_bbox.left, _bbox.top), _screen->pitch,
+	_wm->copyRectToScreen(_screen->getBasePtr(_bbox.left, _bbox.top), _screen->pitch,
 							   _bbox.left, _bbox.top, _bbox.width() + 1, _bbox.height() + 1);
 }
 
@@ -230,7 +230,7 @@ int MacDialog::run() {
 	}
 
 	_screen->copyRectToSurface(_tempSurface->getBasePtr(0, 0), _tempSurface->pitch, _bbox.left, _bbox.top, _bbox.width() + 1, _bbox.height() + 1);
-	g_system->copyRectToScreen(_screen->getBasePtr(r.left, r.top), _screen->pitch, r.left, r.top, r.width() + 1, r.height() + 1);
+	_wm->copyRectToScreen(_screen->getBasePtr(r.left, r.top), _screen->pitch, r.left, r.top, r.width() + 1, r.height() + 1);
 
 	_wm->popCursor();
 

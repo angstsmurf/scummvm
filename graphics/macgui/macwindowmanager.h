@@ -356,6 +356,15 @@ public:
 
 	void passPalette(const byte *palette, uint size);
 	void getPaletteEntry(uint32 color, byte &r, byte &g, byte &b);
+
+	/**
+	 * Set a per-channel lookup table that is applied to everything copied
+	 * to the screen in 32bpp mode, e.g. for gamma correction. In 8bpp mode
+	 * the table should be applied to the palette instead. Pass nullptr to
+	 * disable it. The table must stay valid while it is in use.
+	 */
+	void setOutputColorTable(const byte *table);
+	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h);
 	uint32 findBestColor(byte cr, byte cg, byte cb);
 	void setDesktopColor(byte, byte, byte);
 
@@ -492,6 +501,10 @@ private:
 
 	Common::Array<ZoomBox *> _zoomBoxes;
 	Graphics::PaletteLookup _paletteLookup;
+	const byte *_outputColorTable;
+	uint32 _outputColorLUT[3][256];
+	uint32 _outputColorKeepMask;
+	Surface _outputColorBuf;
 	Common::HashMap<uint, uint> _invertColorHash;
 
 	Common::Archive *_dataBundle;
