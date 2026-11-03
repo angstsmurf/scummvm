@@ -310,7 +310,11 @@ bool textWindowCallback(Graphics::WindowClick click, Common::Event &event, void 
 Graphics::MacWidget *TextCastMember::createWindowOrWidget(Common::Rect &bbox, Common::Rect dims, Graphics::MacFont *macFont) {
 	Graphics::MacText *widget = nullptr;
 
+	// The D2-D6 projectors wrap the text to the width of the member's rect,
+	// whatever the size of the sprite. MacText takes the outer width and
+	// subtracts the border, gutter and shadow from it.
 	int maxWidth = _initialRect.width() + _borderSize * 2 + _gutterSize * 2 + _boxShadow;
+
 	widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(), bbox.left, bbox.top, dims.width(), dims.height(), g_director->_wm, _ftext, macFont, getForeColor(), getBackColor(), maxWidth, getAlignment(), _lineSpacing, _borderSize, _gutterSize, _boxShadow, _textShadow, _textType == kTextTypeFixed || _textType == kTextTypeScrolling, _textType == kTextTypeScrolling);
 	widget->setSelRange(g_director->getCurrentMovie()->_selStart, g_director->getCurrentMovie()->_selEnd);
 	widget->draw();
@@ -335,6 +339,12 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 
 	switch (type) {
 	case kCastText:
+		// TODO: The Mac projectors (D2-D6) inset the text rect by
+		// gutter / 2 at the top and bottom, i.e. 2 * (gutter / 2) in total,
+		// while MacWidget adds gutter. The two differ for odd gutter sizes.
+		// The Windows D3.1 projector insets the top by gutter / 2 and the
+		// bottom by gutter - gutter / 2, so there the total is gutter.
+
 		// for mactext, we can expand now, but we can't shrink. so we may pass the small size when we have adjustToFit text style
 		if (_textType == kTextTypeAdjustToFit) {
 			dims.right = MIN<int>(dims.right, dims.left + _initialRect.width());

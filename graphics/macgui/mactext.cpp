@@ -319,14 +319,20 @@ WindowClick MacText::isInScrollBar(int x, int y) const {
 		bBottom = _scrollBorder.getOffset().bottom;
 	}
 
-	if (x >= _dims.right - bRight && x < _dims.right) {
-		if (y < _dims.top + bTop)
+	// The scroll bar sits inside the border and the box shadow, see
+	// resizeScrollBar()
+	int right = _dims.right - _shadow - _border;
+	int top = _dims.top + _border;
+	int bottom = _dims.bottom - _shadow - _border;
+
+	if (x >= right - bRight && x < right) {
+		if (y < top + bTop)
 			return kBorderBorder;
 
-		if (y >= _dims.bottom - bBottom)
+		if (y >= bottom - bBottom)
 			return kBorderBorder;
 
-		if (y >= _dims.top + _dims.height() / 2)
+		if (y >= (top + bottom) / 2)
 			return kBorderScrollDown;
 
 		return kBorderScrollUp;
@@ -345,6 +351,13 @@ void MacText::setScrollBar(bool enable) {
 }
 
 void MacText::resizeScrollBar(int w, int h) {
+	// Like in the Director 3-6 projectors, the scroll bar runs down the right
+	// of the area inside the border, left of the box shadow, and the text
+	// gutter lies between the text and the scroll bar. The scroll bar
+	// border only draws the bar, at its right edge.
+	w = MAX<int>(1, w - _shadow - _border);
+	h = MAX<int>(1, h - _shadow - 2 * _border);
+
 	_borderSurface.free();
 	_borderSurface.create(w, h, _wm->_pixelformat);
 	if (_wm->_pixelformat.isCLUT8()) {
@@ -954,7 +967,7 @@ void MacText::drawStep(ManagedSurface *g, ManagedSurface *src, ManagedSurface *b
 	g->simpleBlitFrom(*src, Common::Rect(MIN<int>(src->w, x), MIN<int>(src->h, y), MIN<int>(src->w, x + w), MIN<int>(src->h, y + h)), Common::Point(xoff, yoff));
 
 	if (_scrollBar && _scrollBorder.hasBorder(kWindowBorderScrollbar))
-		g->transBlitFrom(*border, Common::Rect(0, 0, border->w, border->h), Common::Point(0, 0), btcolor);
+		g->transBlitFrom(*border, Common::Rect(0, 0, border->w, border->h), Common::Point(0, _border), btcolor);
 }
 
 void MacText::draw(ManagedSurface *g, int x, int y, int w, int h, int xoff, int yoff) {
@@ -1074,8 +1087,9 @@ bool MacText::draw(bool forceRedraw) {
 		_composeSurface->vLine(_composeSurface->w - _shadow + bb, _shadow, _composeSurface->h - _shadow, 0);
 	}
 
+	// The border goes around the box, not around the shadow
 	for (int bb = 0; bb < _border; bb++) {
-		Common::Rect borderRect(bb, bb, _composeSurface->w - bb, _composeSurface->h - bb);
+		Common::Rect borderRect(bb, bb, _composeSurface->w - _shadow - bb, _composeSurface->h - _shadow - bb);
 		_composeSurface->frameRect(borderRect, _borderColor);
 	}
 
