@@ -217,6 +217,7 @@ public:
 	byte _puppetTempo;
 
 	bool _puppetPalette;
+	bool _recording; // between beginRecording and endRecording
 	int _paletteTransitionIndex;
 	byte _paletteSnapshotBuffer[768];
 
