@@ -3689,6 +3689,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	// Windows version is D5
 	MACGAME1f("amber", "", "xn--AMBER-Journeys Beyond-yb4m", "a6a7812d8b3de0da884197eb26a1b059", 60086, 404, GF_TRUECOLOR),
+	MACGAME1f("amber", "", "xn--AMBER-Journeys Beyond-yb4m", "a7422f75a62511d401de1a2b1cc62e31", 62976, 404, GF_TRUECOLOR),
 
 	// Original filename is 'ｱﾒﾘｶ横断ｳﾙﾄﾗｸｲｽﾞ Demo'
 	MACDEMO1_l("americaodan", "Demo", "xn-- Demo-g40kn3x3n73alaj4a1a0e1ezj7clw4h", "32cb3a881f2d47a7e525370b198b2c5c", 484095, Common::JA_JPN, 404),
