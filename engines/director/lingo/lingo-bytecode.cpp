@@ -1134,7 +1134,7 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		}
 		debugC(1, kDebugCompile, "Add V4 script %d: factory '%s'", scriptId, factoryName.c_str());
 
-		sc = _assemblyContext = new ScriptContext(factoryName, scriptType, _assemblyId, parentNumber, scriptId);
+		sc = _assemblyContext = new ScriptContext(factoryName, scriptType, _assemblyId, archive->cast->_castLibID, parentNumber, scriptId);
 		registerFactory(factoryName);
 	} else {
 		debugC(1, kDebugCompile, "Add V4 script %d: %s %d", scriptId, scriptType2str(scriptType), _assemblyId);
