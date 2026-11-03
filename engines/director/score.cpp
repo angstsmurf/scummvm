@@ -68,6 +68,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 
 	_puppetTempo = 0;
 	_puppetPalette = false;
+	_recording = false;
 	_paletteTransitionIndex = 0;
 	memset(_paletteSnapshotBuffer, 0, 768);
 
@@ -463,6 +464,7 @@ bool Score::isWaitingForNextFrame() {
 
 void Score::updateCurrentFrame() {
 	uint32 nextFrameNumberToLoad = _curFrameNumber;
+	bool jumping = _nextFrame != 0;
 
 	if (!_window->_playbackPaused) {
 		if (_nextFrame) {
@@ -505,6 +507,7 @@ void Score::updateCurrentFrame() {
 
 			nextFrameNumberToLoad = 1;
 		}
+		jumping = true;
 	}
 
 	if (_labels != nullptr) {
@@ -515,7 +518,13 @@ void Score::updateCurrentFrame() {
 		}
 	}
 
-	if (_curFrameNumber != nextFrameNumberToLoad) {
+	// D2-D5 rebuild the frame from the score on every jump, including a
+	// jump to the current frame (e.g. "go to the frame"). D5 skips a jump to
+	// the current frame while score recording is on.
+	bool reloadFrame = _curFrameNumber != nextFrameNumberToLoad ||
+		(jumping && _version < kFileVer600 && !_window->_playbackPaused && !_recording);
+
+	if (reloadFrame) {
 		// Cache the previous bounding box for the purposes of rollOver.
 		// If the sprite is blank, D4 and below will use whatever the previous valid bounding
 		// box was for rollOver testing.
@@ -531,6 +540,38 @@ void Score::updateCurrentFrame() {
 		// This copies in the frame data and updates _curFrameNumber.
 		loadFrame(nextFrameNumberToLoad, true);
 
+		// Stepping to the next frame only copies the fields the score delta
+		// changes, so Lingo changes to non-puppet sprites survive. D2-D5 do
+		// this too, but when jumping (go to frame, go to the frame, looping)
+		// they clear all non-puppet channels and rebuild them from the score,
+		// so Lingo changes to non-puppet sprites are lost. The Daedalus
+		// Encounter relies on this: after Continue from the main menu, it
+		// moves the video sprite off-screen, unpuppets it, and expects the
+		// "go to the frame" loop to bring it back.
+		//
+		// D6 keeps the fields Lingo set (auto-puppet) until the sprite span
+		// ends, so it doesn't take this path.
+		if (jumping && _version < kFileVer600) {
+			for (uint ch = 0; ch < _currentFrame->_sprites.size(); ch++) {
+				Sprite *next = _currentFrame->_sprites[ch];
+				next->_copyBackMask = static_cast<uint32>(-1);
+
+				// A D2/D3 score sprite has no editable or moveable bit.
+				// Only the immediate sprite scripts (editableText,
+				// moveableSprite) set them, so a rebuild keeps them while
+				// the channel shows the same member. Otherwise the field
+				// would lose its focus and edit state on every jump
+				// (Spaceship Warlock: STAMBUL/FNCOPS loops with go marker(0)).
+				if (_version < kFileVer400 && ch < _channels.size()) {
+					Sprite *cur = _channels[ch]->_sprite;
+					if (cur->_castId.member && cur->_castId == next->_castId) {
+						next->_editable |= cur->_editable;
+						next->_moveable |= cur->_moveable;
+					}
+				}
+			}
+		}
+
 		for (uint ch = 0; ch < _channels.size(); ch++)
 			_channels[ch]->_sprite->releaseAutoPuppet(_currentFrame->_sprites[ch]->_copyBackMask);
 
@@ -538,9 +579,8 @@ void Score::updateCurrentFrame() {
 		// This will ignore any channel data that is overridden with the puppet flag.
 		updateSprites(kRenderModeNormal, true);
 	} else if (!_window->_playbackPaused) {
-		// Loading the same frame; e.g. "go to frame".
-		// This is mostly a no-op, however any sprite changes for
-		// non-puppet sprites will be reverted.
+		// Loading the same frame; e.g. "go to frame" in D6+.
+		// This is mostly a no-op.
 
 		// If playback has been paused on a frame, the sprites aren't cleaned.
 		updateSprites(kRenderModeNormal, true);
