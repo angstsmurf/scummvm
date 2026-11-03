@@ -3026,6 +3026,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	MACGAME1("maze", "", "Maze", "c4917547b9d9fda87567a9b3544489c4", 384278, 300),
 	MACGAME1("maze", "", "Maze", "39b6473190fb6f175c9dc5fbd7349de0", 327110, 300),
+	MACGAME1("maze", "", "Maze", "cbe51c534db8a78d4ef80c43ed0c788b", 388763, 300),
 
 	// Selection of demos narrated by the MazeBox Tone Cruise mascot:
 	//		Pyramid Interactive, Virtual Cocktail Bar, MazeBrew, Virtual Edo Castle,
