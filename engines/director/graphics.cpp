@@ -52,6 +52,35 @@ uint32 DirectorEngine::transformColor(uint32 color) {
 	return _wm->findBestColor(_currentPalette[color * 3], _currentPalette[color * 3 + 1], _currentPalette[color * 3 + 2]);
 }
 
+/**
+ * Turns a color from transformColor() back into a palette index, for
+ * returning to Lingo.
+ **/
+uint32 DirectorEngine::reverseTransformColor(uint32 color) {
+	if (_pixelformat.bytesPerPixel == 1)
+		return color;
+
+	byte r, g, b;
+	_pixelformat.colorToRGB(color, r, g, b);
+
+	uint32 best = 0;
+	uint32 bestDistance = 0xffffffff;
+	for (uint32 i = 0; i < 256; i++) {
+		int dr = _currentPalette[i * 3] - r;
+		int dg = _currentPalette[i * 3 + 1] - g;
+		int db = _currentPalette[i * 3 + 2] - b;
+		uint32 distance = dr * dr + dg * dg + db * db;
+		if (distance < bestDistance) {
+			best = i;
+			bestDistance = distance;
+			if (distance == 0)
+				break;
+		}
+	}
+
+	return best;
+}
+
 void DirectorEngine::loadPatterns() {
 	for (int i = 0; i < ARRAYSIZE(director3Patterns); i++)
 		_director3Patterns.push_back(director3Patterns[i]);

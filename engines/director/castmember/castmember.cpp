@@ -180,7 +180,7 @@ Datum CastMember::getField(int field) {
 
 	switch (field) {
 	case kTheBackColor:
-		d = (int)getBackColor();
+		d = (int)g_director->reverseTransformColor(getBackColor());
 		break;
 	case kTheCastLibNum:
 		d = _cast->_castLibID;
@@ -199,7 +199,7 @@ Datum CastMember::getField(int field) {
 			d = Datum(castInfo->directory + g_director->_dirSeparator + castInfo->fileName);
 		break;
 	case kTheForeColor:
-		d = (int)getForeColor();
+		d = (int)g_director->reverseTransformColor(getForeColor());
 		break;
 	case kTheHeight:
 		d = _cast->getCastMemberInitialRect(_castId).height();
@@ -269,7 +269,7 @@ void CastMember::setField(int field, const Datum &d) {
 
 	switch (field) {
 	case kTheBackColor:
-		_cast->getCastMember(_castId)->setBackColor(d.asInt());
+		_cast->getCastMember(_castId)->setBackColor(g_director->transformColor(d.asInt()));
 		return;
 	case kTheCastType:
 	case kTheType:
@@ -289,7 +289,7 @@ void CastMember::setField(int field, const Datum &d) {
 		}
 		return;
 	case kTheForeColor:
-		_cast->getCastMember(_castId)->setForeColor(d.asInt());
+		_cast->getCastMember(_castId)->setForeColor(g_director->transformColor(d.asInt()));
 		return;
 	case kTheHeight:
 		warning("BUILDBOT: CastMember::setField(): Attempt to set read-only field \"%s\" of cast %d", g_lingo->field2str(field), _castId);

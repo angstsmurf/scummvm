@@ -1118,8 +1118,7 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		d = _vm->getStage()->_window->getInnerDimensions().bottom;
 		break;
 	case kTheStageColor:
-		// TODO: Provide proper reverse transform for non-indexed color
-		d = (int)g_director->transformColor(g_director->getCurrentWindow()->getStageColor());
+		d = (int)g_director->reverseTransformColor(g_director->getCurrentWindow()->getStageColor());
 		break;
 	case kTheStageLeft:
 		d = _vm->getStage()->_window->getInnerDimensions().left;
@@ -1639,8 +1638,7 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 
 	switch (field) {
 	case kTheBackColor:
-		// TODO: Provide proper reverse transform for non-indexed color
-		d = (int)g_director->transformColor(sprite->_backColor);
+		d = (int)g_director->reverseTransformColor(sprite->_backColor);
 		break;
 	case kTheBlend:
 		d = (255 - sprite->_blendAmount) * 100 / 255;
@@ -1682,8 +1680,7 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = (sprite->_thickness & kTFlipV) ? 1 : 0;
 		break;
 	case kTheForeColor:
-		// TODO: Provide proper reverse transform for non-indexed color
-		d = (int)g_director->transformColor(sprite->_foreColor);
+		d = (int)g_director->reverseTransformColor(sprite->_foreColor);
 		break;
 	case kTheHeight:
 		d = channel->getHeight();

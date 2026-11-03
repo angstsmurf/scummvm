@@ -221,6 +221,7 @@ public:
 	Picture *getTile(int num);
 	const Common::Rect &getTileRect(int num);
 	uint32 transformColor(uint32 color);
+	uint32 reverseTransformColor(uint32 color);
 	Graphics::MacPatterns &getPatterns();
 	void setCursor(DirectorCursor type);
 	void draw();
