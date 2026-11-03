@@ -22,6 +22,7 @@
 #include "common/system.h"
 
 #include "director/director.h"
+#include "director/cursor.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-utils.h"
@@ -85,7 +86,33 @@ void ColorCursorXObj::m_new(int nargs) {
 }
 
 XOBJSTUBNR(ColorCursorXObj::m_dispose)
-XOBJSTUBNR(ColorCursorXObj::m_getSetCursor)
-XOBJSTUBNR(ColorCursorXObj::m_releaseCursor)
+void ColorCursorXObj::m_getSetCursor(int nargs) {
+	int crsrId = g_lingo->pop().asInt();
+
+	Cursor *cursor = new Cursor();
+	bool found = false;
+	for (auto &it : g_director->_allOpenResFiles) {
+		if (cursor->readFromArchive(g_director->_allSeenResFiles[it].get(), crsrId)) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		warning("ColorCursorXObj::m_getSetCursor: 'crsr' resource %d not found", crsrId);
+		delete cursor;
+		return;
+	}
+
+	debugC(5, kDebugXObj, "ColorCursorXObj::m_getSetCursor: set 'crsr' %d", crsrId);
+
+	// Distinguish it from a Lingo cursor with the same resource ID
+	cursor->_cursorResId = Datum(Common::String::format("crsr%d", crsrId));
+	g_director->setXObjCursor(cursor);
+}
+
+void ColorCursorXObj::m_releaseCursor(int nargs) {
+	g_director->setXObjCursor(nullptr);
+}
 
 }
