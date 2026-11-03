@@ -88,6 +88,7 @@ DirectorEngine::DirectorEngine(OSystem *syst, const DirectorGameDescription *gam
 	_mainArchive = nullptr;
 	_currentWindow = nullptr;
 	_cursorWindow = nullptr;
+	_xobjCursor = nullptr;
 	_lingo = nullptr;
 	_clipBoard = nullptr;
 	_fixStageSize = false;
@@ -180,9 +181,26 @@ DirectorEngine::~DirectorEngine() {
 	_allSeenResFiles.clear();
 	for (uint i = 0; i < _winCursor.size(); i++)
 		delete _winCursor[i];
+	delete _xobjCursor;
 
 	delete _surface;
 	delete _primitives;
+}
+
+void DirectorEngine::setXObjCursor(Cursor *cursor) {
+	if (!cursor && !_xobjCursor)
+		return;
+
+	delete _xobjCursor;
+	_xobjCursor = cursor;
+
+	// Make the score of whichever window holds the mouse redraw the cursor
+	if (_stage && _stage->getCurrentMovie())
+		_stage->getCurrentMovie()->getScore()->_cursorDirty = true;
+	for (auto &it : _windowList) {
+		if (it->getCurrentMovie())
+			it->getCurrentMovie()->getScore()->_cursorDirty = true;
+	}
 }
 
 Movie *DirectorEngine::getCurrentMovie() const { return _currentWindow->getCurrentMovie(); }

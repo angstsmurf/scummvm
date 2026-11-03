@@ -219,11 +219,16 @@ void Lingo::func_play(Datum &frame, Datum &movie) {
 void Lingo::func_cursor(Datum cursorDatum) {
 	Window *stage = _vm->getCurrentWindow();
 	Score *score = stage->getCurrentMovie()->getScore();
+	CursorRef oldCursor = score->_defaultCursor.getRef();
 	if (cursorDatum.type == ARRAY){
 		score->_defaultCursor.readFromCast(cursorDatum);
 	} else {
 		score->_defaultCursor.readFromResource(cursorDatum);
 	}
+	// Setting the cursor it already has doesn't touch the hardware cursor,
+	// so a cursor set by an XObject survives that.
+	if (!(score->_defaultCursor == oldCursor))
+		_vm->setXObjCursor(nullptr);
 	score->_cursorDirty = true;
 }
 

@@ -1811,7 +1811,16 @@ void LB::b_openXlib(int nargs) {
 				xlibName = resFile->getResourceDetail(XFCN, rsrcList[i]).name.c_str();
 				g_lingo->openXLib(xlibName, kXObj, xlibPath);
 			}
-			delete resFile;
+
+			// The XObject file stays open in the resource chain, so that its
+			// other resources (e.g. cursors) can be found.
+			if (!g_director->_allSeenResFiles.contains(xlibPath)) {
+				resFile->setPathName(xlibPath);
+				g_director->_allSeenResFiles.setVal(xlibPath, Common::SharedPtr<Archive>(resFile));
+			} else {
+				delete resFile;
+			}
+			g_director->addArchiveToOpenList(xlibPath);
 			return;
 		}
 		delete resFile;

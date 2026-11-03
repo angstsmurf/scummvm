@@ -286,6 +286,9 @@ bool Cursor::readFromArchive(Archive *archive, uint16 resourceId) {
 	if (!cursorStream && archive->hasResource(MKTAG('C', 'R', 'S', 'R'), resourceId))
 		cursorStream = archive->getResource(MKTAG('C', 'R', 'S', 'R'), resourceId);
 
+	if (!cursorStream && archive->hasResource(MKTAG('c', 'r', 's', 'r'), resourceId))
+		cursorStream = archive->getResource(MKTAG('c', 'r', 's', 'r'), resourceId);
+
 	if (cursorStream && readFromStream(*((Common::SeekableReadStream *)cursorStream), false, 0)) {
 		_usePalette = true;
 		_keyColor = 0xff;

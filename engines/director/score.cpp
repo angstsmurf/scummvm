@@ -1490,6 +1490,16 @@ void Score::renderCursor(Common::Point pos, bool forceUpdate) {
 		}
 	}
 
+	Cursor *xobjCursor = _vm->getXObjCursor();
+	if (xobjCursor) {
+		if (!forceUpdate && _currentCursor == *xobjCursor)
+			return;
+
+		_vm->_wm->replaceCursor(xobjCursor->_cursorType, xobjCursor);
+		_currentCursor = xobjCursor->getRef();
+		return;
+	}
+
 	if (!forceUpdate && _currentCursor == _defaultCursor)
 		return;
 

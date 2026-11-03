@@ -55,6 +55,7 @@ namespace Director {
 class Archive;
 class MacArchive;
 class Cast;
+class Cursor;
 class Debugger;
 class DirectorSound;
 class Lingo;
@@ -288,6 +289,11 @@ public:
 
 	Common::Array<Graphics::WinCursorGroup *> _winCursor;
 
+	// Cursor set directly by an XObject (e.g. a colour 'crsr' resource), which
+	// overrides the Lingo cursor until Lingo changes the cursor again.
+	Cursor *getXObjCursor() const { return _xobjCursor; }
+	void setXObjCursor(Cursor *cursor);
+
 
 protected:
 	Common::Error run() override;
@@ -329,6 +335,7 @@ private:
 	Common::Array<Window *> _windowsToForget;
 	Window *_currentWindow;
 	Window *_cursorWindow;
+	Cursor *_xobjCursor;
 
 	Graphics::MacPatterns _director3Patterns;
 	Graphics::MacPatterns _director3QuickDrawPatterns;
