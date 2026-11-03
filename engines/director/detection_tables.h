@@ -1599,6 +1599,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "requiem",			"Requiem: en mordgåta på 1600-talet" },
 	{ "rymdjakten",			"Rymdjakten" },
 	{ "singingbirdbook",	"Jan Lindblad presenterar den sjungande Fågelboken" },
+	{ "svearike",			"Svea Rike" },
 	{ "sverigejakten",		"Sverigejakten"},
 	{ "speltajm",			"Trazan & Banarne presenterar Speltajm" },
 	{ "xtown1",				"CrossTown: Giftet" },
@@ -8121,6 +8122,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 									  "MEDIA/02AHEFT.DXR", "f:d65ebe48689bae17035de773595f6383", 1319598, Common::DE_DEU, 501),
 	WINGAME2_l("suderhof", "Win 95",  "STARTW95.EXE",	   "t:12038763eff6eb54111fb1e088a1ed61", 1410443,
 									  "MEDIA/02AHEFT.DXR", "f:d65ebe48689bae17035de773595f6383", 1319598, Common::DE_DEU, 501),
+
+	MACGAME1f_l("svearike", "", "Svea Rike 1.0", "8353f7b1c9dc5685b05d1b881b61ff5c", 723335, Common::SV_SWE, 500, GF_TRUECOLOR),
 
 	MACGAME2("takeru",   "Chapter 1", "Takeru",			       "rt:868ebe3bbcf766408e7009525c78a97c", 719033,
 									  "module_1/menu.Dxr",	   "d:7fc6068c9ca58ef2f24028b817532c8d", 3024232, 501),
