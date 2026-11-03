@@ -26,6 +26,7 @@
 #include "common/config-manager.h"
 #include "common/file.h"
 #include "common/macresman.h"
+#include "common/ptr.h"
 #include "common/formats/winexe.h"
 
 #include "director/director.h"
@@ -201,17 +202,24 @@ ADDetectedGame DirectorMetaEngineDetection::fallbackDetect(const FileMap &allFil
 				}
 			}
 
+			// The marker file may have been wrapped in MacBinary when copied
+			// off a Mac volume, in which case only its data fork holds the info
+			Common::ScopedPtr<Common::SeekableReadStream> dataFork(Common::MacResManager::openDataForkFromMacBinary(&f));
+			if (!dataFork)
+				f.seek(0); // Undo the read of the MacBinary header check
+			Common::SeekableReadStream &stream = dataFork ? *dataFork : (Common::SeekableReadStream &)f;
+
 			// Now try to read info from the file
-			if (!(tmp = f.readString('\n')).empty())
+			if (!(tmp = stream.readString('\n')).empty())
 				targetID = tmp;
 
-			if (!(tmp = f.readString('\n')).empty())
+			if (!(tmp = stream.readString('\n')).empty())
 				gameName = tmp;
 
-			if (!(tmp = f.readString('\n')).empty())
+			if (!(tmp = stream.readString('\n')).empty())
 				platform = tmp;
 
-			if (!(tmp = f.readString('\n')).empty())
+			if (!(tmp = stream.readString('\n')).empty())
 				version = tmp;
 
 			desc->version = atoi(version.c_str());
