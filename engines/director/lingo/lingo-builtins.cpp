@@ -3900,10 +3900,17 @@ void LB::b_inside(int nargs) {
 		return;
 	}
 
-	Common::Rect rect2(r2.u.farr->arr[0].asInt(), r2.u.farr->arr[1].asInt(), r2.u.farr->arr[2].asInt(), r2.u.farr->arr[3].asInt());
-	Common::Point point1(p1.u.farr->arr[0].asInt(), p1.u.farr->arr[1].asInt());
+	// Don't construct a Common::Rect here: games can pass inverted rects
+	// (e.g. Daedalus combat hotspots), which would trip its validity assert.
+	// Like the Mac PtInRect, an empty or inverted rect contains no points.
+	int left = r2.u.farr->arr[0].asInt();
+	int top = r2.u.farr->arr[1].asInt();
+	int right = r2.u.farr->arr[2].asInt();
+	int bottom = r2.u.farr->arr[3].asInt();
+	int x = p1.u.farr->arr[0].asInt();
+	int y = p1.u.farr->arr[1].asInt();
 
-	d = rect2.contains(point1);
+	d = (x >= left && x < right && y >= top && y < bottom) ? 1 : 0;
 
 	g_lingo->push(d);
 }
