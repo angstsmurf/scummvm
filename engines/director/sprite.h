@@ -127,6 +127,8 @@ public:
 	MacShape *getShape();
 	uint32 getForeColor();
 	uint32 getBackColor();
+	bool setForeColor(uint32 index);
+	bool setBackColor(uint32 index);
 	void setAutoPuppet(AutoPuppetProperty property, bool value);
 	bool getAutoPuppet(AutoPuppetProperty property);
 	void releaseAutoPuppet(uint32 copyBackMask);
@@ -185,6 +187,11 @@ public:
 	bool _immediate;
 	uint32 _backColor;
 	uint32 _foreColor;
+	// Palette indices as stored in the score. In 32bpp, _foreColor and
+	// _backColor hold the colors converted with the palette that was active
+	// when the frame was loaded, so changes must be detected on the indices.
+	uint32 _backColorIndex;
+	uint32 _foreColorIndex;
 
 	byte _volume;
 	bool _stretch;

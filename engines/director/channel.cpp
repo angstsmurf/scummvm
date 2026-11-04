@@ -306,8 +306,11 @@ bool Channel::isDirty(Sprite *nextSprite) {
 		// When puppet is set, the overall dirty flag should be set when sprite is
 		// modified.
 		isDirtyFlag |= _sprite->_castId != nextSprite->_castId ||
-			_sprite->_ink != nextSprite->_ink || _sprite->_backColor != nextSprite->_backColor ||
-			_sprite->_foreColor != nextSprite->_foreColor ||
+			_sprite->_ink != nextSprite->_ink ||
+			// Compare palette indices: in 32bpp the converted colors depend on
+			// the palette active when each frame was loaded.
+			_sprite->_backColorIndex != nextSprite->_backColorIndex ||
+			_sprite->_foreColorIndex != nextSprite->_foreColorIndex ||
 			_sprite->_editable != nextSprite->_editable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
 			// The tweened flag is score authoring data and doesn't affect drawing

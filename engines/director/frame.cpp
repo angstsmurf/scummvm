@@ -339,12 +339,12 @@ void readSpriteDataD2(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 2:
 			// Normalize D2 and D3 colors from -128 ... 127 to 0 ... 255.
-			sprite._foreColor = g_director->transformColor(stream.readByte() ^ 0x80);
+			sprite.setForeColor(stream.readByte() ^ 0x80);
 			sprite._copyBackMask |= kSCBForeColor;
 			break;
 		case 3:
 			// Normalize D2 and D3 colors from -128 ... 127 to 0 ... 255.
-			sprite._backColor = g_director->transformColor(stream.readByte() ^ 0x80);
+			sprite.setBackColor(stream.readByte() ^ 0x80);
 			sprite._copyBackMask |= kSCBBackColor;
 			break;
 		case 4:
@@ -663,11 +663,11 @@ void readSpriteDataD4(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._copyBackMask |= kSCBEnabled;
 			break;
 		case 2:
-			sprite._foreColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setForeColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBForeColor;
 			break;
 		case 3:
-			sprite._backColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setBackColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBBackColor;
 			break;
 		case 4:
@@ -1028,11 +1028,11 @@ void readSpriteDataD5(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			}
 			break;
 		case 10:
-			sprite._foreColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setForeColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBForeColor;
 			break;
 		case 11:
-			sprite._backColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setBackColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBBackColor;
 			break;
 		case 12:
@@ -1450,13 +1450,13 @@ void readSpriteDataD6(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			debugC(6, kDebugLoading, "    sprite._stretch: %d", sprite._stretch);
 			break;
 		case 2:
-			sprite._foreColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setForeColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBForeColor;
 
 			debugC(6, kDebugLoading, "    sprite._foreColor: 0x%02x", sprite._foreColor);
 			break;
 		case 3:
-			sprite._backColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setBackColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBBackColor;
 			debugC(6, kDebugLoading, "    sprite._backColor: 0x%02x", sprite._backColor);
 			break;
@@ -1897,11 +1897,11 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._copyBackMask |= kSCBInk;
 			break;
 		case 2:
-			sprite._foreColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setForeColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBForeColor;
 			break;
 		case 3:
-			sprite._backColor = g_director->transformColor((uint8)stream.readByte());
+			sprite.setBackColor((uint8)stream.readByte());
 			sprite._copyBackMask |= kSCBBackColor;
 			break;
 		case 4:
