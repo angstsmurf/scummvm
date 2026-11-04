@@ -236,6 +236,13 @@ void Cursor::readFromResource(Datum resourceId) {
 			readSuccessful = readFromArchive(cast->getArchive().get(), resourceId.asInt());
 			if (readSuccessful)
 				break;
+
+			Archive *resFork = cast->getMacResourceFork();
+			if (resFork) {
+				readSuccessful = readFromArchive(resFork, resourceId.asInt());
+				if (readSuccessful)
+					break;
+			}
 		}
 
 		for (auto &it : g_director->_allOpenResFiles) {
@@ -271,9 +278,12 @@ void Cursor::readFromResource(Datum resourceId) {
 			}
 		}
 
-		// fallback method. try to use builtin cursor by regarding resourceId as a single byte.
-		if (!readSuccessful)
-			readBuiltinType(resourceId.asInt() & 0x7f);
+		// If GetCursor fails to find the resource, the original sets the
+		// standard arrow cursor.
+		if (!readSuccessful) {
+			warning("Cursor::readFromResource: cursor %d not found, using arrow", resourceId.asInt());
+			resetCursor(Graphics::kMacCursorArrow, true, resourceId);
+		}
 	}
 }
 

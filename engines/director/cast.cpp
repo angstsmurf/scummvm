@@ -83,6 +83,8 @@ Cast::Cast(Movie *movie, uint16 castLibID, bool isShared, bool isExternal, uint3
 	_castIDoffset = 0;
 
 	_castArchive = nullptr;
+	_macResFork = nullptr;
+	_macResForkProbed = false;
 	_version = 0;
 	_platform = Common::kPlatformMacintosh;
 
@@ -135,6 +137,7 @@ Cast::~Cast() {
 
 	delete _chunkResolver;
 	delete _lingodec;
+	delete _macResFork;
 }
 
 CastMember *Cast::getCastMember(int castId, bool load) {
@@ -320,8 +323,35 @@ bool Cast::eraseCastMember(int castId) {
 	return false;
 }
 
+// From D4 on, Mac movies keep their data in a RIFX container in the data
+// fork, but the resource fork of the movie file can still hold resources
+// such as CURS (e.g. The Daedalus Encounter keeps its navigation cursors
+// in DAEDALUS.DAT). The original D4 movie loader opens the movie file's
+// resource fork read-only and keeps it in the resource chain while the movie
+// plays, so GetCursor finds these. Open it lazily on first use.
+Archive *Cast::getMacResourceFork() {
+	if (_macResForkProbed)
+		return _macResFork;
+	_macResForkProbed = true;
+
+	if (!_castArchive || g_director->getPlatform() != Common::kPlatformMacintosh || g_director->getVersion() < 400)
+		return nullptr;
+
+	MacArchive *resFork = new MacArchive();
+	if (!resFork->openFile(findPath(_castArchive->getPathName()))) {
+		delete resFork;
+		return nullptr;
+	}
+	_macResFork = resFork;
+	return _macResFork;
+}
+
 void Cast::setArchive(Common::SharedPtr<Archive> archive) {
 	_castArchive = archive;
+
+	delete _macResFork;
+	_macResFork = nullptr;
+	_macResForkProbed = false;
 
 	if (archive->hasResource(MKTAG('M', 'C', 'N', 'M'), 0)) {
 		_macName = archive->getName(MKTAG('M', 'C', 'N', 'M'), 0).c_str();
