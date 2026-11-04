@@ -426,6 +426,17 @@ bool Score::isWaitingForNextFrame() {
 
 	bool goingTo = _nextFrame && _nextFrame != _curFrameNumber;
 
+	// In D2 to D6, "go" to a frame in the same movie returns to the handler
+	// without waiting for the frame timer; it restarts the timer instead.
+	// The tempo only paces the playback head while no Lingo runs. So a
+	// handler that loops on "go" (e.g. "repeat while the mouseDown") runs as
+	// fast as frames can be drawn. The Daedalus Encounter's planets puzzle
+	// relies on this: dragging the sun moves the planet 1 degree per loop
+	// pass, on frames with a tempo of 4 fps.
+	bool goFromFrozenHandler = _nextFrame &&
+		_window->frozenLingoStateCount() > 0 &&
+		_window->_nextMovie.movie.empty();
+
 	if (_waitForChannel) {
 		if (_waitForChannelCue != 0 && _waitForChannelCue != -2) {
 			 // -1: next, -2: end, else specific cue point
@@ -453,7 +464,7 @@ bool Score::isWaitingForNextFrame() {
 		} else {
 			_waitForVideoChannel = 0;
 		}
-	} else if (g_system->getMillis() < _nextFrameTime) {
+	} else if (g_system->getMillis() < _nextFrameTime && !goFromFrozenHandler) {
 		keepWaiting = true;
 	}
 
