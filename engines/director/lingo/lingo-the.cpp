@@ -1849,9 +1849,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 	switch (field) {
 	case kTheBackColor:
 		{
-			uint32 newColor = g_director->transformColor(d.asInt());
-			if (newColor != sprite->_backColor) {
-				sprite->_backColor = newColor;
+			if (sprite->setBackColor(d.asInt())) {
 				channel->setDirty();
 
 				// Based on Director in a Nutshell, page 15
@@ -1973,9 +1971,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		break;
 	case kTheForeColor:
 		{
-			uint32 newColor = g_director->transformColor(d.asInt());
-			if (newColor != sprite->_foreColor) {
-				sprite->_foreColor = newColor;
+			if (sprite->setForeColor(d.asInt())) {
 				channel->setDirty();
 			}
 

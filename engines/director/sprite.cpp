@@ -78,6 +78,8 @@ void Sprite::reset() {
 	_immediate = false;
 	_backColor = g_director->_wm->_colorWhite;
 	_foreColor = g_director->_wm->_colorWhite;
+	_backColorIndex = 0;
+	_foreColorIndex = 0;
 
 	_volume = 0;
 	_stretch = false;
@@ -135,6 +137,8 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_immediate = sprite._immediate;
 	_backColor = sprite._backColor;
 	_foreColor = sprite._foreColor;
+	_backColorIndex = sprite._backColorIndex;
+	_foreColorIndex = sprite._foreColorIndex;
 
 	_volume = sprite._volume;
 	_stretch = sprite._stretch;
@@ -162,8 +166,8 @@ bool Sprite::operator==(const Sprite &sprite) {
 		_width == sprite._width &&
 		_height == sprite._height &&
 		_ink == sprite._ink &&
-		_foreColor == sprite._foreColor &&
-		_backColor == sprite._backColor &&
+		_foreColorIndex == sprite._foreColorIndex &&
+		_backColorIndex == sprite._backColorIndex &&
 		_blendAmount == sprite._blendAmount &&
 		_ink == sprite._ink &&
 		(_thickness | kTTweened) == (sprite._thickness | kTTweened);
@@ -325,6 +329,23 @@ uint32 Sprite::getBackColor() {
 	default:
 		return _backColor;
 	}
+}
+
+// Set the colors from a palette index. Returns true if the color changed.
+bool Sprite::setForeColor(uint32 index) {
+	uint32 color = g_director->transformColor(index);
+	bool changed = index != _foreColorIndex || color != _foreColor;
+	_foreColorIndex = index;
+	_foreColor = color;
+	return changed;
+}
+
+bool Sprite::setBackColor(uint32 index) {
+	uint32 color = g_director->transformColor(index);
+	bool changed = index != _backColorIndex || color != _backColor;
+	_backColorIndex = index;
+	_backColor = color;
+	return changed;
 }
 
 uint32 Sprite::getForeColor() {
@@ -693,11 +714,13 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 	}
 	if (!getAutoPuppet(kAPForeColor) && (nextSprite->_copyBackMask & kSCBForeColor)) {
 		_foreColor = nextSprite->_foreColor;
+		_foreColorIndex = nextSprite->_foreColorIndex;
 		_fgColorB = nextSprite->_fgColorB;
 		_fgColorG = nextSprite->_fgColorG;
 	}
 	if (!getAutoPuppet(kAPBackColor) && (nextSprite->_copyBackMask & kSCBBackColor)) {
 		_backColor = nextSprite->_backColor;
+		_backColorIndex = nextSprite->_backColorIndex;
 		_bgColorB = nextSprite->_bgColorB;
 		_bgColorG = nextSprite->_bgColorG;
 	}
