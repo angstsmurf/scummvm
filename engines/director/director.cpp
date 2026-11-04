@@ -178,6 +178,7 @@ DirectorEngine::~DirectorEngine() {
 	}
 	delete _wm;
 	_allSeenResFiles.clear();
+	delete _mainResFork;
 	for (uint i = 0; i < _winCursor.size(); i++)
 		delete _winCursor[i];
 

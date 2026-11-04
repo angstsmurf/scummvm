@@ -93,6 +93,7 @@ public:
 	void loadArchive();
 	void setArchive(Common::SharedPtr<Archive> archive);
 	Common::SharedPtr<Archive> getArchive() const { return _castArchive; };
+	Archive *getMacResourceFork();
 	Movie *getMovie() const { return _movie; }
 	void setMovie(Movie *movie) { _movie = movie; }
 	Common::String getMacName() const { return _macName; }
@@ -168,6 +169,8 @@ private:
 
 public:
 	Common::SharedPtr<Archive> _castArchive;
+	Archive *_macResFork;
+	bool _macResForkProbed;
 	Common::Platform _platform;
 	uint16 _castLibID;
 	uint32 _libResourceId;
