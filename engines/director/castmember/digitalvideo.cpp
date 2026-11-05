@@ -88,6 +88,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId)
 	_channel = nullptr;
 
 	_getFirstFrame = false;
+	_startPending = false;
 
 	_vflags = 0;
 	_frameRate = 0;
@@ -123,6 +124,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 	_channel = nullptr;
 
 	_getFirstFrame = false;
+	_startPending = false;
 
 	_initialRect = Movie::readRect(stream);
 	_vflags = stream.readUint32();
@@ -197,6 +199,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 
 	_frameRate = source._frameRate;
 	_getFirstFrame = source._getFirstFrame;
+	_startPending = source._startPending;
 
 	_video = nullptr;
 	_lastFrame = nullptr;
@@ -416,6 +419,13 @@ bool DigitalVideoCastMember::isModified() {
 		return false;
 
 	return _video->needsUpdate();
+}
+
+void DigitalVideoCastMember::startPendingVideo() {
+	if (!_startPending)
+		return;
+	_startPending = false;
+	startVideo();
 }
 
 void DigitalVideoCastMember::startVideo() {
@@ -681,6 +691,7 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 	}
 
 	_channel->_movieRate = rate;
+	_startPending = false;
 
 	if (_channel->_stopTime == 0)
 		_channel->_stopTime = getMovieTotalTime();
@@ -876,16 +887,17 @@ void DigitalVideoCastMember::setField(int field, const Datum &d) {
 		return;
 	case kTheFileName:
 		// Update the filename, then force the video to be replaced.
-		// Channel dimensions are replaced by the video.
+		// Channel dimensions are replaced by the video, unless the
+		// sprite is stretched and so keeps its own size, as in
+		// Channel::setCast().
 		CastMember::setField(field, d);
 		if (_needsReload) {
 			_needsReload = false;
 			_useLinkedPath = true;
 			reloadVideo();
-			if (_channel) {
+			if (_channel && !_channel->_sprite->_stretch) {
 				Common::Rect rect = getInitialRect();
-				_channel->setWidth(rect.width());
-				_channel->setHeight(rect.height());
+				_channel->setVideoSize(rect.width(), rect.height());
 			}
 		}
 		return;
@@ -952,7 +964,11 @@ void DigitalVideoCastMember::reloadVideo() {
 		_channel->_movieTime = 0;
 		_channel->_startTime = 0;
 		_channel->_stopTime = 0;
-		startVideo();
+		// The new video starts with the next update of the stage, unless
+		// a script sets the movieRate first. Until then the rate reads 0.
+		_channel->_movieRate = 0.0;
+		_startPending = true;
+		_getFirstFrame = true;
 	}
 
 	_dirty = true;

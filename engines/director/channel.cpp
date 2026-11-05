@@ -57,6 +57,8 @@ Channel::Channel(Score *sc, Sprite *sp, int priority) {
 	_movieTime = 0;
 	_startTime = 0;
 	_stopTime = 0;
+	_lingoWidth = 0;
+	_lingoHeight = 0;
 
 	_filmLoopFrame = 0;
 
@@ -93,6 +95,9 @@ Channel& Channel::operator=(const Channel &channel) {
 	_movieTime = channel._movieTime;
 	_startTime = channel._startTime;
 	_stopTime = channel._stopTime;
+	_lingoSizeCast = channel._lingoSizeCast;
+	_lingoWidth = channel._lingoWidth;
+	_lingoHeight = channel._lingoHeight;
 
 	_filmLoopFrame = channel._filmLoopFrame;
 
@@ -290,6 +295,21 @@ bool hasTextCastMember(Sprite *sprite) {
 	if (sprite && sprite->_cast)
 		return sprite->_cast->_type == kCastText || sprite->_cast->_type == kCastButton;
 	return false;
+}
+
+void Channel::setVideoSize(int w, int h) {
+	// The video of the sprite's member got another size. An unstretched
+	// sprite is drawn at the new size from now on, but in the original
+	// 'the width/height of sprite' go on returning the old one.
+	if (!keepsLingoSize()) {
+		_lingoWidth = _sprite->_width;
+		_lingoHeight = _sprite->_height;
+		_lingoSizeCast = _sprite->_castId;
+	}
+	_sprite->setWidth(w);
+	_sprite->setHeight(h);
+	replaceWidget();
+	setNeedsDraw();
 }
 
 bool Channel::isDirty(Sprite *nextSprite) {

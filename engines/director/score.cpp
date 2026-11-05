@@ -47,6 +47,7 @@
 #include "director/sprite.h"
 #include "director/window.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/digitalvideo.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
 #include "director/castmember/transition.h"
@@ -980,6 +981,9 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		Channel *channel = _channels[i];
 		Sprite *currentSprite = channel->_sprite;
 		Sprite *nextSprite = _currentFrame->_sprites[i];
+
+		if (currentSprite->_cast && currentSprite->_cast->_type == kCastDigitalVideo)
+			((DigitalVideoCastMember *)currentSprite->_cast)->startPendingVideo();
 
 		// widget content has changed and needs a redraw.
 		// this doesn't include changes in dimension or position!

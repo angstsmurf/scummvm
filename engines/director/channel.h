@@ -47,14 +47,16 @@ public:
 	DirectorPlotData getPlotData();
 	const Graphics::Surface *getMask(bool forceMatte = false);
 
-	inline int getWidth() { return _sprite->_width; };
-	inline int getHeight() { return _sprite->_height; };
+	// The size Lingo reads, which is not always the size drawn; see setVideoSize()
+	inline int getWidth() { return keepsLingoSize() ? _lingoWidth : _sprite->_width; };
+	inline int getHeight() { return keepsLingoSize() ? _lingoHeight : _sprite->_height; };
 	inline Common::Point getPosition() { return _sprite->getPosition(); };
 	// Return the area of screen to be used for drawing content.
 	inline Common::Rect getBbox(bool unstretched = false) { return _sprite->getBbox(unstretched); };
 	Common::Rect getRollOverBbox();
 
 	bool isStretched();
+	bool keepsLingoSize() { return _lingoSizeCast.member && _sprite && _sprite->_castId == _lingoSizeCast; }
 	bool isDirty(Sprite *nextSprite = nullptr);
 	bool isEmpty();
 	bool isActiveText();
@@ -65,8 +67,9 @@ public:
 	bool isActiveVideo();
 	bool isVideoDirectToStage();
 
-	inline void setWidth(int w) { _sprite->setWidth(w); replaceWidget(); setNeedsDraw(); };
-	inline void setHeight(int h) { _sprite->setHeight(h); replaceWidget(); setNeedsDraw(); };
+	inline void setWidth(int w) { _lingoSizeCast = CastMemberID(); _sprite->setWidth(w); replaceWidget(); setNeedsDraw(); };
+	inline void setHeight(int h) { _lingoSizeCast = CastMemberID(); _sprite->setHeight(h); replaceWidget(); setNeedsDraw(); };
+	void setVideoSize(int w, int h);
 	inline void setBbox(int l, int t, int r, int b) { _sprite->setBbox(l, t, r, b); replaceWidget(); setNeedsDraw(); };
 	void setDirty();
 	void setNeedsDraw() { _needsDraw = true; }
@@ -122,6 +125,12 @@ public:
 	int _movieTime;
 	int _startTime;
 	int _stopTime;
+
+	// Size reported to Lingo for a sprite of this member while its video
+	// is drawn at another size
+	CastMemberID _lingoSizeCast;
+	int16 _lingoWidth;
+	int16 _lingoHeight;
 
 	// Used in film loops
 	uint _filmLoopFrame;

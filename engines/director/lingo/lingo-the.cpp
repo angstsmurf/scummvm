@@ -1987,7 +1987,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		}
 		break;
 	case kTheHeight:
-		if (d.asInt() != channel->getHeight()) {
+		if (d.asInt() != sprite->_height) {
 			channel->setHeight(d.asInt());
 		}
 
@@ -2141,7 +2141,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		sprite->_volume = d.asInt();
 		break;
 	case kTheWidth:
-		if (d.asInt() != channel->getWidth()) {
+		if (d.asInt() != sprite->_width) {
 			channel->setWidth(d.asInt());
 		}
 
