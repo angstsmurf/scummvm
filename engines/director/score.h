@@ -106,6 +106,8 @@ public:
 	void setPuppetTempo(int16 puppetTempo);
 
 	CastMemberID getCurrentPalette();
+	bool hasPuppetPalette();
+	bool controlsPalette();
 
 	Channel *getChannelById(uint16 id);
 	Sprite *getSpriteById(uint16 id);
