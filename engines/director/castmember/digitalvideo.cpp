@@ -509,7 +509,14 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 
 	// Do not render stopped videos
 	if (_channel->_movieRate == 0.0 && !_getFirstFrame && _lastFrame) {
-		widget->getSurface()->blitFrom(*_lastFrame);
+		// Stretch like a playing frame does, so a paused video keeps
+		// the sprite's size.
+		copyStretchImg(
+			_lastFrame,
+			widget->getSurface()->surfacePtr(),
+			Common::Rect((int16)_video->getWidth(), (int16)_video->getHeight()),
+			bbox
+		);
 
 		return widget;
 	}
