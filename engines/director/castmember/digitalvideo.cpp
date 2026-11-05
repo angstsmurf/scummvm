@@ -629,9 +629,13 @@ void DigitalVideoCastMember::seekMovie(int stamp) {
 
 	_channel->_startTime = stamp;
 
+	// Build the time from ticks rather than whole milliseconds. Rounding
+	// down to milliseconds lands just before the frame at that tick, so
+	// the previous frame shows. The Door F frescos in The Daedalus
+	// Encounter are single frames reached this way.
 	Audio::Timestamp dur = _video->getDuration();
 
-	_video->seek(Audio::Timestamp(_channel->_startTime * 1000 / getTimeScale(), dur.framerate()));
+	_video->seek(Audio::Timestamp(0, _channel->_startTime, getTimeScale()).convertToFramerate(dur.framerate()));
 
 	if (_channel->_movieRate == 0.0) {
 		_getFirstFrame = true;
@@ -666,7 +670,7 @@ void DigitalVideoCastMember::setStopTime(int stamp) {
 
 	Audio::Timestamp dur = _video->getDuration();
 
-	_video->setEndTime(Audio::Timestamp(_channel->_stopTime * 1000 / getTimeScale(), dur.framerate()));
+	_video->setEndTime(Audio::Timestamp(0, _channel->_stopTime, getTimeScale()).convertToFramerate(dur.framerate()));
 }
 
 void DigitalVideoCastMember::setMovieTime(int units) {
@@ -676,8 +680,10 @@ void DigitalVideoCastMember::setMovieTime(int units) {
 	// startTime and stopTime are always in ticks (1/60)
 	// movieTime and duration are always in scaling units (1/digitalVideoTimeScale)
 
+	// Build the time from units rather than whole milliseconds, as in
+	// seekMovie().
 	Audio::Timestamp dur = _video->getDuration();
-	_video->seek(Audio::Timestamp(units * 1000 / getTimeScale(), dur.framerate()));
+	_video->seek(Audio::Timestamp(0, units, getTimeScale()).convertToFramerate(dur.framerate()));
 
 	if (_channel->_movieRate == 0.0) {
 		_getFirstFrame = true;
