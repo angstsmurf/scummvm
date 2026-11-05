@@ -310,7 +310,8 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_foreColor != nextSprite->_foreColor ||
 			_sprite->_editable != nextSprite->_editable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
-			(_sprite->_thickness & kTThickness) != (nextSprite->_thickness & kTThickness);
+			// The tweened flag is score authoring data and doesn't affect drawing
+			(_sprite->_thickness | kTTweened) != (nextSprite->_thickness | kTTweened);
 		if (!_sprite->_moveable)
 			isDirtyFlag |= _sprite->getPosition() != nextSprite->getPosition();
 		if (isStretched() && !hasTextCastMember(_sprite))
