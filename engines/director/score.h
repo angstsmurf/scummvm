@@ -238,6 +238,7 @@ public:
 	CursorRef _currentCursor;
 	bool _skipTransition;
 	bool _skipIdle;
+	bool _idleWentToFrame;
 
 	Common::Array<uint32> _spriteDetailOffsets;
 	Common::Array<bool> _spriteDetailAccessed;

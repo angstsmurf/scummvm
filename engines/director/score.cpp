@@ -94,6 +94,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_numChannelsDisplayed = 0;
 	_skipTransition = false;
 	_skipIdle = false;
+	_idleWentToFrame = false;
 
 	_curFrameNumber = 1;
 	_framesStream = nullptr;
@@ -357,8 +358,24 @@ void Score::step() {
 			// Like input events, idle is only sent when no Lingo is mid-execution.
 			// Otherwise a handler frozen by "go" (e.g. one called from idle itself)
 			// can be overtaken by a re-entrant idle before it resumes.
-			if (!_skipIdle && !_window->frozenLingoStateCount())
+			//
+			// From D4 on, the projectors send idle and then poll the frame
+			// timer. A "go" from idle restarts that timer before drawing the
+			// new frame, so when the drawing outlasts the tempo, the poll that
+			// follows exits the frame before idle runs again. Here the go is
+			// only carried out by update(), after which the next step would
+			// send idle first. So after a go from idle, skip that idle if the
+			// frame time is up. (The D3 Mac projector restarts the timer after
+			// drawing, and the D3 Windows one is handled by _skipIdle.)
+			// The Daedalus Encounter relies on this: at Door C, idle keeps
+			// going to the "Thrust" frame, a tempo 60 frame whose exitFrame
+			// starts the puzzle and stops the idle loop.
+			bool pollFirst = _idleWentToFrame && g_system->getMillis() >= _nextFrameTime;
+			_idleWentToFrame = false;
+			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst) {
 				_movie->processEvent(kEventIdle);
+				_idleWentToFrame = _version >= kFileVer400 && _nextFrame != 0 && _window->_nextMovie.movie.empty();
+			}
 
 			if (_version >= kFileVer600) {
 				if (_movie->_currentHoveredSpriteId) {
