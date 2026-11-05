@@ -127,7 +127,26 @@ void Score::setPuppetTempo(int16 puppetTempo) {
 }
 
 CastMemberID Score::getCurrentPalette() {
-	return _puppetPalette ? _vm->_lastPuppetPalette : _vm->_lastPalette;
+	return hasPuppetPalette() ? _vm->_lastPuppetPalette : _vm->_lastPalette;
+}
+
+bool Score::hasPuppetPalette() {
+	if (controlsPalette())
+		return _puppetPalette;
+
+	// A movie in a window shows the stage's palette
+	Movie *stageMovie = g_director->getStage()->getCurrentMovie();
+	if (stageMovie && stageMovie->getScore())
+		return stageMovie->getScore()->_puppetPalette;
+	return false;
+}
+
+bool Score::controlsPalette() {
+	// In D4, only the stage's palette channel (and puppetPalette) changes
+	// the screen palette; movies in windows have it disabled.
+	if (_version < kFileVer500)
+		return _window == g_director->getStage();
+	return true;
 }
 
 bool Score::processImmediateFrameScript(Common::String s, int id) {
@@ -1043,7 +1062,7 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 }
 
 bool Score::renderPrePaletteCycle(RenderMode mode) {
-	if (_puppetPalette)
+	if (_puppetPalette || !controlsPalette())
 		return false;
 
 	// Skip this if we don't have a palette instruction
@@ -1160,7 +1179,7 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 }
 
 void Score::setLastPalette() {
-	if (_puppetPalette)
+	if (_puppetPalette || !controlsPalette())
 		return;
 
 	bool isCachedPalette = false;
@@ -1208,7 +1227,7 @@ bool Score::isPaletteColorCycling() {
 }
 
 void Score::renderPaletteCycle(RenderMode mode) {
-	if (_puppetPalette)
+	if (_puppetPalette || !controlsPalette())
 		return;
 
 	// If the palette is defined in the frame and doesn't match
