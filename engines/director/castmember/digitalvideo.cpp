@@ -923,13 +923,15 @@ void DigitalVideoCastMember::setField(int field, const Datum &d) {
 		return;
 	case kTheFileName:
 		// Update the filename, then force the video to be replaced.
-		// Channel dimensions are replaced by the video.
+		// Channel dimensions are replaced by the video, unless the
+		// sprite is stretched and so keeps its own size, as in
+		// Channel::setCast().
 		CastMember::setField(field, d);
 		if (_needsReload) {
 			_needsReload = false;
 			_useLinkedPath = true;
 			reloadVideo();
-			if (_channel) {
+			if (_channel && !_channel->_sprite->_stretch) {
 				Common::Rect rect = getInitialRect();
 				_channel->setWidth(rect.width());
 				_channel->setHeight(rect.height());
