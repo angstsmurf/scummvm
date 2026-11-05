@@ -102,17 +102,8 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 			_clut = CastMemberID(kClutSystemMac, -1);
 		}
 
-		_pitch = _initialRect.width();
-
-		if (_bitsPerPixel == 1) {
-			if (_pitch % 16)
-				_pitch += 16 - (_initialRect.width() % 16);
-		}
-
-		_pitch *= _bitsPerPixel;
-		_pitch >>= 3;
-		if (_pitch % 2)
-			_pitch += 2 - (_pitch % 2);
+		// Rows are padded to a 16-bit boundary
+		_pitch = ((_initialRect.width() * _bitsPerPixel + 15) / 16) * 2;
 
 	} else if (version >= kFileVer400 && version < kFileVer600) {
 		_flags1 = flags1;
