@@ -1254,11 +1254,17 @@ void MacText::drawSelection(int xoff, int yoff) {
 		}
 		numLines--;
 
-		byte *ptr = (byte *)_composeSurface->getBasePtr(x1, MIN<int>(y + yoff, maxSelectionHeight - 1));
-		byte *maskPtr = (byte *)_glyphMaskSurface->getBasePtr(x1, MIN<int>(y + yoff, maxSelectionHeight - 1));
+		int py = MIN<int>(y + yoff, maxSelectionHeight - 1);
+		byte *maskPtr = (byte *)_glyphMaskSurface->getBasePtr(x1, py);
 
-		for (int x = x1; x < x2; x++, ptr++, maskPtr++) {
-			*ptr = (*ptr == _canvas._tfgcolor) ? _canvas._tbgcolor : _canvas._tfgcolor;
+		// Go through getPixel()/setPixel() so this works for every
+		// pixel format, not just 8-bit surfaces. The glyph mask is
+		// always 8-bit.
+		for (int x = x1; x < x2; x++, maskPtr++) {
+			if (_composeSurface->getPixel(x, py) == _canvas._tfgcolor)
+				_composeSurface->setPixel(x, py, _canvas._tbgcolor);
+			else
+				_composeSurface->setPixel(x, py, _canvas._tfgcolor);
 			*maskPtr = (*maskPtr == 0xff) ? 0x00 : 0xff;
 		}
 	}
