@@ -715,17 +715,21 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 			_getFirstFrame = false;
 		}
 		_video->setRate(Common::Rational((int)(rate * 100.0), 100));
-		if ((rate != 0.0) && !_video->isPlaying()) {
+		if (!_video->isPlaying())
 			_video->start();
-		} else if ((rate == 0.0) && _video->isPlaying()) {
-			_video->stop();
-		}
+
+		// Only restarting playback rewinds a movie that has ended.
+		// The D3 to D6 projectors set the rate with mcActionPlay or
+		// SetMovieRate, and in QuickTime 2.0 and 3.0 neither seeks
+		// at rate 0.
+		// Pausing keeps the position: The Daedalus Encounter seeks
+		// DE_FAVA.MOV past its end, sets movieRate to 0 and expects
+		// the floodlight button to see the movieTime at the end.
+		if (endOfVideo())
+			rewindVideo();
 	}
 
 	_channel->_movieRate = rate;
-
-	if (endOfVideo())
-		rewindVideo();
 }
 
 void DigitalVideoCastMember::setFrameRate(int rate) {
