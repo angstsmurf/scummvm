@@ -725,7 +725,15 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 		// Pausing keeps the position: The Daedalus Encounter seeks
 		// DE_FAVA.MOV past its end, sets movieRate to 0 and expects
 		// the floodlight button to see the movieTime at the end.
-		if (endOfVideo())
+		//
+		// The D4 to D6 projectors create a QuickTime movie controller
+		// only for direct-to-stage members, and set their rate with
+		// mcActionPlay. In QuickTime 2.0 and 3.0 that action, at a
+		// positive rate, goes to the start of a movie that has ended.
+		// Other members get a plain SetMovieRate, which never seeks,
+		// so they stay at the end. D3 always uses SetMovieRate, so it
+		// never rewinds here.
+		if (g_director->getVersion() >= 400 && _directToStage && endOfVideo())
 			rewindVideo();
 	}
 
