@@ -105,7 +105,9 @@ TextCastMember::TextCastMember(Cast *cast, uint16 castId, Common::SeekableReadSt
 		} else {
 			pad2 = stream.readUint16();
 			_initialRect = Movie::readRect(stream);
-			pad3 = stream.readUint16();
+			// The D3 projector takes the height of a fixed or scrolling
+			// field from this word, as D4 does from the one after its rect.
+			_maxHeight = pad3 = stream.readUint16();
 			_textFlags = stream.readUint16(); // 1: editable, 2: auto tab, 4: don't wrap
 			_editable = _textFlags & 0x1;
 			totalTextHeight = stream.readUint16();
@@ -351,8 +353,24 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 			dims.bottom = MIN<int>(dims.bottom, dims.top + _initialRect.height());
 		} else if (_textType == kTextTypeFixed || _textType == kTextTypeScrolling) {
 			// use initialRect to create widget for fixed style text, this maybe related to version.
-			dims.right = MAX<int>(dims.right, dims.left + _initialRect.width());
-			dims.bottom = MAX<int>(dims.bottom, dims.top + MAX<int>(_initialRect.height(), _maxHeight));
+			if (g_director->getVersion() < 300) {
+				// The D2 projector ignores the size of the sprite in the
+				// score and takes the box from the member rect. It has no
+				// maximum height and no scroll bar.
+				dims.right = dims.left + _initialRect.width();
+				dims.bottom = dims.top + _initialRect.height();
+			} else {
+				// The D3 to D6 projectors ignore the size of the sprite in
+				// the score and take the box from the member. The content
+				// is the member rect's width, plus 16 pixels for the scroll
+				// bar of a scrolling field, by _maxHeight; the border,
+				// gutter and shadow go around that.
+				// The Daedalus Encounter has a 193 pixel wide sprite for
+				// its 147 pixel translation field, which would cover the
+				// SAVE button.
+				dims.right = dims.left + _initialRect.width() + (_textType == kTextTypeScrolling ? 16 : 0);
+				dims.bottom = dims.top + _maxHeight;
+			}
 		}
 		widget = createWindowOrWidget(bbox, dims, macFont);
 		if (_textType != kTextTypeScrolling) {
