@@ -634,7 +634,15 @@ void Score::updateNextFrameTime() {
 				_nextFrameTime = g_system->getMillis() + 1000.0 / (float)_currentFrameRate;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): setting _nextFrameTime to %d based on a framerate of %d", _nextFrameTime, _currentFrameRate);
 			} else {
-				if (tempo == 128) {
+				if (tempo == 128 && _version >= kFileVer400 && _version < kFileVer500 && _movie->hasQueuedClick()) {
+					// In D4, a click that Lingo has not handled yet ends the
+					// wait at once. It is still sent as mouseDown and mouseUp
+					// afterwards. This happens when a handler clicks (e.g.
+					// through an XObject) and then does "go" to a frame that
+					// waits for a click. Checked in D4 for Windows; other
+					// versions have not been checked.
+					debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click ends the wait for a mouse click");
+				} else if (tempo == 128) {
 					_waitForClick = true;
 					_waitForClickCursor = false;
 					renderCursor(_movie->getWindow()->getMousePos());
