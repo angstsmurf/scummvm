@@ -808,8 +808,10 @@ void LB::b_offset(int nargs) {
 	Common::String source = g_lingo->pop().asString();
 	Common::String target = g_lingo->pop().asString();
 
+	// An empty target matches at position 1, even in an empty string.
+	// Checked in D4 for Windows.
 	if (target.empty()) {
-		g_lingo->push(Datum(0));
+		g_lingo->push(Datum(1));
 		return;
 	}
 	// Lingo character positions count characters, not UTF-8 bytes
