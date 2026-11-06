@@ -189,6 +189,10 @@ void UnitTestXObj::m_leftMouseDown(int nargs) {
 	ev.type = Common::EVENT_LBUTTONDOWN;
 	ev.mouse = me->_mousePos;
 	g_director->_injectedEvents.push_back(ev);
+	// The Windows XObject sends the click with SendMessage, so the stage
+	// handles it before the call returns. Lingo still runs, so its
+	// mouseDown and mouseUp handlers are queued for later.
+	g_director->processSysEvents();
 	g_lingo->push(0);
 }
 
@@ -204,6 +208,8 @@ void UnitTestXObj::m_leftMouseUp(int nargs) {
 	ev.type = Common::EVENT_LBUTTONUP;
 	ev.mouse = me->_mousePos;
 	g_director->_injectedEvents.push_back(ev);
+	// Handled at once, as in m_leftMouseDown().
+	g_director->processSysEvents();
 	g_lingo->push(0);
 }
 
