@@ -966,8 +966,23 @@ void MacText::drawStep(ManagedSurface *g, ManagedSurface *src, ManagedSurface *b
 
 	g->simpleBlitFrom(*src, Common::Rect(MIN<int>(src->w, x), MIN<int>(src->h, y), MIN<int>(src->w, x + w), MIN<int>(src->h, y + h)), Common::Point(xoff, yoff));
 
-	if (_scrollBar && _scrollBorder.hasBorder(kWindowBorderScrollbar))
+	if (_scrollBar && _scrollBorder.hasBorder(kWindowBorderScrollbar)) {
 		g->transBlitFrom(*border, Common::Rect(0, 0, border->w, border->h), Common::Point(0, _border), btcolor);
+
+		// The scroll bar bitmap always has the patterned track of a scroll
+		// bar that can scroll. Like a Mac scroll bar whose maximum is its
+		// minimum, the D3-D6 projectors leave the track white when all of
+		// the text fits. The track lies between the arrow boxes, inside the
+		// bar's frame; the offsets count the bitmap's nine-patch marker pixel.
+		if (border == &_borderSurface && _scrollPos == 0 && getTextHeight() <= getDimensions().height()) {
+			const BorderOffsets &o = _scrollBorder.getOffset();
+			Common::Rect track(border->w - o.right + 2, _border + o.upperScrollHeight - 1,
+							   border->w - 1, _border + border->h - o.lowerScrollHeight + 1);
+			track.clip(Common::Rect(g->w, g->h));
+			if (!track.isEmpty())
+				g->fillRect(track, _wm->_colorWhite);
+		}
+	}
 }
 
 void MacText::draw(ManagedSurface *g, int x, int y, int w, int h, int xoff, int yoff) {
@@ -1082,9 +1097,10 @@ bool MacText::draw(bool forceRedraw) {
 
 	draw(_composeSurface, 0, _scrollPos, _canvas._surface->w, _canvas._surface->h, offset.x, offset.y);
 
+	// The box shadow is black. Colour 0 is white in the Mac palettes
 	for (int bb = 0; bb < _shadow; bb++) {
-		_composeSurface->hLine(_shadow, _composeSurface->h - _shadow + bb, _composeSurface->w, 0);
-		_composeSurface->vLine(_composeSurface->w - _shadow + bb, _shadow, _composeSurface->h - _shadow, 0);
+		_composeSurface->hLine(_shadow, _composeSurface->h - _shadow + bb, _composeSurface->w, _wm->_colorBlack);
+		_composeSurface->vLine(_composeSurface->w - _shadow + bb, _shadow, _composeSurface->h - _shadow, _wm->_colorBlack);
 	}
 
 	// The border goes around the box, not around the shadow
