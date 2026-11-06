@@ -27,6 +27,8 @@ namespace Director {
 class QTCatMoviePlayerXObject : public Object<QTCatMoviePlayerXObject> {
 public:
 	QTCatMoviePlayerXObject(ObjectType objType);
+
+	Common::Path _path;
 };
 
 namespace QTCatMoviePlayerXObj {
