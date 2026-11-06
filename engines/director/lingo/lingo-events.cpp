@@ -680,6 +680,15 @@ void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
 	queueEvent(_inputEventQueue, event, targetId, pos);
 }
 
+// Whether a mouse click is waiting in the input queue, not yet sent to Lingo.
+bool Movie::hasQueuedClick() const {
+	Common::Queue<LingoEvent> queue = _inputEventQueue;
+	for (; !queue.empty(); queue.pop()) {
+		if (queue.front().event == kEventMouseDown || queue.front().event == kEventMouseUp)
+			return true;
+	}
+	return false;
+}
 
 bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
 	// Route a mouse event on a movie cast member into its linked movie so that
