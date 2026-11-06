@@ -753,9 +753,9 @@ void Score::update() {
 
 	// In every projector from D3 to D6, "go" clears any pending delay when it
 	// enters the new frame, so a go from idle during a "delay" cuts the delay
-	// short.
-	if (_nextFrameDelay && hasJump && _nextFrame != _curFrameNumber &&
-			_window->_nextMovie.movie.empty())
+	// short. That includes "go to the frame": Director 4 re-enters the frame at
+	// once, and only then resumes the handler that called go.
+	if (_nextFrameDelay && hasJump && _window->_nextMovie.movie.empty())
 		_nextFrameDelay = 0;
 
 	// Check for delay
