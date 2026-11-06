@@ -29,6 +29,7 @@
 #include "gui/message.h"
 
 #include "graphics/macgui/macwindowmanager.h"
+#include "graphics/macgui/mactext.h"
 
 #include "director/director.h"
 #include "director/movie.h"
@@ -36,7 +37,9 @@
 #include "director/channel.h"
 #include "director/sprite.h"
 #include "director/window.h"
+#include "director/util.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/text.h"
 #include "director/debugger/debugtools.h"
 
 namespace Director {
@@ -373,7 +376,20 @@ bool Movie::processSysEvent(Common::Event &event) {
 		if (_timeOutKeyDown)
 			_lastTimeOut = _lastEventTime;
 
-		result = processInputEvent(kEventKeyDown, sc->getSpriteIDOfActiveWidget());
+		{
+			uint16 widgetSpriteId = sc->getSpriteIDOfActiveWidget();
+			result = processInputEvent(kEventKeyDown, widgetSpriteId);
+
+			// The key goes on to the field only if the keyDown scripts
+			// passed it. A full "limit to field size" field drops it.
+			if (result && widgetSpriteId) {
+				Channel *channel = sc->getChannelById(widgetSpriteId);
+				if (channel && channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastText &&
+						!isButtonSprite(channel->_sprite->_spriteType) &&
+						((TextCastMember *)channel->_sprite->_cast)->dropsTypedKey((Graphics::MacText *)channel->_widget, event.kbd))
+					result = false;
+			}
+		}
 		g_director->loadSlowdownCooloff();
 		return result;
 

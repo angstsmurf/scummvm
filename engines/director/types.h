@@ -123,7 +123,11 @@ enum ShapeType {
 enum TextType {
 	kTextTypeAdjustToFit,
 	kTextTypeScrolling,
-	kTextTypeFixed
+	kTextTypeFixed,
+	// "Limit to field size", D4 and later. D3 projectors only know types 0-2.
+	// It is laid out like a fixed field, but typing stops when the text no
+	// longer fits on one line. Lingo calls it #limit from D5 on.
+	kTextTypeLimit
 };
 
 enum TextAlignType {

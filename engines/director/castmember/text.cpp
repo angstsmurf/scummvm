@@ -317,7 +317,7 @@ Graphics::MacWidget *TextCastMember::createWindowOrWidget(Common::Rect &bbox, Co
 	// subtracts the border, gutter and shadow from it.
 	int maxWidth = _initialRect.width() + _borderSize * 2 + _gutterSize * 2 + _boxShadow;
 
-	widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(), bbox.left, bbox.top, dims.width(), dims.height(), g_director->_wm, _ftext, macFont, getForeColor(), getBackColor(), maxWidth, getAlignment(), _lineSpacing, _borderSize, _gutterSize, _boxShadow, _textShadow, _textType == kTextTypeFixed || _textType == kTextTypeScrolling, _textType == kTextTypeScrolling);
+	widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(), bbox.left, bbox.top, dims.width(), dims.height(), g_director->_wm, _ftext, macFont, getForeColor(), getBackColor(), maxWidth, getAlignment(), _lineSpacing, _borderSize, _gutterSize, _boxShadow, _textShadow, _textType != kTextTypeAdjustToFit, _textType == kTextTypeScrolling);
 	widget->setSelRange(g_director->getCurrentMovie()->_selStart, g_director->getCurrentMovie()->_selEnd);
 	widget->draw();
 
@@ -351,7 +351,10 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 		if (_textType == kTextTypeAdjustToFit) {
 			dims.right = MIN<int>(dims.right, dims.left + _initialRect.width());
 			dims.bottom = MIN<int>(dims.bottom, dims.top + _initialRect.height());
-		} else if (_textType == kTextTypeFixed || _textType == kTextTypeScrolling) {
+		} else {
+			// Fixed, scrolling and limit fields. The projectors only check
+			// for adjust to fit, so a limit field gets the same box as a
+			// fixed one.
 			// use initialRect to create widget for fixed style text, this maybe related to version.
 			if (g_director->getVersion() < 300) {
 				// The D2 projector ignores the size of the sprite in the
@@ -402,6 +405,37 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 
 	delete macFont;
 	return widget;
+}
+
+// A "limit to field size" field stops taking keys once its text fills
+// one line. The D4 projector checks this right before it hands a key to
+// TextEdit. With no selection, any key but backspace is dropped if the width
+// of the whole text + the width of an "n" + 6 is greater than the width of the
+// member's rect.
+bool TextCastMember::dropsTypedKey(Graphics::MacText *widget, const Common::KeyState &kbd) {
+	if (_type != kCastText || _textType != kTextTypeLimit || !widget || !widget->isEditable())
+		return false;
+
+	if (kbd.keycode == Common::KEYCODE_BACKSPACE || kbd.keycode == Common::KEYCODE_TAB)
+		return false;
+
+	// Leave ScummVM's own cut, copy and paste shortcuts alone.
+	if (kbd.flags & (Common::KBD_ALT | Common::KBD_CTRL | Common::KBD_META))
+		return false;
+
+	if (widget->hasSelection())
+		return false;
+
+	Graphics::MacFont macFont(widget->getTextFont(0, 0), widget->getTextSize(0, 0), widget->getTextSlant(0, 0));
+	const Graphics::Font *font = g_director->_wm->_fontMan->getFont(macFont);
+	if (!font)
+		return false;
+
+	int textWidth = font->getStringWidth(widget->getPlainText());
+	bool full = textWidth + font->getCharWidth('n') + 6 > _initialRect.width();
+	debugC(3, kDebugEvents, "TextCastMember::dropsTypedKey(): text width %d, 'n' width %d, field width %d: %s",
+		textWidth, font->getCharWidth('n'), _initialRect.width(), full ? "dropped" : "kept");
+	return full;
 }
 
 Graphics::MacText *TextCastMember::getWidget() {
@@ -769,6 +803,10 @@ Datum TextCastMember::getField(int field) {
 		warning("STUB: TextCastMember::getField(): boxDropShadow not implemented");
 		d = 1;
 		break;
+	case kTheBoxType:
+		d = Common::String(textType2str(_textType));
+		d.type = SYMBOL;
+		break;
 	case kTheDropShadow:
 		warning("STUB: TextCastMember::getField(): dropShadow not implemented");
 		d = 1;
@@ -878,8 +916,23 @@ void TextCastMember::setField(int field, const Datum &d) {
 		warning("STUB: TextCastMember::setField(): boxDropShadow not implemented");
 		return;
 	case kTheBoxType:
-		// The possible values are #adjust, #scroll, #fixed, and #limit.
-		warning("STUB: TextCastMember::setField(): boxType not implemented");
+		{
+			// The possible values are #adjust, #scroll, #fixed, and #limit.
+			Common::String type = d.asString();
+			if (type.equalsIgnoreCase("adjust")) {
+				_textType = kTextTypeAdjustToFit;
+			} else if (type.equalsIgnoreCase("scroll")) {
+				_textType = kTextTypeScrolling;
+			} else if (type.equalsIgnoreCase("fixed")) {
+				_textType = kTextTypeFixed;
+			} else if (type.equalsIgnoreCase("limit")) {
+				_textType = kTextTypeLimit;
+			} else {
+				warning("TextCastMember::setField(): Unknown boxType %s", d.asString(true).c_str());
+				return;
+			}
+			setModified(true);
+		}
 		return;
 	case kTheDropShadow:
 		warning("STUB: TextCastMember::setField(): dropShadow not implemented");

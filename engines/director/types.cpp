@@ -352,6 +352,9 @@ Common::String textType2str(TextType value) {
 	case kTextTypeFixed:
 		return "fixed";
 		break;
+	case kTextTypeLimit:
+		return "limit";
+		break;
 	default:
 		return "<unknown>";
 		break;
