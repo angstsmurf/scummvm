@@ -797,7 +797,12 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 		switch (ink) {
 		case kInkTypeCopy:
 			if (!mask) {
-				dst->blitFrom(*srf, offsetRect, destRect);
+				// Blit to a point, not to destRect: blitFrom scales when the
+				// two rects differ, and the surface can be smaller than the
+				// sprite, as for a fixed field in a larger score box. The
+				// slow path below doesn't scale either.
+				if (!offsetRect.isEmpty())
+					dst->blitFrom(*srf, offsetRect, Common::Point(destRect.left, destRect.top));
 				return;
 			}
 			break;
