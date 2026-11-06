@@ -24,6 +24,10 @@
 
 #include "director/castmember/castmember.h"
 
+namespace Common {
+struct KeyState;
+}
+
 namespace Graphics {
 class MacText;
 }
@@ -42,6 +46,7 @@ public:
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
 	Graphics::MacText *getWidget();
+	bool dropsTypedKey(Graphics::MacText *widget, const Common::KeyState &kbd);
 
 	CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) override;
 
