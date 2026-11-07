@@ -1477,7 +1477,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		setTheEntitySTUB(kTheStage);
 		break;
 	case kTheStageColor:
-		g_director->getCurrentWindow()->setStageColor(g_director->transformColor(d.asInt()));
+		// The stageColor is a palette index kept in a byte, so a larger
+		// value wraps around, as sprite colors do: D4 reads 300 back as 44.
+		g_director->getCurrentWindow()->setStageColor(g_director->transformColor(d.asInt() & 0xff));
 
 		// Redraw the stage
 		score->updateSprites(kRenderForceUpdate);
