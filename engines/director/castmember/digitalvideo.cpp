@@ -522,7 +522,11 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 		return widget;
 	}
 
-	const Graphics::Surface *frame = _video->decodeNextFrame();
+	// Recreating the widget, e.g. when the sprite is resized, must not
+	// advance a playing video: only decode when a new frame is due
+	const Graphics::Surface *frame = nullptr;
+	if (!_lastFrame || _getFirstFrame || _frameStale || _video->needsUpdate())
+		frame = _video->decodeNextFrame();
 
 	// If the video gets stopped, for whatever reason, _video->getPalette() will not work.
 	// Cache it when possible.
