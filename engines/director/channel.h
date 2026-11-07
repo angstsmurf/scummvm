@@ -47,9 +47,11 @@ public:
 	DirectorPlotData getPlotData();
 	const Graphics::Surface *getMask(bool forceMatte = false);
 
-	// The stored size, which is not always the size drawn; see getBbox()
-	inline int getWidth() { return _sprite->_width; };
-	inline int getHeight() { return _sprite->_height; };
+	// The stored size, which is not always the size drawn; see getBbox().
+	// A text or button widget may resize the sprite: Lingo reads the size
+	// from before.
+	inline int getWidth() { return _sprite->_reportedWidth >= 0 ? _sprite->_reportedWidth : _sprite->_width; };
+	inline int getHeight() { return _sprite->_reportedHeight >= 0 ? _sprite->_reportedHeight : _sprite->_height; };
 	inline Common::Point getPosition() { return _sprite->getPosition(); };
 	// Return the area of screen to be used for drawing content.
 	inline Common::Rect getBbox(bool unstretched = false) { return _sprite->getBbox(unstretched); };
@@ -83,6 +85,7 @@ public:
 	void replaceSprite(Sprite *nextSprite);
 	void replaceWidget(CastMemberID previousCastId = CastMemberID(0, 0), bool force = false);
 	bool updateWidget();
+	void sizeSpriteFromWidget();
 	void updateTextCast();
 
 	bool isTrail();
