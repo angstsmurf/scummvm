@@ -45,6 +45,7 @@ void m_screenshot(int nargs);
 void m_moveMouse(int nargs);
 void m_leftMouseDown(int nargs);
 void m_leftMouseUp(int nargs);
+void m_keyPress(int nargs);
 
 } // End of namespace UnitTest
 

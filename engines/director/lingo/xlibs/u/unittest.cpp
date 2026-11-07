@@ -58,6 +58,7 @@ IS     mScreenshot, path        --Copy contents of stage window to file
 III    mMoveMouse, x, y         --Move the mouse pointer to window position (x, y)
 I      mLeftMouseDown           --Press the LMB
 I      mLeftMouseUp             --Release the LMB
+II     mKeyPress, code          --Type the key with this ASCII code
  */
 
 static const MethodProto xlibMethods[] = {
@@ -68,6 +69,7 @@ static const MethodProto xlibMethods[] = {
 	{ "moveMouse",			UnitTestXObj::m_moveMouse,			2, 2,	400 },	// D4
 	{ "leftMouseDown",		UnitTestXObj::m_leftMouseDown,		0, 0,	400 },	// D4
 	{ "leftMouseUp",		UnitTestXObj::m_leftMouseUp,		0, 0,	400 },	// D4
+	{ "keyPress",			UnitTestXObj::m_keyPress,			1, 1,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
@@ -207,6 +209,27 @@ void UnitTestXObj::m_leftMouseUp(int nargs) {
 	Common::Event ev;
 	ev.type = Common::EVENT_LBUTTONUP;
 	ev.mouse = me->_mousePos;
+	g_director->_injectedEvents.push_back(ev);
+	// Handled at once, as in m_leftMouseDown().
+	g_director->processSysEvents();
+	g_lingo->push(0);
+}
+
+void UnitTestXObj::m_keyPress(int nargs) {
+	if (nargs != 1) {
+		warning("UnitTestXObj::m_keyPress: expected 1 argument");
+		g_lingo->dropStack(nargs);
+		g_lingo->push(0);
+		return;
+	}
+	// The code is an ASCII code (8 = Backspace, 9 = Tab, 13 = Return),
+	// which is also the matching Common::KeyCode.
+	int code = g_lingo->pop().asInt() & 0xff;
+	Common::Event ev;
+	ev.type = Common::EVENT_KEYDOWN;
+	ev.kbd = Common::KeyState((Common::KeyCode)code, code);
+	g_director->_injectedEvents.push_back(ev);
+	ev.type = Common::EVENT_KEYUP;
 	g_director->_injectedEvents.push_back(ev);
 	// Handled at once, as in m_leftMouseDown().
 	g_director->processSysEvents();
