@@ -47,8 +47,9 @@ public:
 	DirectorPlotData getPlotData();
 	const Graphics::Surface *getMask(bool forceMatte = false);
 
-	inline int getWidth() { return _sprite->_width; };
-	inline int getHeight() { return _sprite->_height; };
+	// The size Lingo reports; getBbox() is the size the sprite draws and hit-tests at.
+	inline int getWidth() { return _sprite->_reportedWidth >= 0 ? _sprite->_reportedWidth : _sprite->_width; };
+	inline int getHeight() { return _sprite->_reportedHeight >= 0 ? _sprite->_reportedHeight : _sprite->_height; };
 	inline Common::Point getPosition() { return _sprite->getPosition(); };
 	// Return the area of screen to be used for drawing content.
 	inline Common::Rect getBbox(bool unstretched = false) { return _sprite->getBbox(unstretched); };
@@ -79,6 +80,7 @@ public:
 	void replaceSprite(Sprite *nextSprite);
 	void replaceWidget(CastMemberID previousCastId = CastMemberID(0, 0), bool force = false);
 	bool updateWidget();
+	void sizeSpriteFromWidget();
 	void updateTextCast();
 
 	bool isTrail();

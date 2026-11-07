@@ -584,8 +584,7 @@ void Channel::updateTextCast() {
 		Graphics::MacText *textWidget = (Graphics::MacText *)_widget;
 		// if we got auto expand text, then we update dims to sprite
 		if (!textWidget->getFixDims() && (_sprite->_width != _widget->_dims.width() || _sprite->_height != _widget->_dims.height())) {
-			_sprite->_width = _widget->_dims.width();
-			_sprite->_height = _widget->_dims.height();
+			sizeSpriteFromWidget();
 			setDirty();
 		}
 	}
@@ -644,6 +643,8 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 	}
 	int16 width = _sprite->_width;
 	int16 height = _sprite->_height;
+	int16 reportedWidth = _sprite->_reportedWidth;
+	int16 reportedHeight = _sprite->_reportedHeight;
 
 	if (!(_sprite->_puppet || _sprite->getAutoPuppet(kAPCast)) && (_sprite->_castId != nextSprite->_castId)) {
 		// if there's a video in the old sprite that's different, stop it before we continue
@@ -679,6 +680,8 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 	if (hasTextCastMember(_sprite) && hasWidget) {
 		_sprite->_width = width;
 		_sprite->_height = height;
+		_sprite->_reportedWidth = reportedWidth;
+		_sprite->_reportedHeight = reportedHeight;
 	}
 
 	if (g_director->getVersion() >= 600) {
@@ -774,11 +777,22 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 			// fixed text would re-add its shadow chrome each rebuild and creep larger.
 			if (_sprite->_cast->_type == kCastButton ||
 					(_sprite->_cast->_type == kCastText && !((Graphics::MacText *)_widget)->getFixDims())) {
-				_sprite->_width = _widget->_dims.width();
-				_sprite->_height = _widget->_dims.height();
+				sizeSpriteFromWidget();
 			}
 		}
 	}
+}
+
+// Draw and hit-test the sprite at its widget's size. The projector still
+// reports the size from the score (or Lingo) as the sprite's width and
+// height, although its left, top, right and bottom follow the drawn rect.
+void Channel::sizeSpriteFromWidget() {
+	if (_sprite->_reportedWidth < 0)
+		_sprite->_reportedWidth = _sprite->_width;
+	if (_sprite->_reportedHeight < 0)
+		_sprite->_reportedHeight = _sprite->_height;
+	_sprite->_width = _widget->_dims.width();
+	_sprite->_height = _widget->_dims.height();
 }
 
 bool Channel::updateWidget() {

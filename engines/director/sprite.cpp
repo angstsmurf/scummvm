@@ -73,6 +73,8 @@ void Sprite::reset() {
 	_thickness = 0;
 	_width = 0;
 	_height = 0;
+	_reportedWidth = -1;
+	_reportedHeight = -1;
 	_moveable = false;
 	_editable = false;
 	_immediate = false;
@@ -130,6 +132,8 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_startPoint = sprite._startPoint;
 	_width = sprite._width;
 	_height = sprite._height;
+	_reportedWidth = sprite._reportedWidth;
+	_reportedHeight = sprite._reportedHeight;
 	_moveable = sprite._moveable;
 	_editable = sprite._editable;
 	_puppet = sprite._puppet;
@@ -523,6 +527,7 @@ void Sprite::releaseAutoPuppet(uint32 copyBackMask) {
 
 void Sprite::setWidth(int w) {
 	_width = MAX<int>(w, 0);
+	_reportedWidth = -1;
 
 	// Based on Director in a Nutshell, page 15
 	setAutoPuppet(kAPWidth, true);
@@ -530,6 +535,7 @@ void Sprite::setWidth(int w) {
 
 void Sprite::setHeight(int h) {
 	_height = MAX<int>(h, 0);
+	_reportedHeight = -1;
 
 	// Based on Director in a Nutshell, page 15
 	setAutoPuppet(kAPHeight, true);
@@ -554,6 +560,7 @@ Common::Rect Sprite::getBbox(bool unstretched) {
 void Sprite::setBbox(int l, int t, int r, int b) {
 	_width = r - l;
 	_height = b - t;
+	_reportedWidth = _reportedHeight = -1;
 
 	Common::Rect source(_width, _height);
 	if (_cast) {
@@ -747,9 +754,11 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 	// height and width seem to be copied back if the cast ID changes (e.g. intro of sabotenman)
 	if (!getAutoPuppet(kAPHeight) && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBHeight))) {
 		_height = nextSprite->_height;
+		_reportedHeight = -1;
 	}
 	if (!getAutoPuppet(kAPWidth) && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBWidth))) {
 		_width = nextSprite->_width;
+		_reportedWidth = -1;
 	}
 	if (!getAutoPuppet(kAPMoveable) && (nextSprite->_copyBackMask & kSCBMoveable)) {
 		_colorcode = nextSprite->_colorcode;

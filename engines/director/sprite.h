@@ -179,6 +179,11 @@ public:
 	Common::Point _startPoint;
 	int16 _width;
 	int16 _height;
+	// In D3-D6 a text or button sprite draws at its widget's size, which is
+	// copied into _width/_height, but Lingo's width and height still report
+	// the size the score or Lingo gave it. -1 means "same as _width/_height".
+	int16 _reportedWidth;
+	int16 _reportedHeight;
 
 	bool _moveable;
 	bool _editable;
