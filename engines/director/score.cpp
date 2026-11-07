@@ -192,6 +192,20 @@ bool Score::processFrozenScripts(bool recursion, int count) {
 			debugC(3, kDebugEvents, "Score::processFrozenScripts(): Input event completed");
 			g_lingo->_currentInputEvent = Symbol();
 		}
+
+		// Director 4 and later send stepMovie and enterFrame from one routine,
+		// and a go inside stepMovie returns to it. Once that stepMovie is done,
+		// it sends enterFrame to whatever frame is current by then.
+		if (_version >= kFileVer400 && currentScript.name &&
+				currentScript.name->equalsIgnoreCase("stepMovie") &&
+				!_nextFrame && _window->_nextMovie.movie.empty() &&
+				_playState != kPlayStopped && !_window->_playbackPaused) {
+			uint32 frozenCount = _window->frozenLingoStateCount();
+			_exitFrameCalled = false;
+			_movie->processEvent(kEventEnterFrame);
+			if (_window->frozenLingoStateCount() > frozenCount)
+				return false;
+		}
 		remainCount = recursion ? _window->frozenLingoRecursionCount() : _window->frozenLingoStateCount();
 		count -= 1;
 	}
