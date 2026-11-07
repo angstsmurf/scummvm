@@ -1062,6 +1062,12 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 	_movie->_currentKeyDownSpriteScriptID = CastMemberID();
 	_movie->_currentKeyDownSpriteImmediate = false;
 
+	// A cast member's modified state is cleared by the first channel that
+	// recreates its widget (a bitmap also forgets a palette change once it
+	// has been redithered), so decide for every channel before any of them
+	// redraws, or only the first sprite showing the member gets updated.
+	Common::Array<bool> memberModified = modifiedMembers();
+
 	for (uint16 i = 0; i < _channels.size(); i++) {
 		Channel *channel = _channels[i];
 		Sprite *currentSprite = channel->_sprite;
@@ -1076,7 +1082,7 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 			_movie->_videoPlayback = true;
 		}
 
-		if (channel->isDirty(nextSprite) || widgetRedrawn || mode == kRenderForceUpdate) {
+		if (channel->isDirty(nextSprite) || memberModified[i] || widgetRedrawn || mode == kRenderForceUpdate) {
 
 			if (currentSprite && currentSprite->_cast && currentSprite->_cast->_erase) {
 				currentSprite->_cast->_erase = false;
@@ -1593,13 +1599,25 @@ void Score::renderCursor(Common::Point pos, bool forceUpdate) {
 	_currentCursor = _defaultCursor.getRef();
 }
 
+Common::Array<bool> Score::modifiedMembers() {
+	Common::Array<bool> modified(_channels.size(), false);
+	for (uint16 i = 0; i < _channels.size(); i++) {
+		CastMember *cast = _channels[i]->_sprite ? _channels[i]->_sprite->_cast : nullptr;
+		modified[i] = cast && cast->isModified();
+	}
+	return modified;
+}
+
 void Score::updateWidgets(bool hasVideoPlayback) {
+	// Decided up front for every channel, see updateSprites()
+	Common::Array<bool> memberModified = modifiedMembers();
+
 	for (uint16 i = 0; i < _channels.size(); i++) {
 		Channel *channel = _channels[i];
 		CastMember *cast = channel->_sprite->_cast;
 		if (hasVideoPlayback)
 			channel->updateVideoTime();
-		if (cast && (cast->_type != kCastDigitalVideo || hasVideoPlayback) && cast->isModified()) {
+		if (cast && (cast->_type != kCastDigitalVideo || hasVideoPlayback) && memberModified[i]) {
 			channel->replaceWidget();
 			channel->setNeedsDraw();
 		}

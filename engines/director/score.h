@@ -141,6 +141,7 @@ public:
 	void renderPaletteCycle(RenderMode mode = kRenderModeNormal);
 	void renderCursor(Common::Point pos, bool forceUpdate = false);
 	void updateWidgets(bool hasVideoPlayback);
+	Common::Array<bool> modifiedMembers();
 
 	void invalidateRectsForMember(CastMember *member);
 
