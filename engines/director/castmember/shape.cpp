@@ -132,6 +132,13 @@ Datum ShapeCastMember::getField(int field) {
 	case kThePattern:
 		d = Datum(_pattern);
 		break;
+	case kTheForeColor:
+	case kTheBackColor:
+		// A shape's colors live on the sprite, not the member: D4 reports
+		// foreColor 0 and backColor 255 for every shape member and ignores
+		// sets, whatever the member record holds.
+		d = (field == kTheForeColor) ? 0 : 255;
+		break;
 	case kTheShapeType:
 		switch (_shapeType) {
 		case kShapeRectangle:
@@ -164,6 +171,10 @@ Datum ShapeCastMember::getField(int field) {
 
 void ShapeCastMember::setField(int field, const Datum &d) {
 	switch (field) {
+	case kTheForeColor:
+	case kTheBackColor:
+		// See getField(): a no-op
+		return;
 	case kTheFilled:
 		_fillType = d.asInt() ? 1 : 0;
 		return;
