@@ -244,13 +244,18 @@ void DirectorEngine::addArchiveToOpenList(const Common::Path &path) {
 	_allOpenResFiles.push_front(path);
 }
 
+void DirectorEngine::markArchiveStale(const Common::Path &path) {
+	if (_allSeenResFiles.contains(path))
+		_staleResFiles.setVal(path, true);
+}
+
 Common::SharedPtr<Archive> DirectorEngine::openArchive(const Common::Path &path) {
 	debug(1, "DirectorEngine::openArchive(\"%s\")", path.toString().c_str());
 
 	// If the archive is already open, don't reopen it;
 	// just init from the existing archive. This prevents errors that
 	// can happen when trying to load the same archive more than once.
-	if (_allSeenResFiles.contains(path)) {
+	if (_allSeenResFiles.contains(path) && !_staleResFiles.contains(path)) {
 		addArchiveToOpenList(path);
 		return _allSeenResFiles.getVal(path);
 	}
@@ -270,7 +275,9 @@ Common::SharedPtr<Archive> DirectorEngine::openArchive(const Common::Path &path)
 	}
 	result->setPathName(path);
 	Common::SharedPtr<Archive> arch(result);
+	// Movies still using a stale archive keep their own reference to it
 	_allSeenResFiles.setVal(path, arch);
+	_staleResFiles.erase(path);
 
 	addArchiveToOpenList(path);
 

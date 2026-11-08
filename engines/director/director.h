@@ -237,6 +237,7 @@ public:
 	Archive *createArchive();
 	Common::SharedPtr<Archive> openArchive(const Common::Path &movie);
 	void addArchiveToOpenList(const Common::Path &path);
+	void markArchiveStale(const Common::Path &path);
 	Archive *loadEXE(const Common::Path &movie);
 	Archive *loadEXEv3(Common::SeekableReadStream *stream);
 	Archive *loadEXEv4(Common::SeekableReadStream *stream);
@@ -287,6 +288,9 @@ public:
 	Common::HashMap<Common::Path, Common::SharedPtr<Archive>, Common::Path::IgnoreCaseAndMac_Hash, Common::Path::IgnoreCaseAndMac_EqualTo> _openResFiles;
 	// List of all currently open resource files
 	Common::List<Common::Path> _allOpenResFiles;
+	// Archives in _allSeenResFiles whose file was rewritten by saveMovie,
+	// to be read again from disk the next time they are opened
+	Common::HashMap<Common::Path, bool, Common::Path::IgnoreCaseAndMac_Hash, Common::Path::IgnoreCaseAndMac_EqualTo> _staleResFiles;
 
 	Common::Array<Graphics::WinCursorGroup *> _winCursor;
 
