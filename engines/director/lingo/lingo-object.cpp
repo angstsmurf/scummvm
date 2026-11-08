@@ -113,6 +113,7 @@
 #include "director/lingo/xlibs/o/orthoplayxobj.h"
 #include "director/lingo/xlibs/p/paco.h"
 #include "director/lingo/xlibs/p/palxobj.h"
+#include "director/lingo/xlibs/p/panomovie.h"
 #include "director/lingo/xlibs/p/panel.h"
 #include "director/lingo/xlibs/p/pharaohs.h"
 #include "director/lingo/xlibs/p/popupmenuxobj.h"
@@ -362,6 +363,7 @@ static const struct XLibProto {
 	XLIBDEF(MuiXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(MyFolderXObj,			kXObj,					400),	// D4
 	XLIBDEF(MystIsleXObj,		kXObj,			400),	// D4
+	XLIBDEF(NavMovieXCMD,		kXObj,			400),	// D4
 	XLIBDEF(NetLingoXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(OSCheckXtra,		kXtraObj,		400),	// D4
 	XLIBDEF(OpenBleedWindowXCMD,kXObj,			300),	// D3
@@ -370,6 +372,7 @@ static const struct XLibProto {
 	XLIBDEF(PACoXObj,			kXObj,			300),	// D3
 	XLIBDEF(PaintXXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(PalXObj,			kXObj,			400),	// D4
+	XLIBDEF(PanoMovieXCMD,		kXObj,			400),	// D4
 	XLIBDEF(PanelXObj,			kXObj,			200),	// D2
 	XLIBDEF(PharaohsXObj,		kXObj,			400),	// D4
 	XLIBDEF(PlaySoundMovieXObj,			kXObj,					400),	// D4
@@ -391,6 +394,7 @@ static const struct XLibProto {
 	XLIBDEF(RegistryReaderXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(RemixXCMD,			kXObj,			300),	// D3
 	XLIBDEF(RolloverToolkitXtra,kXtraObj,		500),	// D5
+	XLIBDEF(RunningInForegroundXFCN,	kXObj,		400),	// D4
 	XLIBDEF(SaveNRestoreXObj,			kXObj,					400),	// D4
 	XLIBDEF(ScrnUtilXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(SerialPortXObj,		kXObj,			200),	// D2
