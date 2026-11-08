@@ -40,7 +40,7 @@ const XlibFileDesc RegisterComponent::fileNames[] = {
 };
 
 static const BuiltinProto builtins[] = {
-	{ "RegisterComponent",	RegisterComponent::b_RegisterComponent, 1, 2, 400, FBLTIN },
+	{ "RegisterComponent",	RegisterComponent::b_RegisterComponent, 1, 2, 400, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
