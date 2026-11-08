@@ -206,6 +206,8 @@ void Window::probeResources(Archive *archive) {
 		// need to be loaded in.
 		MacArchive *resFork = new MacArchive();
 		Common::Path resForkPathName = findPath(archive->getPathName());
+		if (resForkPathName.empty())
+			resForkPathName = archive->getPathName();
 		if (resFork->openFile(resForkPathName)) {
 			if (resFork->hasResource(MKTAG('X', 'C', 'O', 'D'), -1)) {
 				Common::Array<uint16> xcod = resFork->getResourceIDList(MKTAG('X', 'C', 'O', 'D'));
