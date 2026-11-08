@@ -599,6 +599,9 @@ static bool getFilePropertiesIntern(uint md5Bytes, const AdvancedMetaEngineBase:
 		if (md5prop & kMD5MacDataFork) {
 			Common::SeekableReadStream *dataFork = Common::MacResManager::openFileOrDataFork(fname, fileMapArchive);
 			if (dataFork) {
+				if ((md5prop & kMD5Tail) && dataFork->size() > md5Bytes)
+					dataFork->seek(-(int64)md5Bytes, SEEK_END);
+
 				fileProps.size = dataFork->size();
 				fileProps.md5 = Common::computeStreamMD5AsString(*dataFork, md5Bytes);
 				fileProps.md5prop = (MD5Properties)((md5prop & kMD5Tail) | kMD5MacDataFork);
