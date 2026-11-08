@@ -432,17 +432,24 @@ void DigitalVideoCastMember::startVideo() {
 		// Opera Fatal's instrument screens pick the play or pause
 		// cursor from the movieRate.
 		_getFirstFrame = true;
-		if (_channel)
+		// Draw the first frame without starting the clock, or the
+		// movieTime reads 1 instead of 0 (T_DVID05)
+		_video->stop();
+		if (_channel) {
 			_channel->_movieRate = 0.0;
+			rewindVideo();
+		} else {
+			_video->seek(Audio::Timestamp(0, 0, 1000));
+		}
 	} else {
 		if (_channel && _channel->_movieRate == 0.0)
 			_channel->_movieRate = 1.0;
-	}
 
-	if (_video->isPlaying())
-		rewindVideo();
-	else
-		_video->start();
+		if (_video->isPlaying())
+			rewindVideo();
+		else
+			_video->start();
+	}
 
 	debugC(2, kDebugImages, "STARTING VIDEO %s %d/%d", _filename.c_str(), getMovieCurrentTime(), getMovieTotalTime());
 
