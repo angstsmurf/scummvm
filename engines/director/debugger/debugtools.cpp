@@ -443,6 +443,7 @@ ImGuiImage getShapeID(CastMember *castMember) {
 	Sprite *sprite = new Sprite();
 	sprite->_movie = g_director->getCurrentMovie();
 	sprite->setCast(CastMemberID(castMember->getID(), castMember->getCast()->_castLibID));
+	sprite->_spriteType = kCastMemberSprite;
 	sprite->_ink = shapeMember->_ink;
 	sprite->_backColor = shapeMember->getBackColor();
 	sprite->_foreColor = shapeMember->getForeColor();

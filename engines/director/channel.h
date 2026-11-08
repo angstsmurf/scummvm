@@ -73,6 +73,7 @@ public:
 	void setNeedsDraw() { _needsDraw = true; }
 	void setPosition(int x, int y, bool force = false);
 	void setCast(CastMemberID memberID);
+	void setAutoType();
 	void setClean(Sprite *nextSprite, bool partial = false);
 	void setStretch(bool enabled);
 	bool getEditable();

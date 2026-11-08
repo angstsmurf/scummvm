@@ -472,6 +472,45 @@ bool Channel::isVideoDirectToStage() {
 	return ((DigitalVideoCastMember *)_sprite->_cast)->_directToStage;
 }
 
+void Channel::setAutoType() {
+	// Starting in D4, setting a sprite's castNum also sets its type
+	// to an appropriate default. Before D4 it had to be set manually.
+	// QDShapes have no associated cast, so their type must not change.
+	if (g_director->getVersion() < 400 || _sprite->isQDShape() || _sprite->_castId == CastMemberID(0, 0))
+		return;
+
+	_sprite->_spriteType = kCastMemberSprite;
+	if (!_sprite->_cast)
+		return;
+
+	// Only bitmap, text and buttons get a more specific type
+	switch (_sprite->_cast->_type) {
+	case kCastBitmap:
+		_sprite->_spriteType = kBitmapSprite;
+		break;
+	case kCastText:
+		_sprite->_spriteType = kTextSprite;
+		break;
+	case kCastButton:
+		switch (((TextCastMember *)_sprite->_cast)->_buttonType) {
+		case kTypeButton:
+			_sprite->_spriteType = kButtonSprite;
+			break;
+		case kTypeCheckBox:
+			_sprite->_spriteType = kCheckboxSprite;
+			break;
+		case kTypeRadio:
+			_sprite->_spriteType = kRadioButtonSprite;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 void Channel::setCast(CastMemberID memberID) {
 	// release previous widget
 	if (_sprite->_cast)
