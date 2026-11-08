@@ -7915,6 +7915,22 @@ static const DirectorGameDescription gameDescriptions[] = {
 								  "SC_DATA/MAIN_SPA.Dxr",			"d:76183fa661413d200ce0154c968a3627", 6409022, Common::ES_ESP, 501, GF_TRUECOLOR),
 	MACGAME2f_l("safecracker", "", "xn--SafeCracker PPC (SWE)-ob4m", "rt:4596cfa67cecddc475ec09748ec54000", 397827,
 								  "SC_DATA/MAIN_SWE.Dxr",			"d:e4976c37b4cfbb8111f0919595b0dea2", 6383684, Common::SV_SWE, 501, GF_TRUECOLOR),
+	// European multi-language Mac release, run straight from its Installer VISE archive on the CD.
+	// It holds the projectors for all languages, the quirk picks one by the language.
+	MACGAME2f("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::FR_FRA, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::DE_DEU, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::IT_ITA, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::NL_NLD, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::ES_ESP, 501, GF_TRUECOLOR),
+	MACGAME2f_l("safecracker", "", "xn--Install Safecracker-jo0l", "dt:d07e3a5337d0b5b96fdb158c2b9b1a0e", 52179638,
+								  "MEDIA/INTRO.MOV",				"d:3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::SV_SWE, 501, GF_TRUECOLOR),
 	// The game looks for its CD at startup, so the CD files are required too.
 	// DreamCatcher release: it checks for MEDIA/INTRO.MOV and MEDIA/R00/PANEL.DXR
 	WINGAME3f("safecracker", "", "sc_eng.exe",						"t:01871e94a5d9b0fad2b063b486cda3f1", 1415977,
