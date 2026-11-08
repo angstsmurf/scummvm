@@ -746,7 +746,7 @@ Common::Path resolvePathInner(const Common::String &path, const Common::Path &ba
 			bool match = true;
 			for (size_t i = 0; i < srcComponents.size(); i++) {
 				Common::String component = Common::punycode_decodefilename(destComponents[i]);
-				if (!component.equalsIgnoreCase(srcComponents[i])) {
+				if (!component.equalsIgnoreCase(Common::punycode_decodefilename(srcComponents[i]))) {
 					match = false;
 					break;
 				}
