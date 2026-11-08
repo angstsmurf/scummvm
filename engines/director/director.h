@@ -393,6 +393,7 @@ struct DirectorPlotData {
 	uint32 backColor;
 	uint32 foreColor;
 	bool applyColor = false;
+	bool srcAlpha = false; // composite srf by its alpha channel (anti-aliased rich text)
 
 	// graphics.cpp
 	void setApplyColor();
@@ -411,7 +412,7 @@ struct DirectorPlotData {
 	                                                srf(old.srf), dst(old.dst),
 	                                                destRect(old.destRect), srcPoint(old.srcPoint),
 	                                                colorWhite(old.colorWhite), colorBlack(old.colorBlack),
-	                                                applyColor(old.applyColor) {
+	                                                applyColor(old.applyColor), srcAlpha(old.srcAlpha) {
 		if (old.ms) {
 			ms = new MacShape(*old.ms);
 		} else {

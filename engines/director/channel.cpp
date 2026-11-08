@@ -156,6 +156,14 @@ DirectorPlotData Channel::getPlotData() {
 		pd.setApplyColor();
 	}
 
+	// Rich text drawn with Background Transparent ink has no background
+	// colour to key out: its anti-aliased text carries per-pixel alpha.
+	if (pd.srf && _sprite->_cast && _sprite->_cast->_type == kCastRichText &&
+			_sprite->_ink == kInkTypeBackgndTrans && pd.srf->format.bytesPerPixel == 4 &&
+			pd.srf->format.aBits() > 0) {
+		pd.srcAlpha = true;
+	}
+
 	pd.srfMask = nullptr;
 	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
 		// kInkTypeCopy -- no mask, default rendering

@@ -811,6 +811,34 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 		}
 	}
 
+	if (srcAlpha && !mask && !srfMask && dst->format == srf->format) {
+		const Graphics::PixelFormat &fmt = srf->format;
+		srcPoint.y = abs(srcRect.top - destRect.top);
+		for (int i = 0; i < destRect.height(); i++, srcPoint.y++) {
+			srcPoint.x = abs(srcRect.left - destRect.left);
+			for (int j = 0; j < destRect.width(); j++, srcPoint.x++) {
+				if (!srfClip.contains(srcPoint)) {
+					failedBoundsCheck = true;
+					continue;
+				}
+				uint32 *dp = (uint32 *)dst->getBasePtr(destRect.left + j, destRect.top + i);
+				uint8 a, rS, gS, bS, rD, gD, bD;
+				fmt.colorToARGB(*(const uint32 *)srf->getBasePtr(srcPoint.x, srcPoint.y), a, rS, gS, bS);
+				if (a == 0)
+					continue;
+				if (a == 255) {
+					*dp = fmt.RGBToColor(rS, gS, bS);
+					continue;
+				}
+				fmt.colorToRGB(*dp, rD, gD, bD);
+				*dp = fmt.RGBToColor(lerpByte(rD, rS, a, 255), lerpByte(gD, gS, a, 255), lerpByte(bD, bS, a, 255));
+			}
+		}
+		if (failedBoundsCheck)
+			warning("DirectorPlotData::inkBlitSurface: Out of bounds in alpha blit");
+		return;
+	}
+
 	// For blit efficiency, surfaces passed here need to be the same
 	// format as the window manager. Most of the time this is
 	// the job of BitmapCastMember::createWidget.
