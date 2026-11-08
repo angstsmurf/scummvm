@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/compression/dcl_installer.h"
 #include "common/compression/vise.h"
 #include "common/file.h"
 #include "common/hashmap.h"
@@ -269,31 +270,68 @@ static void quirkMcLuhanWin() {
 	fontMan->loadWindowsFont("MCLUHAN/SYSTEM/MCL1N___.FON");
 }
 
-// Mounts the files inside a Windows Installer VISE executable and runs the
-// projector from there, so that the game can be played without installing it
-static void mountWinVISEInstaller(const char *installerName, const char *exeName) {
+// Mounts the files inside the installer on the CD and runs the projector
+// from there, so that the game can be played without installing it
+static void quirkSafecrackerWin() {
+	const char *installerName = "sc32inst.exe";
 	if (!g_director->getRawEXEName().equalsIgnoreCase(installerName))
 		return;
 
+	// The English DreamCatcher release has an Installer VISE executable
 	Common::File *installer = new Common::File();
+	if (installer->open(Common::Path(installerName))) {
+		Common::Archive *archive = Common::createWinVISEArchive(installer);
+		if (archive) {
+			SearchMan.add(installerName, archive, 5);
+			g_director->_exeNameOverride = "sc_eng.exe";
+			return;
+		}
+	} else {
+		delete installer;
+	}
+
+	// The European multi-language release has another installer, holding
+	// the projector and movies for each language
+	installer = new Common::File();
 	if (!installer->open(Common::Path(installerName))) {
-		warning("mountWinVISEInstaller(): Cannot open installer \"%s\"", installerName);
+		warning("quirkSafecrackerWin(): Cannot open installer \"%s\"", installerName);
 		delete installer;
 		return;
 	}
 
-	Common::Archive *archive = Common::createWinVISEArchive(installer);
+	Common::Archive *archive = Common::createDCLInstallerArchive(installer);
 	if (!archive) {
-		warning("mountWinVISEInstaller(): Failed to open installer \"%s\"", installerName);
+		warning("quirkSafecrackerWin(): Failed to open installer \"%s\"", installerName);
 		return;
 	}
 
-	SearchMan.add(installerName, archive, 5);
-	g_director->_exeNameOverride = exeName;
-}
+	const char *lang;
+	switch (g_director->getLanguage()) {
+	case Common::FR_FRA:
+		lang = "fra";
+		break;
+	case Common::DE_DEU:
+		lang = "ger";
+		break;
+	case Common::IT_ITA:
+		lang = "ita";
+		break;
+	case Common::NL_NLD:
+		lang = "nl";
+		break;
+	case Common::ES_ESP:
+		lang = "spa";
+		break;
+	case Common::SV_SWE:
+		lang = "swe";
+		break;
+	default:
+		lang = "eng";
+		break;
+	}
 
-static void quirkSafecrackerWin() {
-	mountWinVISEInstaller("sc32inst.exe", "sc_eng.exe");
+	SearchMan.add(installerName, archive, 5);
+	g_director->_exeNameOverride = Common::String::format("sc_%s.exe", lang);
 }
 
 // Mac archives such as Installer VISE store their names in Mac Roman, but

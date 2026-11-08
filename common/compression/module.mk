@@ -3,6 +3,7 @@ MODULE := common/compression
 MODULE_OBJS := \
 	clickteam.o \
 	dcl.o \
+	dcl_installer.o \
 	gentee_installer.o \
 	gzio.o \
 	installshield_cab.o \
