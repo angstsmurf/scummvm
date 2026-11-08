@@ -353,6 +353,17 @@ Symbol Lingo::getHandler(const Common::String &name) {
 	if (sym.type != VOIDSYM)
 		return sym;
 
+	// Code run by `do` lives in an anonymous context. The original also
+	// finds the handlers of the script that ran it, even after a
+	// `go movie` has removed that script's movie (Mac Safecracker runs
+	// `do "loadQTVR"` right after switching movies).
+	ScriptContext *ctx = _state->context;
+	for (int i = (int)_state->callstack.size() - 1; i >= 0 && ctx && ctx->_scriptType == kNoneScript; i--) {
+		ctx = _state->callstack[i]->retContext;
+		if (ctx && ctx->_functionHandlers.contains(name))
+			return ctx->_functionHandlers[name];
+	}
+
 	sym.type = VOIDSYM;
 	sym.name = new Common::String(name);
 	return sym;
