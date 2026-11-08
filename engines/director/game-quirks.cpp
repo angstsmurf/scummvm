@@ -21,6 +21,7 @@
 
 #include "common/compression/vise.h"
 #include "common/file.h"
+#include "common/hashmap.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/platform.h"
@@ -295,6 +296,101 @@ static void quirkSafecrackerWin() {
 	mountWinVISEInstaller("sc32inst.exe", "sc_eng.exe");
 }
 
+// Mac archives such as Installer VISE store their names in Mac Roman, but
+// Director looks files up by their punycode-encoded Unicode names, the way
+// they are named on disk. This exposes the members under those names.
+class MacRomanPathArchive : public Common::Archive {
+public:
+	MacRomanPathArchive(Common::Archive *archive, Common::SeekableReadStream *stream) : _archive(archive), _stream(stream) {
+		Common::ArchiveMemberList list;
+		_archive->listMembers(list);
+		for (auto &member : list) {
+			Common::Path rawPath = member->getPathInArchive();
+			Common::StringArray components = rawPath.splitComponents();
+			for (auto &component : components)
+				component = Common::U32String(component, Common::kMacRoman).encode();
+			_paths[Common::Path::joinComponents(components).punycodeEncode()] = rawPath;
+		}
+	}
+
+	~MacRomanPathArchive() override {
+		delete _archive;
+		delete _stream;
+	}
+
+	bool hasFile(const Common::Path &path) const override {
+		return _paths.contains(path);
+	}
+
+	int listMembers(Common::ArchiveMemberList &list) const override {
+		int count = 0;
+		for (auto &it : _paths) {
+			list.push_back(Common::ArchiveMemberPtr(new Common::GenericArchiveMember(it._key, *this)));
+			count++;
+		}
+		return count;
+	}
+
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override {
+		if (!hasFile(path))
+			return Common::ArchiveMemberPtr();
+		return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
+	}
+
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override {
+		if (!hasFile(path))
+			return nullptr;
+		return _archive->createReadStreamForMember(_paths[path]);
+	}
+
+	Common::SeekableReadStream *createReadStreamForMemberAltStream(const Common::Path &path, Common::AltStreamType altStreamType) const override {
+		if (!hasFile(path))
+			return nullptr;
+		return _archive->createReadStreamForMemberAltStream(_paths[path], altStreamType);
+	}
+
+private:
+	Common::Archive *_archive;
+	Common::SeekableReadStream *_stream;
+	Common::HashMap<Common::Path, Common::Path, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> _paths;
+};
+
+// The European Mac release has the projectors for all languages in one
+// Installer VISE archive on the CD, each in a "SafeCracker (XXX)" folder
+static void quirkSafecrackerMac() {
+	// The detection entry holds the punycode-encoded file name
+	if (g_director->getRawEXEName() != "xn--Install Safecracker-jo0l")
+		return;
+
+	const char *installerName = "Install Safecracker\xe2\x84\xa2";
+	Common::SeekableReadStream *installer = Common::MacResManager::openFileOrDataFork(installerName);
+	if (!installer) {
+		warning("quirkSafecrackerMac(): Cannot open installer \"%s\"", installerName);
+		return;
+	}
+
+	Common::Archive *archive = Common::createMacVISEArchive(installer);
+	if (!archive) {
+		warning("quirkSafecrackerMac(): Failed to open installer \"%s\"", installerName);
+		delete installer;
+		return;
+	}
+
+	const char *lang;
+	switch (g_director->getLanguage()) {
+	case Common::FR_FRA: lang = "FRA"; break;
+	case Common::DE_DEU: lang = "GER"; break;
+	case Common::IT_ITA: lang = "ITA"; break;
+	case Common::NL_NLD: lang = "NL"; break;
+	case Common::ES_ESP: lang = "SPA"; break;
+	case Common::SV_SWE: lang = "SWE"; break;
+	default: lang = "ENG"; break;
+	}
+
+	SearchMan.add(installerName, new MacRomanPathArchive(archive, installer), 5);
+	g_director->_exeNameOverride = Common::String::format("SafeCracker\xe2\x84\xa2 (%s):SafeCracker\xe2\x84\xa2 PPC (%s)", lang, lang);
+}
+
 static void quirkTrekTechWin() {
 	Graphics::MacFontManager *fontMan = g_director->_wm->_fontMan;
 	fontMan->loadWindowsFont("TREKCON4.FON");
@@ -376,6 +472,7 @@ const struct Quirk {
 
 	// Star Trek titles install fonts into the system
 	{ "safecracker", Common::kPlatformWindows, &quirkSafecrackerWin },
+	{ "safecracker", Common::kPlatformMacintosh, &quirkSafecrackerMac },
 	{ "trektech", Common::kPlatformWindows, &quirkTrekTechWin },
 	{ "trekguidetng", Common::kPlatformWindows, &quirkTrekGuideTNGWin },
 
