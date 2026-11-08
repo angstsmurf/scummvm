@@ -7969,6 +7969,22 @@ static const DirectorGameDescription gameDescriptions[] = {
 								  "SC_DATA/Main_swe.dxr",			"d0663e4aef4e49b2306200370ec22fbb", 6604368,
 								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
 								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::SV_SWE, 501, GF_TRUECOLOR),
+	// The same release, run straight from SC32INST.EXE on the CD. It holds the projectors
+	// and movies for all languages, the quirk picks one by the language.
+	WINGAME2f("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::FR_FRA, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::DE_DEU, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::IT_ITA, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::NL_NLD, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::ES_ESP, 501, GF_TRUECOLOR),
+	WINGAME2f_l("safecracker", "", "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::SV_SWE, 501, GF_TRUECOLOR),
 	WINDEMO2f("safecracker", "Demo", "sc_demo.exe",						"t:edec426e8e11231c8fad68f607ec4e0b", 1415543,
 								  "SC_DATA/Main_eng.dxr",			"00ccbc4268e3d9cac9323239a4e6be8a", 567556, 501, GF_TRUECOLOR),
 
