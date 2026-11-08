@@ -54,7 +54,6 @@ ScriptCastMember::ScriptCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 			break;
 		case 7:
 			_scriptType = kParentScript;
-			warning("Unhandled kParentScript %d", castId);
 			break;
 		default:
 			error("ScriptCastMember: Unprocessed script type: %d", type);
