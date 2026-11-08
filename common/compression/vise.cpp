@@ -263,6 +263,11 @@ bool MacVISEArchive::loadCatalog() {
 
 	uint16 numEntries = READ_BE_UINT16(vl3Catalog + 16);
 
+	// Entries hold their nesting depth rather than a directory index: an
+	// entry at depth N is in the last directory read at depth N - 1. This
+	// maps the depth to the 1-based index of that directory.
+	Common::Array<uint16> openDirectories;
+
 	for (uint16 i = 0; i < numEntries; i++) {
 		uint8 entryMagic[4];
 		if (_archiveStream->read(entryMagic, 4) != 4 || memcmp(entryMagic + 1, "VCT", 3)) {
@@ -282,7 +287,14 @@ bool MacVISEArchive::loadCatalog() {
 				_archiveStream->seek(6, SEEK_CUR);
 
 			DirectoryDesc desc;
-			desc.containingDirectory = READ_BE_UINT16(directoryData + 68);
+			uint16 depth = READ_BE_UINT16(directoryData + 68);
+			if (depth > openDirectories.size()) {
+				debug(1, "VISE directory depth was invalid");
+				return false;
+			}
+			desc.containingDirectory = (depth == 0) ? 0 : openDirectories[depth - 1];
+			openDirectories.resize(depth);
+			openDirectories.push_back(_directoryDescs.size() + 1);
 
 			uint8 nameLength = directoryData[76];
 
@@ -310,7 +322,12 @@ bool MacVISEArchive::loadCatalog() {
 			desc.uncompressedDataSize = READ_BE_UINT32(fileData + 68);
 			desc.compressedResSize = READ_BE_UINT32(fileData + 72);
 			desc.uncompressedResSize = READ_BE_UINT32(fileData + 76);
-			desc.containingDirectory = READ_BE_UINT16(fileData + 92);
+			uint16 depth = READ_BE_UINT16(fileData + 92);
+			if (depth > openDirectories.size()) {
+				debug(1, "VISE file depth was invalid");
+				return false;
+			}
+			desc.containingDirectory = (depth == 0) ? 0 : openDirectories[depth - 1];
 			desc.positionInArchive = READ_BE_UINT32(fileData + 96);
 
 			uint8 nameLength = fileData[118];
