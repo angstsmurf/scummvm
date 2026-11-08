@@ -2035,6 +2035,14 @@ namespace Director {
 #define WINDEMO2t_l(t,e,f1,m1,s1,f2,m2,s2,l,v) GENGAME2t_(t,e,f1,m1,s1,f2,m2,s2,l,Common::kPlatformWindows,ADGF_DEMO,v)
 #define WINDEMO2f_l(t,e,f1,m1,s1,f2,m2,s2,l,v,fl) GENGAME2_(t,e,f1,m1,s1,f2,m2,s2,l,Common::kPlatformWindows,((fl)|ADGF_DEMO),v)
 
+#define GENGAME3_(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,l,p,fl,v)	{ { t, e, AD_ENTRY3s(f1, m1, s1, f2, m2, s2, f3, m3, s3), l, p, ((fl) | SUPPORT_STATUS), GUIO1(GUIO_NOASPECT) }, GID_GENERIC, v }
+
+#define GENGAME4_(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,f4,m4,s4,l,p,fl,v)	{ { t, e, AD_ENTRY4s(f1, m1, s1, f2, m2, s2, f3, m3, s3, f4, m4, s4), l, p, ((fl) | SUPPORT_STATUS), GUIO1(GUIO_NOASPECT) }, GID_GENERIC, v }
+
+#define WINGAME3f(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,v,fl)	GENGAME3_(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,Common::EN_ANY,Common::kPlatformWindows,((fl)|ADGF_NO_FLAGS),v)
+#define WINGAME4f(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,f4,m4,s4,v,fl)	GENGAME4_(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,f4,m4,s4,Common::EN_ANY,Common::kPlatformWindows,((fl)|ADGF_NO_FLAGS),v)
+#define WINGAME4f_l(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,f4,m4,s4,l,v,fl)	GENGAME4_(t,e,f1,m1,s1,f2,m2,s2,f3,m3,s3,f4,m4,s4,l,Common::kPlatformWindows,((fl)|ADGF_NO_FLAGS),v)
+
 static const DirectorGameDescription gameDescriptions[] = {
 	// Execute all *.lingo files in game directory
 	{
@@ -7907,25 +7915,44 @@ static const DirectorGameDescription gameDescriptions[] = {
 								  "SC_DATA/MAIN_SPA.Dxr",			"d:76183fa661413d200ce0154c968a3627", 6409022, Common::ES_ESP, 501, GF_TRUECOLOR),
 	MACGAME2f_l("safecracker", "", "xn--SafeCracker PPC (SWE)-ob4m", "rt:4596cfa67cecddc475ec09748ec54000", 397827,
 								  "SC_DATA/MAIN_SWE.Dxr",			"d:e4976c37b4cfbb8111f0919595b0dea2", 6383684, Common::SV_SWE, 501, GF_TRUECOLOR),
-	WINGAME2f("safecracker", "", "sc_eng.exe",						"t:01871e94a5d9b0fad2b063b486cda3f1", 1415977,
-								  "SC_DATA/Main_eng.dxr",			"ecc8f8b40956ad36041b5492ec5a4577", 6491010, 501, GF_TRUECOLOR),
-	// The same release, run straight from its Installer VISE archive
-	WINGAME1tf("safecracker", "", "sc32inst.exe",					"t:5d3b6fed596aca2ee627d524e4ce4e35", 8542183, 501, GF_TRUECOLOR),
-	// European multi-language release, SC32INST.EXE is a 16-bit installer with PKWARE DCL compressed files
-	WINGAME2f("safecracker", "", "sc_eng.exe",						"t:e1d2b3d9631c3512dffdf1a677bca805", 1416001,
-								  "SC_DATA/Main_eng.dxr",			"a65252aea058daffe1c73ac6f42fa796", 6660868, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_fra.exe",					"t:73210af1194e8ceee35fb3418e440a40", 1416219,
-								  "SC_DATA/Main_fra.dxr",			"de73814b1e0147c3f580642a2013629e", 6441952, Common::FR_FRA, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_ger.exe",					"t:49837c40763abbebfd1e5f231e74c22d", 1416269,
-								  "SC_DATA/Main_ger.dxr",			"960c63826b71f747e52b76ffea5f9bb9", 6451280, Common::DE_DEU, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_ita.exe",					"t:3ce19d1185587a867e30d448ce267328", 1416195,
-								  "SC_DATA/Main_ita.dxr",			"c6fb6532180e1f61c594b2d5636b64ad", 6458370, Common::IT_ITA, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_nl.exe",						"t:9c590603858fa34fb3ca437b41b25700", 1416219,
-								  "SC_DATA/Main_nl.dxr",			"540149ea05fe5f6d246d71bedfd3ab2a", 6447482, Common::NL_NLD, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_spa.exe",					"t:2338c99b42cce0cf1413c61debef24ef", 1416231,
-								  "SC_DATA/Main_spa.dxr",			"ff99406d2be12af7703e0af5b387660a", 6697332, Common::ES_ESP, 501, GF_TRUECOLOR),
-	WINGAME2f_l("safecracker", "", "sc_swe.exe",					"t:6ae379028aa05a652c917e9079b6d1d7", 1416137,
-								  "SC_DATA/Main_swe.dxr",			"d0663e4aef4e49b2306200370ec22fbb", 6604368, Common::SV_SWE, 501, GF_TRUECOLOR),
+	// The game looks for its CD at startup, so the CD files are required too.
+	// DreamCatcher release: it checks for MEDIA/INTRO.MOV and MEDIA/R00/PANEL.DXR
+	WINGAME3f("safecracker", "", "sc_eng.exe",						"t:01871e94a5d9b0fad2b063b486cda3f1", 1415977,
+								  "SC_DATA/Main_eng.dxr",			"ecc8f8b40956ad36041b5492ec5a4577", 6491010,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, 501, GF_TRUECOLOR),
+	// The same release, run straight from its Installer VISE archive on the CD
+	WINGAME2f("safecracker", "", "sc32inst.exe",					"t:5d3b6fed596aca2ee627d524e4ce4e35", 8542183,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, 501, GF_TRUECOLOR),
+	// European multi-language release, SC32INST.EXE is a 16-bit installer with PKWARE DCL compressed files.
+	// It checks for SC32INST.EXE in the CD root and for MEDIA/INTRO.MOV (English) or MEDIA/DUMMY.CXT.
+	WINGAME4f("safecracker", "", "sc_eng.exe",						"t:e1d2b3d9631c3512dffdf1a677bca805", 1416001,
+								  "SC_DATA/Main_eng.dxr",			"a65252aea058daffe1c73ac6f42fa796", 6660868,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_fra.exe",					"t:73210af1194e8ceee35fb3418e440a40", 1416219,
+								  "SC_DATA/Main_fra.dxr",			"de73814b1e0147c3f580642a2013629e", 6441952,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::FR_FRA, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_ger.exe",					"t:49837c40763abbebfd1e5f231e74c22d", 1416269,
+								  "SC_DATA/Main_ger.dxr",			"960c63826b71f747e52b76ffea5f9bb9", 6451280,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::DE_DEU, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_ita.exe",					"t:3ce19d1185587a867e30d448ce267328", 1416195,
+								  "SC_DATA/Main_ita.dxr",			"c6fb6532180e1f61c594b2d5636b64ad", 6458370,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::IT_ITA, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_nl.exe",						"t:9c590603858fa34fb3ca437b41b25700", 1416219,
+								  "SC_DATA/Main_nl.dxr",			"540149ea05fe5f6d246d71bedfd3ab2a", 6447482,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::NL_NLD, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_spa.exe",					"t:2338c99b42cce0cf1413c61debef24ef", 1416231,
+								  "SC_DATA/Main_spa.dxr",			"ff99406d2be12af7703e0af5b387660a", 6697332,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::ES_ESP, 501, GF_TRUECOLOR),
+	WINGAME4f_l("safecracker", "", "sc_swe.exe",					"t:6ae379028aa05a652c917e9079b6d1d7", 1416137,
+								  "SC_DATA/Main_swe.dxr",			"d0663e4aef4e49b2306200370ec22fbb", 6604368,
+								  "SC32INST.EXE",					"t:8871f96aaa0830885d88cba37dea0eac", 52021097,
+								  "MEDIA/INTRO.MOV",				"3b1d2eaa08d2b8cea9f89af0cee2ea3d", 7735169, Common::SV_SWE, 501, GF_TRUECOLOR),
 	WINDEMO2f("safecracker", "Demo", "sc_demo.exe",						"t:edec426e8e11231c8fad68f607ec4e0b", 1415543,
 								  "SC_DATA/Main_eng.dxr",			"00ccbc4268e3d9cac9323239a4e6be8a", 567556, 501, GF_TRUECOLOR),
 
