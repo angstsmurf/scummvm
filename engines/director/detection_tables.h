@@ -7892,7 +7892,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1_l("ronron", "", "xn--hekarb", "e158dde6f7c52692400f4f58f84405b5", 103908, Common::JA_JPN, 501),
 	WINGAME1t_l("ronron", "", "xn--.EXE-9u4ca5bb", "a7f01320844d04408e1519e398a5e0d0", 1451774, Common::JA_JPN, 501),
 
-	// Requires installation, sc32inst.exe, Vise installer
+	// Requires installation, sc32inst.exe, Vise installer (or runs straight from it, see below)
 	MACGAME2f("safecracker", "",	  "xn--SafeCracker PPC (ENG)-ob4m",	"rt:4596cfa67cecddc475ec09748ec54000", 397827,
 								  "SC_DATA/MAIN_ENG.Dxr",			"d:b147e3ad3dc53f2426a36f7898724b6a", 6387730, 501, GF_TRUECOLOR),
 	MACGAME2f_l("safecracker", "", "xn--SafeCracker PPC (FRA)-ob4m", "rt:4596cfa67cecddc475ec09748ec54000", 397827,
@@ -7909,6 +7909,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 								  "SC_DATA/MAIN_SWE.Dxr",			"d:e4976c37b4cfbb8111f0919595b0dea2", 6383684, Common::SV_SWE, 501, GF_TRUECOLOR),
 	WINGAME2f("safecracker", "", "sc_eng.exe",						"t:01871e94a5d9b0fad2b063b486cda3f1", 1415977,
 								  "SC_DATA/Main_eng.dxr",			"ecc8f8b40956ad36041b5492ec5a4577", 6491010, 501, GF_TRUECOLOR),
+	// The same release, run straight from its Installer VISE archive
+	WINGAME1tf("safecracker", "", "sc32inst.exe",					"t:5d3b6fed596aca2ee627d524e4ce4e35", 8542183, 501, GF_TRUECOLOR),
 	// European multi-language release, SC32INST.EXE is a 16-bit installer with PKWARE DCL compressed files
 	WINGAME2f("safecracker", "", "sc_eng.exe",						"t:e1d2b3d9631c3512dffdf1a677bca805", 1416001,
 								  "SC_DATA/Main_eng.dxr",			"a65252aea058daffe1c73ac6f42fa796", 6660868, 501, GF_TRUECOLOR),

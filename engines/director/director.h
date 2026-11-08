@@ -281,6 +281,9 @@ public:
 	Common::Rect _fixStageRect;
 	Common::List<Common::String> _extraSearchPath;
 	bool _emulateMultiButtonMouse;
+	// Projector to run instead of the detected main file, e.g. when the
+	// detected file is an installer that a quirk mounted as an archive
+	Common::String _exeNameOverride;
 
 	// Owner of all Archive objects.
 	Common::HashMap<Common::Path, Common::SharedPtr<Archive>, Common::Path::IgnoreCaseAndMac_Hash, Common::Path::IgnoreCaseAndMac_EqualTo> _allSeenResFiles;
