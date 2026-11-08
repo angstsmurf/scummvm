@@ -20,6 +20,7 @@
  */
 
 #include "common/compression/vise.h"
+#include "common/file.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/platform.h"
@@ -267,6 +268,33 @@ static void quirkMcLuhanWin() {
 	fontMan->loadWindowsFont("MCLUHAN/SYSTEM/MCL1N___.FON");
 }
 
+// Mounts the files inside a Windows Installer VISE executable and runs the
+// projector from there, so that the game can be played without installing it
+static void mountWinVISEInstaller(const char *installerName, const char *exeName) {
+	if (!g_director->getRawEXEName().equalsIgnoreCase(installerName))
+		return;
+
+	Common::File *installer = new Common::File();
+	if (!installer->open(Common::Path(installerName))) {
+		warning("mountWinVISEInstaller(): Cannot open installer \"%s\"", installerName);
+		delete installer;
+		return;
+	}
+
+	Common::Archive *archive = Common::createWinVISEArchive(installer);
+	if (!archive) {
+		warning("mountWinVISEInstaller(): Failed to open installer \"%s\"", installerName);
+		return;
+	}
+
+	SearchMan.add(installerName, archive, 5);
+	g_director->_exeNameOverride = exeName;
+}
+
+static void quirkSafecrackerWin() {
+	mountWinVISEInstaller("sc32inst.exe", "sc_eng.exe");
+}
+
 static void quirkTrekTechWin() {
 	Graphics::MacFontManager *fontMan = g_director->_wm->_fontMan;
 	fontMan->loadWindowsFont("TREKCON4.FON");
@@ -347,6 +375,7 @@ const struct Quirk {
 	{ "mcluhan", Common::kPlatformMacintosh, &quirkMcLuhanMac },
 
 	// Star Trek titles install fonts into the system
+	{ "safecracker", Common::kPlatformWindows, &quirkSafecrackerWin },
 	{ "trektech", Common::kPlatformWindows, &quirkTrekTechWin },
 	{ "trekguidetng", Common::kPlatformWindows, &quirkTrekGuideTNGWin },
 

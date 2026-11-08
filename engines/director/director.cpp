@@ -456,6 +456,9 @@ Common::CodePage DirectorEngine::getPlatformEncoding() {
 }
 
 Common::String DirectorEngine::getRawEXEName() const {
+	if (!_exeNameOverride.empty())
+		return _exeNameOverride;
+
 	if (!_gameDescription->desc.filesDescriptions[0].fileName)
 		return Common::String();
 
