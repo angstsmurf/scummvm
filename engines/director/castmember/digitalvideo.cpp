@@ -428,7 +428,12 @@ void DigitalVideoCastMember::startVideo() {
 	}
 
 	if (_pausedAtStart) {
+		// Only the first frame is shown, so the movie is stopped.
+		// Opera Fatal's instrument screens pick the play or pause
+		// cursor from the movieRate.
 		_getFirstFrame = true;
+		if (_channel)
+			_channel->_movieRate = 0.0;
 	} else {
 		if (_channel && _channel->_movieRate == 0.0)
 			_channel->_movieRate = 1.0;
