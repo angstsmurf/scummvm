@@ -609,7 +609,7 @@ AudioStream *QuickTimeAudioDecoder::AudioSampleDesc::createAudioStream(Common::S
 	} else if (_codecTag == MKTAG('t', 'w', 'o', 's') || _codecTag == MKTAG('r', 'a', 'w', ' ')) {
 		// Fortunately, most of the audio used in Myst videos is raw...
 		uint16 flags = 0;
-		if (_codecTag == MKTAG('r', 'a', 'w', ' '))
+		if (_codecTag == MKTAG('r', 'a', 'w', ' ') && _bitsPerSample == 8)
 			flags |= FLAG_UNSIGNED;
 		if (_channels == 2)
 			flags |= FLAG_STEREO;
