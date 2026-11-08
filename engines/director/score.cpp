@@ -386,7 +386,11 @@ void Score::step() {
 			// starts the puzzle and stops the idle loop.
 			bool pollFirst = _idleWentToFrame && g_system->getMillis() >= _nextFrameTime;
 			_idleWentToFrame = false;
-			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst) {
+			// In D7, the frame step returns at once while a "delay" runs, before
+			// it sends idle (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
+			bool delayed = _version >= kFileVer700 && _nextFrameDelay &&
+				g_system->getMillis() < _nextFrameDelay;
+			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst && !delayed) {
 				_movie->processEvent(kEventIdle);
 				_idleWentToFrame = _version >= kFileVer400 && _nextFrame != 0 && _window->_nextMovie.movie.empty();
 			}
@@ -438,7 +442,7 @@ void Score::stopPlay() {
 }
 
 void Score::setDelay(uint32 ticks) {
-	// While the delay runs, D4 and later keep calling the exitFrame handler
+	// While the delay runs, D4 to D6 keep calling the exitFrame handler
 	// (see Score::update()). Even if the handler sets a new delay value, only
 	// the first one is acknowledged (T_EVNT26).
 	if (!_nextFrameDelay) {
@@ -766,14 +770,16 @@ void Score::update() {
 		// and _skipFrameAdvance is set to true.
 		// exitFrame is not called in this case.
 		//
-		// From D4 on, while a "delay" runs, each pass of the score loop sends
+		// In D4 to D6, while a "delay" runs, each pass of the score loop sends
 		// idle and then exitFrame again, until the delay is over (T_EVNT32:
 		// thousands of re-runs per second in the D4 projector). Otherwise,
 		// exitFrame is only sent once per frame; pausing the movie from
 		// exitFrame must not repeat it (T_EVNT12). The delay is checked after
 		// exitFrame, so the pass that ends the delay sends exitFrame too.
-		bool exitFrameAgain = _version >= kFileVer400 && _nextFrameDelay &&
-			!_window->frozenLingoStateCount();
+		// D7 checks the delay first and sends nothing until it is over
+		// (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
+		bool exitFrameAgain = _version >= kFileVer400 && _version < kFileVer700 &&
+			_nextFrameDelay && !_window->frozenLingoStateCount();
 		if (_haveInteractivity && !_window->_skipFrameAdvance && (!_exitFrameCalled || exitFrameAgain)) {
 			// Exit the current frame. This can include scopeless ScoreScripts.
 			_movie->processEvent(kEventExitFrame);
