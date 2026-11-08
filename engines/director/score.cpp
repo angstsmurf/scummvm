@@ -461,7 +461,7 @@ bool Score::isWaitingForNextFrame() {
 
 	bool goingTo = _nextFrame && _nextFrame != _curFrameNumber;
 
-	// In D2 to D6, "go" to a frame in the same movie returns to the handler
+	// In D2 to D7, "go" to a frame in the same movie returns to the handler
 	// without waiting for the frame timer; it restarts the timer instead.
 	// The tempo only paces the playback head while no Lingo runs. So a
 	// handler that loops on "go" (e.g. "repeat while the mouseDown") runs as
