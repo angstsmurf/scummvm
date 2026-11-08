@@ -971,6 +971,26 @@ Common::Path findMoviePath(const Common::String &path, bool currentFolder, bool 
 	return result;
 }
 
+// Like findMoviePath, but tries the cast file extensions first, so that
+// a cast stored with another extension, e.g. MAIN.CST protected as MAIN.CXT,
+// is not resolved to the movie of the same name next to it.
+Common::Path findCastPath(const Common::String &path, bool currentFolder, bool searchPaths) {
+	const char *extsD4[] = { ".CST", ".CXT", ".DIR", ".DXR", nullptr };
+	const char *extsD5[] = { ".CST", ".CXT", ".DIR", ".DXR", ".EXE", nullptr };
+	const char *extsD6[] = { ".CST", ".CXT", ".CCT", ".DIR", ".DXR", ".EXE", ".DCR", ".DCT", nullptr };
+
+	const char **exts = nullptr;
+	if (g_director->getVersion() < 500) {
+		exts = extsD4;
+	} else if (g_director->getVersion() < 600) {
+		exts = extsD5;
+	} else {
+		exts = extsD6;
+	}
+
+	return findPath(path, currentFolder, searchPaths, false, exts);
+}
+
 Common::Path findXLibPath(const Common::String &path, bool currentFolder, bool searchPaths) {
 	const char *extsD3[] = { ".DLL", nullptr };
 	const char *extsD5[] = { ".DLL", ".X16", ".X32", nullptr };
