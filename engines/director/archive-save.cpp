@@ -212,6 +212,13 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 	// Add to search index
 	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->_addFile(saveFileName);
 
+	// The cached archives for the saved file are out of date now. Have
+	// them read back from disk the next time the file is opened, or
+	// reopening the movie in the same session would show its contents
+	// from before the save (Opera Fatal's save slots).
+	g_director->markArchiveStale(getPathName());
+	g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
+
 	delete saveFile;
 	for (auto it : builtResources) {
 		delete it;
