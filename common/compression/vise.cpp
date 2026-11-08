@@ -21,6 +21,8 @@
 
 #include "common/compression/vise.h"
 
+#include "common/debug.h"
+#include "common/hashmap.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/compression/deflate.h"
@@ -34,7 +36,7 @@
 //     Installer VISE 3.6 Lite
 //
 // Windows:
-//     None
+//     VISE 3.x (vise32ex.dll)
 
 namespace Common {
 
@@ -423,6 +425,421 @@ bool MacVISEArchive::getFileDescIndex(const Common::Path &path, uint &outIndex) 
 
 Common::Archive *createMacVISEArchive(Common::SeekableReadStream *stream) {
 	MacVISEArchive *archive = new MacVISEArchive(stream);
+	if (!archive->loadCatalog()) {
+		delete archive;
+		return nullptr;
+	}
+
+	return archive;
+}
+
+// Windows Installer VISE
+//
+// The installer is a PE executable with the archive appended as an overlay.
+// The file ends with "ESIV" followed by the offset of the overlay, which also
+// starts with "ESIV". The overlay holds the installer support files, the
+// installer script and the compressed file data.
+//
+// The script is a list of items, each starting with a 32-bit type. Only
+// folders (type 1) and files (type 2) are parsed here. The other item types
+// are skipped by scanning for the next folder or file item that parses
+// cleanly. The item layouts come from vise32ex.dll (VISE 3.x).
+//
+// File data is raw deflate over byte-swapped 16-bit words.
+
+class WinVISEArchive : public Common::Archive {
+public:
+	explicit WinVISEArchive(Common::SeekableReadStream *stream);
+	~WinVISEArchive() override;
+
+	bool loadCatalog();
+
+	bool hasFile(const Common::Path &path) const override;
+	int listMembers(Common::ArchiveMemberList &list) const override;
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override;
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
+
+private:
+	enum ItemType {
+		kItemFolder = 1,
+		kItemFile = 2
+	};
+
+	struct Item {
+		Item() : type(0), id(0), parent(0), compressed(0), installMethod(0), size(0), compressedSize(0), offset(0) {}
+
+		uint32 type;
+		uint32 id;
+		uint32 parent;
+		Common::String name;
+
+		// Files only
+		uint32 compressed;
+		byte installMethod;
+		uint32 size;
+		uint32 compressedSize;
+		uint32 offset;
+	};
+
+	struct FileDesc {
+		uint32 size;
+		uint32 compressedSize;
+		uint32 offset;
+	};
+
+	class ScriptReader {
+	public:
+		ScriptReader(const byte *data, uint32 size, uint32 pos) : _data(data), _size(size), _pos(pos), _err(false) {}
+
+		bool err() const { return _err; }
+		uint32 pos() const { return _pos; }
+
+		void skip(uint32 count) {
+			if (_err || count > _size - _pos)
+				_err = true;
+			else
+				_pos += count;
+		}
+
+		byte readByte() {
+			if (_err || _pos >= _size) {
+				_err = true;
+				return 0;
+			}
+			return _data[_pos++];
+		}
+
+		uint16 readUint16() {
+			if (_err || _size - _pos < 2) {
+				_err = true;
+				return 0;
+			}
+			uint16 value = READ_LE_UINT16(_data + _pos);
+			_pos += 2;
+			return value;
+		}
+
+		uint32 readUint32() {
+			if (_err || _size - _pos < 4) {
+				_err = true;
+				return 0;
+			}
+			uint32 value = READ_LE_UINT32(_data + _pos);
+			_pos += 4;
+			return value;
+		}
+
+		// 16-bit length followed by the characters
+		void skipString(uint maxLength) {
+			uint16 length = readUint16();
+			if (length > maxLength)
+				_err = true;
+			else
+				skip(length);
+		}
+
+		// Item name, followed by its translations
+		Common::String readName() {
+			uint16 length = readUint16();
+			if (_err || length == 0 || length > 259 || length > _size - _pos) {
+				_err = true;
+				return Common::String();
+			}
+
+			Common::String name(reinterpret_cast<const char *>(_data + _pos), length);
+			_pos += length;
+
+			for (uint i = 0; i < length; i++) {
+				byte c = name[i];
+				if (c < 0x20 || strchr("\\/:*?\"<>|", c)) {
+					_err = true;
+					return Common::String();
+				}
+			}
+
+			uint16 numTranslations = readUint16();
+			if (numTranslations > 64)
+				_err = true;
+
+			for (uint i = 0; i < numTranslations && !_err; i++) {
+				readUint16(); // Language
+				skipString(259);
+			}
+
+			return name;
+		}
+
+	private:
+		const byte *_data;
+		uint32 _size;
+		uint32 _pos;
+		bool _err;
+	};
+
+	bool readItem(ScriptReader &reader, Item &item) const;
+	static bool readItemHeader(ScriptReader &reader, Item &item);
+
+	Common::SeekableReadStream *_stream;
+	uint32 _overlayOffset;
+	uint32 _overlaySize;
+
+	typedef Common::HashMap<Common::Path, FileDesc, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> FileMap;
+	FileMap _files;
+};
+
+WinVISEArchive::WinVISEArchive(Common::SeekableReadStream *stream) : _stream(stream), _overlayOffset(0), _overlaySize(0) {
+}
+
+WinVISEArchive::~WinVISEArchive() {
+	delete _stream;
+}
+
+bool WinVISEArchive::readItemHeader(ScriptReader &reader, Item &item) {
+	item.id = reader.readUint32();
+	item.parent = reader.readUint32();
+
+	if (item.id == 0 || item.id >= 0x100000 || item.parent >= 0x100000 || item.parent == item.id)
+		return false;
+
+	reader.skip(4 + 8 + 6 + 1);
+
+	uint16 numConditions = reader.readUint16();
+	if (numConditions > 64)
+		return false;
+	reader.skip(numConditions * 5);
+
+	reader.skip(1);
+
+	for (uint list = 0; list < 2 && !reader.err(); list++) {
+		uint16 count = reader.readUint16();
+		if (count > 64)
+			return false;
+
+		for (uint i = 0; i < count && !reader.err(); i++) {
+			reader.skipString(1024);
+			reader.skip(4);
+			reader.skipString(1024);
+			reader.skipString(1024);
+		}
+	}
+
+	// Two 256-bit masks and a flag
+	reader.skip(32 + 32 + 1);
+
+	return !reader.err();
+}
+
+bool WinVISEArchive::readItem(ScriptReader &reader, Item &item) const {
+	item.type = reader.readUint32();
+	if (item.type != kItemFolder && item.type != kItemFile)
+		return false;
+
+	if (!readItemHeader(reader, item))
+		return false;
+
+	item.name = reader.readName();
+	reader.skipString(0x7fff); // Description
+	if (reader.err())
+		return false;
+
+	if (item.type == kItemFolder) {
+		reader.skip(4 + 1 + 4);
+		reader.skipString(1024);
+		reader.skip(1 + 1 + 1);
+		reader.skipString(1024);
+		reader.skip(4);
+		return !reader.err();
+	}
+
+	item.size = reader.readUint32();
+	item.compressedSize = reader.readUint32();
+	item.compressed = reader.readUint32();
+	item.offset = reader.readUint32();
+	reader.skip(4); // Attributes
+
+	if (item.compressed > 1 || (item.compressed && (item.offset > _overlaySize || item.compressedSize > _overlaySize - item.offset)))
+		return false;
+
+	reader.skip(3 * 8); // Creation, access and modification time
+	reader.skip(2 + 2 + 1 + 4);
+	reader.skipString(1024);
+	reader.skip(4 + 1 + 1 + 4 + 4 + 4 + 4 + 4);
+
+	item.installMethod = reader.readByte();
+	reader.skipString(1024);
+	reader.skip(1);
+	if (item.installMethod == 4)
+		reader.skip(16);
+	reader.skip(1 + 4 + 4);
+
+	return !reader.err();
+}
+
+bool WinVISEArchive::loadCatalog() {
+	uint32 fileSize = _stream->size();
+	if (fileSize < 8)
+		return false;
+
+	_stream->seek(fileSize - 8);
+	if (_stream->readUint32BE() != MKTAG('E', 'S', 'I', 'V'))
+		return false;
+
+	_overlayOffset = _stream->readUint32LE();
+	if (_overlayOffset >= fileSize - 8)
+		return false;
+
+	_overlaySize = fileSize - _overlayOffset;
+
+	_stream->seek(_overlayOffset);
+	if (_stream->readUint32BE() != MKTAG('E', 'S', 'I', 'V'))
+		return false;
+
+	// The script comes after the support files, which are small. File data
+	// starts after the script, so stop scanning once the first file data
+	// offset is reached.
+	const uint32 kMaxScanSize = 4 * 1024 * 1024;
+	uint32 scanSize = MIN<uint32>(_overlaySize, kMaxScanSize);
+
+	byte *script = (byte *)malloc(scanSize);
+	if (!script)
+		return false;
+
+	_stream->seek(_overlayOffset);
+	if (_stream->read(script, scanSize) != scanSize) {
+		free(script);
+		return false;
+	}
+
+	Common::Array<Item> items;
+	uint32 scanEnd = scanSize;
+
+	for (uint32 pos = 4; pos + 4 <= scanEnd;) {
+		uint32 type = READ_LE_UINT32(script + pos);
+		if (type != kItemFolder && type != kItemFile) {
+			pos++;
+			continue;
+		}
+
+		ScriptReader reader(script, scanSize, pos);
+		Item item;
+		if (!readItem(reader, item)) {
+			pos++;
+			continue;
+		}
+
+		if (item.type == kItemFile && item.compressed)
+			scanEnd = MIN(scanEnd, item.offset);
+
+		items.push_back(item);
+		pos = reader.pos();
+	}
+
+	free(script);
+
+	Common::HashMap<uint32, uint> idToItem;
+	for (uint i = 0; i < items.size(); i++) {
+		if (!idToItem.contains(items[i].id))
+			idToItem[items[i].id] = i;
+	}
+
+	for (const Item &item : items) {
+		if (item.type != kItemFile)
+			continue;
+
+		// Install methods 2 and 4 refer to files outside the archive
+		if (!item.compressed || item.installMethod == 2 || item.installMethod == 4) {
+			debug(1, "WinVISEArchive: Skipping file '%s' (compressed %u, install method %u)", item.name.c_str(), item.compressed, item.installMethod);
+			continue;
+		}
+
+		Common::Path path(item.name, Common::Path::kNoSeparator);
+		uint32 parent = item.parent;
+		for (uint depth = 0; parent != 0 && depth < 64; depth++) {
+			Common::HashMap<uint32, uint>::const_iterator it = idToItem.find(parent);
+			if (it == idToItem.end() || items[it->_value].type != kItemFolder)
+				break;
+
+			const Item &folder = items[it->_value];
+			path = Common::Path(folder.name, Common::Path::kNoSeparator).join(path);
+			parent = folder.parent;
+		}
+
+		if (_files.contains(path)) {
+			debug(1, "WinVISEArchive: Duplicate file '%s'", path.toString().c_str());
+			continue;
+		}
+
+		FileDesc desc;
+		desc.size = item.size;
+		desc.compressedSize = item.compressedSize;
+		desc.offset = _overlayOffset + item.offset;
+		_files[path] = desc;
+
+		debug(2, "WinVISEArchive: '%s' size %u compressed %u at 0x%x", path.toString().c_str(), desc.size, desc.compressedSize, desc.offset);
+	}
+
+	return !_files.empty();
+}
+
+bool WinVISEArchive::hasFile(const Common::Path &path) const {
+	return _files.contains(path);
+}
+
+int WinVISEArchive::listMembers(Common::ArchiveMemberList &list) const {
+	for (const auto &file : _files)
+		list.push_back(getMember(file._key));
+
+	return _files.size();
+}
+
+const Common::ArchiveMemberPtr WinVISEArchive::getMember(const Common::Path &path) const {
+	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
+}
+
+Common::SeekableReadStream *WinVISEArchive::createReadStreamForMember(const Common::Path &path) const {
+	FileMap::const_iterator it = _files.find(path);
+	if (it == _files.end())
+		return nullptr;
+
+	const FileDesc &desc = it->_value;
+
+	// Pad to a whole number of 16-bit words
+	uint32 paddedSize = desc.compressedSize + (desc.compressedSize & 1);
+	byte *compressed = (byte *)malloc(paddedSize);
+	byte *decompressed = (byte *)malloc(desc.size ? desc.size : 1);
+	if (!compressed || !decompressed) {
+		free(compressed);
+		free(decompressed);
+		return nullptr;
+	}
+
+	compressed[paddedSize - 1] = 0;
+	_stream->seek(desc.offset);
+	if (_stream->read(compressed, desc.compressedSize) != desc.compressedSize) {
+		warning("WinVISEArchive: Failed to read '%s'", path.toString().c_str());
+		free(compressed);
+		free(decompressed);
+		return nullptr;
+	}
+
+	for (uint32 i = 0; i < paddedSize; i += 2)
+		SWAP(compressed[i], compressed[i + 1]);
+
+	uint decompressedSize = desc.size;
+	bool ok = Common::inflateZlibHeaderless(decompressed, &decompressedSize, compressed, paddedSize);
+	free(compressed);
+
+	if (!ok || decompressedSize != desc.size) {
+		warning("WinVISEArchive: Failed to decompress '%s'", path.toString().c_str());
+		free(decompressed);
+		return nullptr;
+	}
+
+	return new Common::MemoryReadStream(decompressed, desc.size, DisposeAfterUse::YES);
+}
+
+Common::Archive *createWinVISEArchive(Common::SeekableReadStream *stream) {
+	WinVISEArchive *archive = new WinVISEArchive(stream);
 	if (!archive->loadCatalog()) {
 		delete archive;
 		return nullptr;

@@ -25,6 +25,7 @@
 /**
  * @file
  * Installer VISE decompressor used in engines:
+ * - director
  * - mtropolis
  */
 
@@ -34,6 +35,10 @@ namespace Common {
 
 // Loads a Macintosh Installer VISE archive from a stream
 Common::Archive *createMacVISEArchive(Common::SeekableReadStream *stream);
+
+// Loads the archive appended to a Windows Installer VISE executable from a stream.
+// Takes ownership of the stream, which is deleted if loading fails.
+Common::Archive *createWinVISEArchive(Common::SeekableReadStream *stream);
 
 } // End of namespace Common
 
