@@ -972,7 +972,9 @@ void Cast::loadCast() {
 		// Try to load script context
 		// Even for multiple casts, ID is 1024
 		if ((r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId)) != nullptr) {
-			loadLingoContext(*r);
+			// Empty cast libraries can have a 0-byte Lctx (Safecracker)
+			if (r->size() > 0)
+				loadLingoContext(*r);
 			delete r;
 		}
 	}
