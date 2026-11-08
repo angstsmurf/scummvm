@@ -146,6 +146,7 @@ MODULE_OBJS = \
 	lingo/xlibs/p/paco.o \
 	lingo/xlibs/p/palxobj.o \
 	lingo/xlibs/p/panel.o \
+	lingo/xlibs/p/panomovie.o \
 	lingo/xlibs/p/pharaohs.o \
 	lingo/xlibs/p/playsoundmoviexobj.o \
 	lingo/xlibs/p/popupmenuxobj.o \
