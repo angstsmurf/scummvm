@@ -223,7 +223,7 @@ void Movie::loadCastLibMapping(Common::SeekableReadStreamEndian &stream) {
 		Common::SharedPtr<Archive> castArchive = _movieArchive;
 		bool isExternal = !path.empty();
 		if (isExternal) {
-			Common::Path archivePath = findMoviePath(path);
+			Common::Path archivePath = findCastPath(path);
 			castArchive = loadExternalCastFrom(archivePath);
 			if (!castArchive) {
 				continue;	// couldn't load external cast

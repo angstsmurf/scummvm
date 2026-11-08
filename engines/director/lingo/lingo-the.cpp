@@ -2308,7 +2308,7 @@ void Lingo::setTheCastLib(Datum &id1, int field, Datum &d) {
 	switch (field) {
 	case kTheFileName:
 		{
-			Common::Path castPath = findMoviePath(d.asString());
+			Common::Path castPath = findCastPath(d.asString());
 			movie->loadCastLibFrom(id1.u.i, castPath);
 		}
 		break;
