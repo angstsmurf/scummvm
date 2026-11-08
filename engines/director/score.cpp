@@ -1097,15 +1097,6 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		}
 
 		if (channel->isDirty(nextSprite) || memberModified[i] || widgetRedrawn || mode == kRenderForceUpdate) {
-
-			if (currentSprite && currentSprite->_cast && currentSprite->_cast->_erase) {
-				currentSprite->_cast->_erase = false;
-				_movie->eraseCastMember(currentSprite->_castId);
-
-				currentSprite->setCast(currentSprite->_castId);
-				nextSprite->setCast(nextSprite->_castId);
-			}
-
 			// Only clean out the channel if we're moving to a different frame
 			if (withClean)
 				channel->setClean(nextSprite);

@@ -2769,17 +2769,10 @@ void LB::b_editableText(int nargs) {
 void LB::b_erase(int nargs) {
 	Datum d = g_lingo->pop();
 	Movie *movie = g_director->getCurrentMovie();
-	CastMember *eraseCast = movie->getCastMember(d.asMemberID());
-
-	if (eraseCast) {
-		eraseCast->_erase = true;
-		Common::Array<Channel *> channels = movie->getScore()->_channels;
-
-		for (uint i = 0; i < channels.size(); i++) {
-			if (channels[i]->_sprite->_castId == d.asMemberID()) {
-				channels[i]->setDirty();
-			}
-		}
+	if (movie->getCastMember(d.asMemberID())) {
+		movie->eraseCastMember(d.asMemberID());
+		movie->getWindow()->render();
+		g_director->draw();
 	}
 }
 
