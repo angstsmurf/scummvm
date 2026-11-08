@@ -644,44 +644,9 @@ void Sprite::setCast(CastMemberID memberID) {
 		_cast->decRefCount();
 	}
 	_cast = _movie->getCastMember(_castId);
-	//As QDShapes don't have an associated cast, we must not change their _SpriteType.
-	if (g_director->getVersion() >= 400 && !isQDShape() && _castId != CastMemberID(0, 0))
-		_spriteType = kCastMemberSprite;
 
 	if (_cast) {
 		_cast->incRefCount();
-		if (g_director->getVersion() >= 400) {
-			// Set the sprite type to be more specific ONLY for bitmap or text.
-			// Others just use the generic kCastMemberSprite in D4.
-			switch (_cast->_type) {
-			case kCastBitmap:
-				_spriteType = kBitmapSprite;
-				break;
-			case kCastText:
-				_spriteType = kTextSprite;
-				break;
-			case kCastButton:
-				{
-					TextCastMember *text = (TextCastMember *)_cast;
-					switch (text->_buttonType) {
-					case kTypeButton:
-						_spriteType = kButtonSprite;
-						break;
-					case kTypeCheckBox:
-						_spriteType = kCheckboxSprite;
-						break;
-					case kTypeRadio:
-						_spriteType = kRadioButtonSprite;
-						break;
-					default:
-						break;
-					}
-					break;
-				}
-			default:
-				break;
-			}
-		}
 
 		// The size of the sprite stays as stored: getBbox() takes the
 		// size of the member where it applies. Only a button is sized

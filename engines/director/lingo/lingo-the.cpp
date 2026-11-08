@@ -1885,6 +1885,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			if (targetMember != sprite->_castId) {
 				channel->keepLingoBbox();
 				channel->setCast(targetMember);
+				channel->setAutoType();
 				// Ensure the new sprite, whether larger or smaller, appears correctly on the screen
 			}
 		}
@@ -1923,6 +1924,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 					channel->keepLingoBbox();
 				channel->setCast(castId);
 			}
+			channel->setAutoType();
 		}
 		break;
 	case kTheConstraint:
