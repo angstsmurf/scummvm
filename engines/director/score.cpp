@@ -438,9 +438,9 @@ void Score::stopPlay() {
 }
 
 void Score::setDelay(uint32 ticks) {
-	// the score will continually loop at the exitFrame handler,
-	// even if the handler sets a new delay value only the first one
-	// will be acknowledged.
+	// While the delay runs, D4 and later keep calling the exitFrame handler
+	// (see Score::update()). Even if the handler sets a new delay value, only
+	// the first one is acknowledged (T_EVNT26).
 	if (!_nextFrameDelay) {
 		_nextFrameDelay = g_system->getMillis() + (ticks * 1000 / 60);
 		debugC(5, kDebugEvents, "Score::setDelay(): delaying %d ticks, next frame time at %d", ticks, _nextFrameDelay);
@@ -765,7 +765,16 @@ void Score::update() {
 		// When Lingo::func_goto* is called, _nextFrame is set
 		// and _skipFrameAdvance is set to true.
 		// exitFrame is not called in this case.
-		if (_haveInteractivity && !_window->_skipFrameAdvance && !_exitFrameCalled) {
+		//
+		// From D4 on, while a "delay" runs, each pass of the score loop sends
+		// idle and then exitFrame again, until the delay is over (T_EVNT32:
+		// thousands of re-runs per second in the D4 projector). Otherwise,
+		// exitFrame is only sent once per frame; pausing the movie from
+		// exitFrame must not repeat it (T_EVNT12). The delay is checked after
+		// exitFrame, so the pass that ends the delay sends exitFrame too.
+		bool exitFrameAgain = _version >= kFileVer400 && _nextFrameDelay &&
+			!_window->frozenLingoStateCount();
+		if (_haveInteractivity && !_window->_skipFrameAdvance && (!_exitFrameCalled || exitFrameAgain)) {
 			// Exit the current frame. This can include scopeless ScoreScripts.
 			_movie->processEvent(kEventExitFrame);
 			_exitFrameCalled = true;
