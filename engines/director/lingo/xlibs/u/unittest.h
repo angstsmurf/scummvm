@@ -46,6 +46,8 @@ void m_moveMouse(int nargs);
 void m_leftMouseDown(int nargs);
 void m_leftMouseUp(int nargs);
 void m_keyPress(int nargs);
+void m_postKeyPress(int nargs);
+void m_postLeftClick(int nargs);
 
 } // End of namespace UnitTest
 

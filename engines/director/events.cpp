@@ -52,7 +52,22 @@ bool DirectorEngine::pollEvent(Common::Event &event) {
 		event = _injectedEvents.remove_at(0);
 		return true;
 	}
+	if (!_postedEvents.empty() && (int32)(g_system->getMillis() - _postedEvents[0].due) >= 0) {
+		event = _postedEvents.remove_at(0).event;
+		return true;
+	}
 	return g_system->getEventManager()->pollEvent(event);
+}
+
+void DirectorEngine::postEvent(const Common::Event &event, uint32 delay) {
+	PostedEvent posted;
+	posted.due = g_system->getMillis() + delay;
+	posted.event = event;
+	// Keep the queue in delivery order; equal times stay in posting order
+	uint i = _postedEvents.size();
+	while (i > 0 && (int32)(_postedEvents[i - 1].due - posted.due) > 0)
+		i--;
+	_postedEvents.insert_at(i, posted);
 }
 
 bool DirectorEngine::processSysEvents(bool captureClick, bool skipWindowManager) {
