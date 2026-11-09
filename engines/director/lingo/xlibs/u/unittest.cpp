@@ -235,8 +235,11 @@ void UnitTestXObj::m_keyPress(int nargs) {
 	g_director->_injectedEvents.push_back(ev);
 	ev.type = Common::EVENT_KEYUP;
 	g_director->_injectedEvents.push_back(ev);
-	// Handled at once, as in m_leftMouseDown().
+	// Handled at once, as in m_leftMouseDown(). The message never sits in
+	// the queue, so a transition after it must not see a pending key.
+	bool keyHeld = g_director->_keyHeldByLingo;
 	g_director->processSysEvents();
+	g_director->_keyHeldByLingo = keyHeld;
 	g_lingo->push(0);
 }
 
