@@ -174,7 +174,31 @@ void Window::drawChannelBox(Director::Movie *currentMovie, Graphics::ManagedSurf
 	}
 }
 
+static void addMergedArea(Common::Array<Common::Rect> &areas, Common::Rect rect) {
+	if (rect.isEmpty())
+		return;
+	// Absorb every area the rect overlaps (touching edges don't count, as
+	// with SectRect), and repeat while the grown rect reaches new ones
+	bool merged;
+	do {
+		merged = false;
+		for (uint i = 0; i < areas.size(); i++) {
+			if (rect.intersects(areas[i])) {
+				rect.extend(areas[i]);
+				areas.remove_at(i);
+				merged = true;
+				break;
+			}
+		}
+	} while (merged);
+	areas.push_back(rect);
+}
+
 void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo, bool invert) {
+	renderRect(rect, blitTo, channel->isTrail() ? channel : nullptr, invert ? channel : nullptr);
+}
+
+void Window::renderRect(const Common::Rect &rect, Graphics::ManagedSurface *blitTo, Channel *trailChannel, Channel *invertedChannel) {
 	Score *score = _currentMovie->getScore();
 	if (rect.isEmpty())
 		return;
@@ -198,10 +222,10 @@ void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics:
 	}
 
 	size_t startIdx = 0;
-	if (channel->isTrail()) {
+	if (trailChannel) {
 		// trails mode, don't redraw anything stationary below the target
 		for (size_t i = 0; i < dirtyChannels.size(); i++) {
-			if (dirtyChannels[i] == channel) {
+			if (dirtyChannels[i] == trailChannel) {
 				startIdx = i;
 				break;
 			}
@@ -222,7 +246,7 @@ void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics:
 				}
 			} else {
 				inkBlitFrom(ch, r, blitTo);
-				if ((ch == channel) && invert)
+				if (ch == invertedChannel)
 					invertChannel(ch, r);
 			}
 		}
@@ -276,21 +300,56 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 	debugC(7, kDebugImages, "Window::render(): starting draw cycle for frame %d", score->getCurrentFrameNum());
 	uint32 renderStartTime = g_system->getMillis();
 
-	for (size_t i = 0; i < score->_channels.size(); i++) {
-		Channel *chan = score->_channels[i];
-		if (!chan->_needsDraw && !forceRedraw)
-			continue;
-		Common::Rect bbox = chan->getBbox();
+	if (g_director->getVersion() >= 500 && !forceRedraw) {
+		// D5 first collects the changed areas, replacing any two that
+		// overlap with their union (FUN_1009d310), then redraws each
+		// collected area from scratch. Pixels no sprite owns, like a
+		// panorama an XCMD drew straight to the stage, get erased whenever
+		// a merged area spans them. Trails sprites are drawn on top
+		// afterwards and leave their old area alone.
+		Common::Array<Common::Rect> areas;
+		Common::Array<Channel *> trails;
 
-		debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
+		for (size_t i = 0; i < score->_channels.size(); i++) {
+			Channel *chan = score->_channels[i];
+			if (!chan->_needsDraw)
+				continue;
+			Common::Rect bbox = chan->getBbox();
 
-		if (!chan->_lastTrail) {
-			renderChannel(chan, chan->_lastRenderedBbox, blitTo, chan == hiliteChannel);
+			debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
+
+			if (!chan->_lastTrail)
+				addMergedArea(areas, chan->_lastRenderedBbox);
+			if (chan->isTrail())
+				trails.push_back(chan);
+			else
+				addMergedArea(areas, bbox);
+			chan->_needsDraw = false;
+			chan->_lastRenderedBbox = bbox;
+			chan->_lastTrail = chan->isTrail();
 		}
-		renderChannel(chan, bbox, blitTo, chan == hiliteChannel);
-		chan->_needsDraw = false;
-		chan->_lastRenderedBbox = bbox;
-		chan->_lastTrail = chan->isTrail();
+
+		for (auto &area : areas)
+			renderRect(area, blitTo, nullptr, hiliteChannel);
+		for (auto &chan : trails)
+			renderChannel(chan, chan->getBbox(), blitTo, chan == hiliteChannel);
+	} else {
+		for (size_t i = 0; i < score->_channels.size(); i++) {
+			Channel *chan = score->_channels[i];
+			if (!chan->_needsDraw && !forceRedraw)
+				continue;
+			Common::Rect bbox = chan->getBbox();
+
+			debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
+
+			if (!chan->_lastTrail) {
+				renderChannel(chan, chan->_lastRenderedBbox, blitTo, chan == hiliteChannel);
+			}
+			renderChannel(chan, bbox, blitTo, chan == hiliteChannel);
+			chan->_needsDraw = false;
+			chan->_lastRenderedBbox = bbox;
+			chan->_lastTrail = chan->isTrail();
+		}
 	}
 
 	Common::List<Common::Rect> &dirtyRects = _window->getDirtyRectList();
