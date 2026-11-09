@@ -155,6 +155,58 @@ void Window::stepTransition(TransParams &t, int step) {
 	g_director->draw();
 }
 
+// Director doesn't handle input while a transition plays. The D5 projector
+// (checked in Svea Rike) only peeks at the event queue: once 250 ms of the
+// transition have passed, and every 250 ms after that, it ends the transition
+// early if a keyDown is pending while the exitLock is off. A mouseDown only
+// counts while the menu bar is shown, but a Mac projector hides it during
+// playback, so there a click never ends a transition.
+// Every event, mouseUp included, stays queued and reaches Lingo afterwards.
+bool Window::checkTransitionAbort(TransParams &t) {
+	Common::Array<Common::Event> held;
+	Common::Event event;
+	bool quit = false;
+
+	while (_vm->pollEvent(event)) {
+		switch (event.type) {
+		case Common::EVENT_QUIT:
+			_vm->processEventQUIT();
+			quit = true;
+			continue;
+		case Common::EVENT_LBUTTONDOWN:
+		case Common::EVENT_RBUTTONDOWN:
+			if (_vm->getPlatform() != Common::kPlatformMacintosh)
+				t.abortPending = true;
+			break;
+		case Common::EVENT_KEYDOWN:
+			if (!g_lingo->_exitLock)
+				t.abortPending = true;
+			break;
+		default:
+			break;
+		}
+
+		if (Common::isMouseEvent(event) || event.type == Common::EVENT_KEYDOWN || event.type == Common::EVENT_KEYUP)
+			held.push_back(event);
+		else
+			_vm->getMacWindowManager()->processEvent(event);
+	}
+
+	// Hand the held events back in order; pollEvent returns them before new ones
+	for (auto &e : held)
+		_vm->_injectedEvents.push_back(e);
+
+	if (quit)
+		return true;
+
+	uint32 elapsed = g_system->getMillis() - t.startTime;
+	if (elapsed <= t.nextAbortCheck)
+		return false;
+	t.nextAbortCheck = elapsed + 250;
+
+	return t.abortPending;
+}
+
 void Window::playTransition(uint frame, RenderMode mode, uint16 transDuration, uint8 transArea, uint8 transChunkSize, TransitionType transType, CastMemberID paletteId) {
 	// Play a transition and return the number of subframes rendered
 	TransParams t;
@@ -229,6 +281,10 @@ void Window::playTransition(uint frame, RenderMode mode, uint16 transDuration, u
 	Common::Rect rfrom, rto;
 
 	initTransParams(t, clipRect);
+
+	t.startTime = g_system->getMillis();
+	t.nextAbortCheck = 250;
+	t.abortPending = false;
 
 	Graphics::ManagedSurface *blitFrom;
 	bool fullredraw = false;
@@ -566,7 +622,7 @@ void Window::playTransition(uint frame, RenderMode mode, uint16 transDuration, u
 
 		composeSurface->blitFrom(*blitFrom, rfrom, Common::Point(rto.left, rto.top));
 
-		if (_vm->processSysEvents(true)) {
+		if (checkTransitionAbort(t)) {
 			exitTransition(t, &nextFrame, clipRect);
 			break;
 		}
@@ -786,7 +842,7 @@ void Window::dissolveTrans(TransParams &t, Common::Rect &clipRect, Graphics::Man
 
 		g_lingo->executePerFrameHook(t.frame, i + 1, false);
 
-		if (_vm->processSysEvents(true)) {
+		if (checkTransitionAbort(t)) {
 			exitTransition(t, nextFrame, clipRect);
 			break;
 		}
@@ -926,7 +982,7 @@ void Window::dissolvePatternsTrans(TransParams &t, Common::Rect &clipRect, Graph
 
 		g_lingo->executePerFrameHook(t.frame, i + 1, false);
 
-		if (_vm->processSysEvents(true)) {
+		if (checkTransitionAbort(t)) {
 			exitTransition(t, nextFrame, clipRect);
 			break;
 		}
@@ -1111,7 +1167,7 @@ void Window::transMultiPass(TransParams &t, Common::Rect &clipRect, Graphics::Ma
 		debugC(6, kDebugImages, "Window::transMultiPass(): delaying for %d", diff);
 		g_director->delayMillis(diff);
 
-		if (_vm->processSysEvents(true)) {
+		if (checkTransitionAbort(t)) {
 			exitTransition(t, nextFrame, clipRect);
 			break;
 		}
@@ -1165,7 +1221,7 @@ void Window::transZoom(TransParams &t, Common::Rect &clipRect, Graphics::Managed
 		r.setWidth(t.xStepSize * i * 2 / TSTEP_FRAC);
 		r.moveTo(clipRect.left + w / 2 - t.xStepSize * i / TSTEP_FRAC, clipRect.top + h / 2 - t.yStepSize * i / TSTEP_FRAC);
 
-		if (_vm->processSysEvents(true)) {
+		if (checkTransitionAbort(t)) {
 			exitTransition(t, nextFrame, clipRect);
 			break;
 		}
