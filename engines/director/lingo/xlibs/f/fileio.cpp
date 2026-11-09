@@ -436,19 +436,34 @@ XOBJSTUB(FileIO::m_setFilterMask, 0)
 
 // Read
 
+// Files hold text in the platform encoding; Lingo strings are UTF-8.
+// writeString() encodes, so whatever is read back must be decoded.
+static Datum decodeFileString(const Common::String &s) {
+	return Datum(Common::U32String(s, g_director->getPlatformEncoding()).encode(Common::kUtf8));
+}
+
 void FileIO::m_readChar(int nargs) {
 	FileObject *me = static_cast<FileObject *>(g_lingo->_state->me.u.obj);
 
+	// The XObject API (mReadChar) returns the character code, while the
+	// Xtra API (readChar) returns the character itself as a string.
+	bool isXtra = me->getObjType() == kXtraObj;
+
 	if (!me->_inStream || me->_inStream->eos() || me->_inStream->err()) {
-		g_lingo->push(Datum(kErrorEOF));
+		g_lingo->push(isXtra ? Datum("") : Datum(kErrorEOF));
 		return;
 	}
 
 	int ch = me->_inStream->readByte();
 	if (me->_inStream->eos() || me->_inStream->err()) {
-		ch = kErrorEOF;
+		g_lingo->push(isXtra ? Datum("") : Datum(kErrorEOF));
+		return;
 	}
-	g_lingo->push(Datum(ch));
+
+	if (isXtra)
+		g_lingo->push(decodeFileString(Common::String((char)ch)));
+	else
+		g_lingo->push(Datum(ch));
 }
 
 void FileIO::m_readLine(int nargs) {
@@ -515,7 +530,7 @@ void FileIO::m_readToken(int nargs) {
 	do {
 		ch = me->_inStream->readByte();
 		if (me->_inStream->eos() || me->_inStream->err()) {
-			g_lingo->push(Datum(tok));
+			g_lingo->push(decodeFileString(tok));
 			return;
 		}
 	} while (charInMatchString(ch, skipString));
@@ -525,7 +540,7 @@ void FileIO::m_readToken(int nargs) {
 		ch = me->_inStream->readByte();
 
 		if (me->_inStream->eos() || me->_inStream->err()) {
-			g_lingo->push(Datum(tok));
+			g_lingo->push(decodeFileString(tok));
 			return;
 		}
 	}
@@ -537,7 +552,7 @@ void FileIO::m_readToken(int nargs) {
 		me->_inStream->seek(-1, SEEK_CUR);
 	}
 
-	g_lingo->push(Datum(tok));
+	g_lingo->push(decodeFileString(tok));
 }
 
 void FileIO::m_readFile(int nargs) {
@@ -555,7 +570,7 @@ void FileIO::m_readFile(int nargs) {
 		ch = me->_inStream->readByte();
 	}
 
-	g_lingo->push(res);
+	g_lingo->push(decodeFileString(res));
 }
 
 // Write
@@ -573,7 +588,7 @@ void FileIO::m_writeChar(int nargs) {
 	// while the Xtra API passes the character itself as a string (writeChar, theChar).
 	byte ch;
 	if (d.type == STRING) {
-		Common::String s = d.asString();
+		Common::String s = Common::U32String(d.asString(), Common::kUtf8).encode(g_director->getPlatformEncoding());
 		ch = s.empty() ? 0 : (byte)s[0];
 	} else {
 		ch = (byte)d.asInt();
