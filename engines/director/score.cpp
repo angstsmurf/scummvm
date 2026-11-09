@@ -988,7 +988,11 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 	// If we have transitions, sounds start in parallel
 	playSoundChannel(false, sound1Changed, sound2Changed);
 
-	_frameDrawPending = _window->_updateLock;
+	// Entering the last frame of the score while locked leaves no
+	// transition pending in the D5 projector: the frame loader
+	// (FUN_1008d854) then takes the pending flag from score+0x1702,
+	// which is 0 on the stage (cleared by FUN_1006bb80).
+	_frameDrawPending = _window->_updateLock && frameId + 1 < _numFrames;
 	if (_window->_updateLock) {
 		// The D5 projector skips the whole frame draw while the stage is
 		// locked, transition included (FUN_1005c5d4). The frame stays
