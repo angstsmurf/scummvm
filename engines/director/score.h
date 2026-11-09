@@ -132,6 +132,7 @@ public:
 	bool refreshPointersForCastLib(uint16 castLib);
 
 	bool renderTransition(uint16 frameId, RenderMode mode);
+	void renderUnlockedStage();
 	void renderFrame(uint16 frameId, RenderMode mode = kRenderModeNormal, bool sound1Changed = true, bool sound2Changed = true);
 	void incrementFilmLoops();
 	void updateSprites(RenderMode mode = kRenderModeNormal, bool withClean = false);
@@ -238,6 +239,7 @@ public:
 	Cursor _defaultCursor;
 	CursorRef _currentCursor;
 	bool _skipTransition;
+	bool _frameDrawPending;	// frame entered while "the updateLock" was set
 	bool _skipIdle;
 	bool _idleWentToFrame;
 

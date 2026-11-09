@@ -240,6 +240,11 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 	if (_currentMovie->_isEmbedded)
 		return false;
 
+	// While "the updateLock" is set, the stage keeps its old picture.
+	// Channels stay marked for redraw, so unlocking draws everything.
+	if (_updateLock && !blitTo)
+		return false;
+
 	if (!blitTo)
 		blitTo = _window->getSurface();
 
