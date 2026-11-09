@@ -1849,6 +1849,7 @@ void LB::b_saveMovie(int nargs) {
 	if (nargs) {
 		filename = g_lingo->pop().asString();
 	}
+	debugC(2, kDebugSaving, "b_saveMovie(\"%s\") from:\n%s", filename.c_str(), g_lingo->formatCallStack(g_lingo->_state->pc).c_str());
 	g_director->getCurrentMovie()->getArchive()->writeToFile(filename, g_director->getCurrentMovie());
 }
 
