@@ -254,6 +254,13 @@ public:
 	void processEventQUIT();
 	int getMacTicks();
 	Common::Array<Common::Event> _injectedEvents;
+	// Queued input from the UnitTest XObject, delivered once due (in getMillis() time)
+	struct PostedEvent {
+		uint32 due;
+		Common::Event event;
+	};
+	Common::Array<PostedEvent> _postedEvents;
+	void postEvent(const Common::Event &event, uint32 delay);
 
 	// game-quirks.cpp
 	bool lingoOpenWrapper(const char *target, Common::Platform platform, const Common::String &whichApplication, const Common::String &whichDocument);

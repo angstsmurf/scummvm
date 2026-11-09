@@ -59,6 +59,8 @@ III    mMoveMouse, x, y         --Move the mouse pointer to window position (x, 
 I      mLeftMouseDown           --Press the LMB
 I      mLeftMouseUp             --Release the LMB
 II     mKeyPress, code          --Type the key with this ASCII code
+III    mPostKeyPress, code, delay --Queue the key after delay ms (0 = now)
+II     mPostLeftClick, delay    --Queue a left click at the pointer after delay ms
  */
 
 static const MethodProto xlibMethods[] = {
@@ -70,6 +72,8 @@ static const MethodProto xlibMethods[] = {
 	{ "leftMouseDown",		UnitTestXObj::m_leftMouseDown,		0, 0,	400 },	// D4
 	{ "leftMouseUp",		UnitTestXObj::m_leftMouseUp,		0, 0,	400 },	// D4
 	{ "keyPress",			UnitTestXObj::m_keyPress,			1, 1,	400 },	// D4
+	{ "postKeyPress",		UnitTestXObj::m_postKeyPress,		2, 2,	400 },	// D4
+	{ "postLeftClick",		UnitTestXObj::m_postLeftClick,		1, 1,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
@@ -233,6 +237,45 @@ void UnitTestXObj::m_keyPress(int nargs) {
 	g_director->_injectedEvents.push_back(ev);
 	// Handled at once, as in m_leftMouseDown().
 	g_director->processSysEvents();
+	g_lingo->push(0);
+}
+
+// The Windows XObject posts these with PostMessage (from a timer when delay > 0),
+// so unlike mKeyPress and the mouse methods they wait in the queue until
+// Director next looks for input.
+void UnitTestXObj::m_postKeyPress(int nargs) {
+	if (nargs != 2) {
+		warning("UnitTestXObj::m_postKeyPress: expected 2 arguments");
+		g_lingo->dropStack(nargs);
+		g_lingo->push(0);
+		return;
+	}
+	int delay = MAX(0, g_lingo->pop().asInt());
+	int code = g_lingo->pop().asInt() & 0xff;
+	Common::Event ev;
+	ev.type = Common::EVENT_KEYDOWN;
+	ev.kbd = Common::KeyState((Common::KeyCode)code, code);
+	g_director->postEvent(ev, delay);
+	ev.type = Common::EVENT_KEYUP;
+	g_director->postEvent(ev, delay);
+	g_lingo->push(0);
+}
+
+void UnitTestXObj::m_postLeftClick(int nargs) {
+	if (nargs != 1) {
+		warning("UnitTestXObj::m_postLeftClick: expected 1 argument");
+		g_lingo->dropStack(nargs);
+		g_lingo->push(0);
+		return;
+	}
+	UnitTestXObject *me = static_cast<UnitTestXObject *>(g_lingo->_state->me.u.obj);
+	int delay = MAX(0, g_lingo->pop().asInt());
+	Common::Event ev;
+	ev.type = Common::EVENT_LBUTTONDOWN;
+	ev.mouse = me->_mousePos;
+	g_director->postEvent(ev, delay);
+	ev.type = Common::EVENT_LBUTTONUP;
+	g_director->postEvent(ev, delay);
 	g_lingo->push(0);
 }
 
