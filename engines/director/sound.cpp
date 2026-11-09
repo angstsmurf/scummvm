@@ -31,7 +31,9 @@
 #include "audio/decoders/wave.h"
 #include "audio/decoders/raw.h"
 #include "audio/softsynth/pcspk.h"
+#include "audio/decoders/adpcm.h"
 #include "audio/decoders/aiff.h"
+#include "audio/decoders/mac_snd_mace.h"
 
 #include "director/director.h"
 #include "director/movie.h"
@@ -912,9 +914,77 @@ bool SNDDecoder::processBufferCommand(Common::SeekableReadStreamEndian &stream) 
 		stream.readUint32();
 		stream.readUint32();
 	} else if (encoding == 0xfe) {
-		// Compressed sound header
-		warning("SNDDecoder: Compressed sound header not supported");
-		return false;
+		// Compressed sound header. As in the extended header, the length
+		// field holds the channel count, but numFrames counts compressed
+		// packets, not decoded frames.
+		_channels = param;
+		uint32 numPackets = stream.readUint32();
+		stream.skip(10);			// AIFF sample rate
+		/*uint32 markerChunk =*/stream.readUint32();
+		uint32 format = stream.readUint32();
+		/*uint32 futureUse2 =*/stream.readUint32();
+		/*uint32 stateVars =*/stream.readUint32();
+		/*uint32 leftOverSamples =*/stream.readUint32();
+		int16 compressionID = stream.readSint16();
+		/*uint16 packetSize =*/stream.readUint16();
+		/*uint16 snthID =*/stream.readUint16();
+		/*uint16 sampleSize =*/stream.readUint16();
+
+		uint32 compression;
+		uint32 packetBytes;			// per channel
+		uint32 packetSamples;
+		if (compressionID == 3 || (compressionID == -1 && format == MKTAG('M', 'A', 'C', '3'))) {
+			compression = MKTAG('M', 'A', 'C', '3');
+			packetBytes = 2;
+			packetSamples = 6;
+		} else if (compressionID == 4 || (compressionID == -1 && format == MKTAG('M', 'A', 'C', '6'))) {
+			compression = MKTAG('M', 'A', 'C', '6');
+			packetBytes = 1;
+			packetSamples = 6;
+		} else if (format == MKTAG('i', 'm', 'a', '4')) {
+			compression = format;
+			packetBytes = 34;
+			packetSamples = 64;
+		} else {
+			warning("SNDDecoder: Unsupported compression '%s' (id %d)", tag2str(format), compressionID);
+			return false;
+		}
+
+		frameCount = numPackets * packetSamples;
+		debugC(5, kDebugSound, "SNDDecoder: '%s' compressed, %d channels, %d frames at %d Hz", tag2str(compression), _channels, frameCount, _rate);
+		Common::SeekableReadStream *data = stream.readStream(numPackets * _channels * packetBytes);
+		Audio::SeekableAudioStream *decoder;
+		if (compression == MKTAG('i', 'm', 'a', '4'))
+			decoder = Audio::makeADPCMStream(data, DisposeAfterUse::YES, data->size(), Audio::kADPCMApple, _rate, _channels, 34);
+		else
+			decoder = Audio::makeMacSndMACEStream(data, DisposeAfterUse::YES, _rate, numPackets, _channels,
+				compression == MKTAG('M', 'A', 'C', '3') ? Audio::kMacSndMACE3 : Audio::kMacSndMACE6);
+		if (!decoder)
+			return false;
+
+		// Decode it all up front: the decoders can't seek, which looping
+		// between the loop points needs
+		int16 *samples = (int16 *)malloc(frameCount * _channels * sizeof(int16));
+		assert(samples);
+		int decoded = decoder->readBuffer(samples, frameCount * _channels);
+		delete decoder;
+		decoded = MAX(decoded, 0);
+
+		// The data can be shorter than the header says: Safecracker's
+		// FOUNT.SY7 lacks 14 bytes, putting its loop end past the last
+		// sample. Mac OS loops it anyway, so end the loop at the last sample.
+		if (_loopEnd > (uint32)decoded / _channels)
+			_loopEnd = decoded / _channels;
+
+		_bits = 16;
+		_flags = Audio::FLAG_16BITS;
+#ifdef SCUMM_LITTLE_ENDIAN
+		_flags |= Audio::FLAG_LITTLE_ENDIAN;
+#endif
+		_flags |= (_channels == 2) ? Audio::FLAG_STEREO : 0;
+		_data = (byte *)samples;
+		_size = decoded * sizeof(int16);
+		return true;
 	} else {
 		warning("SNDDecoder: Bad encoding: %d", encoding);
 		return false;
