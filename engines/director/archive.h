@@ -179,7 +179,12 @@ public:
 	Resource getResourceDetail(uint32 tag, uint16 id) override;
 	Common::String formatArchiveInfo() override;
 
+	// Offset of the RIFX data in its file; non-zero for a movie embedded in a projector
+	uint32 getStartOffset() const { return _startOffset; }
+
 private:
+	uint32 _startOffset = 0;
+
 	/* archive-save.cpp */
 	/* These functions are for writing movies */
 	bool writeMemoryMap(Common::SeekableWriteStream *writeStream, Common::Array<Resource *> resource); 	// Parallel to readMemoryMap
@@ -289,6 +294,9 @@ public:
 	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 
 	bool _addFile(const Common::String &path);
+
+	static Common::String encodeKey(const Common::String &key);
+	static Common::String decodeKey(const Common::String &name);
 
 private:
 	typedef Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> FileMap;
