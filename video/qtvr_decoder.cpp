@@ -1612,6 +1612,18 @@ void QuickTimeDecoder::handleObjectMouseButton(bool isDown, int16 x, int16 y, bo
 	_isMouseButtonDown = isDown;
 }
 
+// Mouse offset from the mouse-down point as the QTVR 1.0 controller scales it:
+// zero stays zero, anything else is at least 16 pixels and at most 3/4 of the
+// box, expressed relative to half the box size
+static float panoDragFraction(int offset, int boxSize) {
+	if (offset == 0)
+		return 0.0f;
+
+	int magnitude = CLIP(ABS(offset), 16, boxSize * 3 / 4);
+
+	return (offset < 0 ? -magnitude : magnitude) * 2.0f / boxSize;
+}
+
 void QuickTimeDecoder::handlePanoMouseButton(bool isDown, int16 x, int16 y, bool repeat) {
 	_isMouseButtonDown = isDown;
 
@@ -1623,6 +1635,8 @@ void QuickTimeDecoder::handlePanoMouseButton(bool isDown, int16 x, int16 y, bool
 
 		_mouseDrag.x = x;
 		_mouseDrag.y = y;
+
+		_dragStartTime = _dragStepTime = g_system->getMillis();
 
 		_clickedHotspot = _rolloverHotspot;
 		_clickedHotspotID = _rolloverHotspotID;
@@ -1656,21 +1670,39 @@ void QuickTimeDecoder::handlePanoMouseButton(bool isDown, int16 x, int16 y, bool
 	if (!repeat)
 		return;
 
-	// HACK: FIXME: Hard coded for now
-	const int sensitivity = 5;
-	const float speedFactor = 0.1f;
+	// Drag panning as done by the QuickTime VR 1.0 panorama controller (the
+	// 'play' component embedded in the Safecracker projector). On every pass
+	// of its StillDown() loop the view turns by 0.4 * halfFOV * d * |d|, where
+	// d is the offset of the mouse from the mouse-down point, forced to at
+	// least 16 pixels and at most 3/4 of the movie box, as a fraction of half
+	// the box size. There is no inertia. The loop made about 67 passes per
+	// second on the reference machine (SheepShaver: a full turn in 2.56 s at
+	// 70 pixels offset and 0.57 s at 150 pixels with a half horizontal field
+	// of view of 56 degrees, and 3.51 s at 70 pixels with 41 degrees), so we
+	// apply that many steps per second regardless of our own frame rate.
+	uint32 now = g_system->getMillis();
+	float steps = MIN<uint32>(now - _dragStepTime, 100) * 0.067f;
+	_dragStepTime = now;
 
-	int16 mouseDeltaX = x - _mouseDrag.x;
-	int16 mouseDeltaY = y - _mouseDrag.y;
+	int mouseDeltaX = x - _mouseDrag.x;
+	int mouseDeltaY = _mouseDrag.y - y;
 
-	float speedX = (float)mouseDeltaX * speedFactor;
-	float speedY = (float)mouseDeltaY * speedFactor;
+	// A mouse that has moved two pixels or less is still a potential click
+	// during the first half second
+	if (ABS(mouseDeltaX) <= 2 && ABS(mouseDeltaY) <= 2 && now - _dragStartTime < 500)
+		return;
 
-	if (ABS(mouseDeltaX) >= sensitivity)
-		setPanAngle(getPanAngle() - speedX);
+	// Half of the horizontal field of view actually shown, see projectPanorama()
+	float halfHFOV = atan(tan(_fov * M_PI / 360.0) * _width / _height) * 180.0 / M_PI;
 
-	if (ABS(mouseDeltaY) >= sensitivity)
-		setTiltAngle(getTiltAngle() - speedY);
+	float dx = panoDragFraction(mouseDeltaX, _width);
+	float dy = panoDragFraction(mouseDeltaY, _height);
+
+	if (dx != 0.0f)
+		setPanAngle(getPanAngle() - 0.4f * halfHFOV * dx * ABS(dx) * steps);
+
+	if (dy != 0.0f)
+		setTiltAngle(getTiltAngle() + 0.4f * (_fov / 2) * dy * ABS(dy) * steps);
 }
 
 void QuickTimeDecoder::handleKey(Common::KeyState &state, bool down, bool repeat) {

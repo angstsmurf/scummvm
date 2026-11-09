@@ -195,6 +195,8 @@ public:
 	Common::Point _prevMouse;
 	bool _isMouseButtonDown = false;
 	Common::Point _mouseDrag;
+	uint32 _dragStartTime = 0;
+	uint32 _dragStepTime = 0;
 
 	bool _isKeyDown = false;
 	Common::KeyState _lastKey;
