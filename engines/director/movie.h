@@ -222,6 +222,10 @@ public:
 	// or recolour it.
 	bool _isEmbedded = false;
 
+	// Set when Lingo changes a cast member, so the movie can be saved when
+	// it branches to another movie while updateMovieEnabled is set.
+	bool _isModified = false;
+
 	// For an embedded movie, the movie that hosts it. Its scripts share the
 	// host's handler scope, so getHandler() falls back to the parent.
 	Movie *_parentMovie = nullptr;

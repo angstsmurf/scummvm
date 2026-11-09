@@ -628,6 +628,7 @@ bool Movie::eraseCastMember(CastMemberID memberID) {
 	if (_casts.contains(memberID.castLib)) {
 		bool result = _casts.getVal(memberID.castLib)->eraseCastMember(memberID.member);
 		_score->refreshPointersForCastMemberID(memberID);
+		_isModified = true;
 		return result;
 	}
 
@@ -664,6 +665,7 @@ bool Movie::duplicateCastMember(CastMemberID source, CastMemberID target) {
 		debugC(3, kDebugLoading, "Movie::DuplicateCastMember(): copying cast data from %s to %s (%s)", source.asString().c_str(), target.asString().c_str(), castType2str(sourceMember->_type));
 		bool result = targetCast->duplicateCastMember(sourceMember, sourceInfo, target.member);
 		_score->refreshPointersForCastMemberID(target);
+		_isModified = true;
 		return result;
 	}
 	return false;

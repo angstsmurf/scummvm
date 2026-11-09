@@ -2839,6 +2839,7 @@ void LB::b_importFileInto(int nargs) {
 	cast->importFileInto(memberID.member, path);
 
 	score->refreshPointersForCastMemberID(dst.asMemberID());
+	movie->_isModified = true;
 }
 
 void menuCommandsCallback(int action, Common::String &text, void *data) {

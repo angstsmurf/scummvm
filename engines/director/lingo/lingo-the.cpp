@@ -2233,6 +2233,7 @@ void Lingo::setTheCast(Datum &id1, int field, Datum &d) {
 		cast->duplicateCastMember(replacement, nullptr, id.member);
 		Score *score = movie->getScore();
 		score->refreshPointersForCastMemberID(id);
+		movie->_isModified = true;
 		return;
 	}
 
@@ -2242,6 +2243,7 @@ void Lingo::setTheCast(Datum &id1, int field, Datum &d) {
 	}
 
 	member->setField(field, d);
+	movie->_isModified = true;
 }
 
 Datum Lingo::getTheCastLib(Datum &id1, int field) {
@@ -2315,10 +2317,13 @@ void Lingo::setTheCastLib(Datum &id1, int field, Datum &d) {
 		{
 			Common::Path castPath = findCastPath(d.asString());
 			movie->loadCastLibFrom(id1.u.i, castPath);
+			// Director marks the movie as changed when a cast library is relinked
+			movie->_isModified = true;
 		}
 		break;
 	case kTheName:
 		movie->setCastLibName(d.asString(), id1.u.i);
+		movie->_isModified = true;
 		break;
 	case kTheNumber:
 		warning("Lingo::setTheCastLib(): number is read-only");
@@ -2398,6 +2403,7 @@ void Lingo::setTheField(Datum &id1, int field, Datum &d) {
 	}
 
 	member->setField(field, d);
+	movie->_isModified = true;
 }
 
 Datum Lingo::getTheChunk(Datum &chunk, int field) {
@@ -2755,11 +2761,13 @@ void Lingo::setObjectProp(Datum &obj, Common::String &propName, Datum &val) {
 			cast->duplicateCastMember(replacement, nullptr, id.member);
 			Score *score = movie->getScore();
 			score->refreshPointersForCastMemberID(id);
+			movie->_isModified = true;
 			return;
 		}
 
 		if (member->hasProp(propName)) {
 			member->setProp(propName, val);
+			movie->_isModified = true;
 		} else {
 			g_lingo->lingoError("Lingo::setObjectProp(): %s has no property '%s'", id.asString().c_str(), propName.c_str());
 		}
