@@ -22,6 +22,8 @@
 #include "common/memstream.h"
 #include "common/savefile.h"
 #include "common/config-manager.h"
+#include "common/crc.h"
+#include "common/ptr.h"
 
 #include "director/director.h"
 #include "director/archive.h"
@@ -76,6 +78,8 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		saveKey = convertPath(filename);
 	}
 	Common::String saveFileName = g_director->getTargetName() + "-" + SavedArchive::encodeKey(saveKey);
+	// Read the original before the save is opened, which could replace it
+	SavedArchive::Stamp stamp = SavedArchive::stampFor(saveKey);
 	// Don't open the save file as compressed which doesn't support seeking
 	Common::OutSaveFile *saveFile = g_engine->getSaveFileManager()->openForSaving(saveFileName, false);
 
@@ -218,9 +222,9 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		}
 	}
 
-	Common::DumpFile out;
+	saveFile->seek(0, SEEK_END);
+	SavedArchive::writeStamp(saveFile, stamp);
 
-	// Write the movie out, stored in dumpData
 	if (saveFile) {
 		saveFile->flush();
 		debugC(3, kDebugSaving, "RIFXArchive::writeStream: Saved the movie as file %s", saveFileName.c_str());
@@ -228,7 +232,7 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		warning("RIFXArchive::writeStream: Error saving the file %s", saveFileName.c_str());
 	}
 	// Add to search index
-	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->_addFile(saveFileName);
+	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->addWrittenFile(saveFileName);
 
 	// The cached archives for the saved file are out of date now. Have
 	// them read back from disk the next time the file is opened, or
@@ -831,13 +835,15 @@ SavedArchive::SavedArchive(const Common::String &target) {
 }
 
 bool SavedArchive::hasFile(const Common::Path &path) const {
-	return (_files.find(path.toString()) != _files.end());
+	return _files.contains(path.toString()) && isTrusted(path.toString());
 }
 
 int SavedArchive::listMembers(Common::ArchiveMemberList &list) const {
 	int count = 0;
 
 	for (FileMap::const_iterator i = _files.begin(); i != _files.end(); ++i) {
+		if (!isTrusted(i->_key))
+			continue;
 		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
 		++count;
 	}
@@ -854,7 +860,7 @@ const Common::ArchiveMemberPtr SavedArchive::getMember(const Common::Path &path)
 
 Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common::Path &path) const {
 	FileMap::const_iterator fDesc = _files.find(path.toString());
-	if (fDesc == _files.end())
+	if (fDesc == _files.end() || !isTrusted(fDesc->_key))
 		return nullptr;
 
 	// Buffer the save file data into memory.
@@ -912,18 +918,115 @@ Common::String SavedArchive::decodeKey(const Common::String &name) {
 	return res;
 }
 
-bool SavedArchive::_addFile(const Common::String &fileName) {
+Common::String SavedArchive::keyFor(const Common::String &fileName) const {
 	// Derive the original file name from the save file name
 	// Save files are named target_name-save_filename
 	Common::String name = fileName.substr(_target.size() + 1);
-	Common::String origFileName;
 	if (name.contains("%2F") || name.contains("%2f")) {
 		// A movie saved over its own file, keyed by its path
-		origFileName = decodeKey(name);
-	} else {
-		// Normalise it with convertPath.
-		origFileName = convertPath(name);
+		return decodeKey(name);
 	}
+	// Normalise it with convertPath.
+	return convertPath(name);
+}
+
+void SavedArchive::addWrittenFile(const Common::String &fileName) {
+	_addFile(fileName);
+	_trusted[keyFor(fileName)] = true;
+}
+
+// Bump this whenever the movie writer changes its output; raise
+// kMinTrustedVersion to it when the change fixes saves that broke a game,
+// so saves written before the fix are ignored and the game files used
+// instead. 1: unchanged resources kept verbatim (e02180d7893).
+static const uint32 kSavedMovieVersion = 1;
+static const uint32 kMinTrustedVersion = 1;
+static const uint32 kStampTag = MKTAG('S', 'V', 'M', 'S');
+static const uint32 kStampSize = 5 * 4;
+
+SavedArchive::Stamp SavedArchive::stampFor(const Common::String &key) {
+	Stamp stamp;
+	stamp.version = kSavedMovieVersion;
+	stamp.origSize = kNoOriginal;
+
+	// The original is whatever a lookup would find if there were no save
+	Common::Archive *saved = SearchMan.getArchive(kSavedFilesArchive);
+	Common::ScopedPtr<Common::SeekableReadStream> orig(SearchMan.createReadStreamForMemberNext(Common::Path(key), saved));
+	if (!orig)
+		return stamp;
+
+	uint32 size = orig->size();
+	byte *data = (byte *)malloc(size ? size : 1);
+	if (!data || orig->read(data, size) != size) {
+		free(data);
+		return stamp;
+	}
+	stamp.origSize = size;
+	stamp.origCrc = Common::CRC32().crcFast(data, size);
+	free(data);
+	return stamp;
+}
+
+void SavedArchive::writeStamp(Common::WriteStream *stream, const Stamp &stamp) {
+	stream->writeUint32BE(stamp.version);
+	stream->writeUint32BE(stamp.origSize);
+	stream->writeUint32BE(stamp.origCrc);
+	stream->writeUint32BE(kStampSize);
+	stream->writeUint32BE(kStampTag);
+}
+
+// A save that stands in for a game file is only used while it is known to
+// be good: written by a writer without known faults, and over the same
+// game file it was made from. Anything else would play differently from
+// the original, e.g. a Safecracker MAIN rewritten by an older writer lost
+// its transitions. Rejected saves are left on disk.
+bool SavedArchive::isTrusted(const Common::String &key) const {
+	TrustMap::const_iterator t = _trusted.find(key);
+	if (t != _trusted.end())
+		return t->_value;
+
+	const Common::String &fileName = _files.getVal(key);
+	const char *reason = nullptr;
+	Stamp stamp;
+	bool stamped = false;
+
+	Common::ScopedPtr<Common::SeekableReadStream> save(g_engine->getSaveFileManager()->openForLoading(fileName));
+	if (save && save->size() >= kStampSize) {
+		save->seek(save->size() - 8);
+		uint32 stampSize = save->readUint32BE();
+		if (save->readUint32BE() == kStampTag && stampSize >= kStampSize && stampSize <= save->size()) {
+			save->seek(save->size() - stampSize);
+			stamp.version = save->readUint32BE();
+			stamp.origSize = save->readUint32BE();
+			stamp.origCrc = save->readUint32BE();
+			stamped = true;
+		}
+	}
+
+	if (!save) {
+		reason = "it can't be read";
+	} else if (!stamped) {
+		// Saves keyed by path were only made by unstamped development
+		// builds, some with the faulty writer. Older saves, keyed by
+		// name, are kept: they hold players' progress, e.g. save slots.
+		if (fileName.contains("%2F") || fileName.contains("%2f"))
+			reason = "it was made by an older version of ScummVM";
+	} else if (stamp.version < kMinTrustedVersion) {
+		reason = "it was made by an older version of ScummVM";
+	} else if (stamp.origSize != kNoOriginal) {
+		Stamp now = stampFor(key);
+		if (now.origSize != stamp.origSize || now.origCrc != stamp.origCrc)
+			reason = "the game file it stands in for has changed";
+	}
+
+	if (reason)
+		warning("SavedArchive: ignoring saved movie '%s' for '%s': %s. Delete it to stop this warning", fileName.c_str(), key.c_str(), reason);
+	_trusted[key] = !reason;
+	return !reason;
+}
+
+bool SavedArchive::_addFile(const Common::String &fileName) {
+	Common::String origFileName = keyFor(fileName);
 	if (!_files.contains(origFileName)) {
 		debugC(3, kDebugLoading, "Found save file: %s -> %s", fileName.c_str(), origFileName.c_str());
 

@@ -297,13 +297,35 @@ public:
 	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 
 	bool _addFile(const Common::String &path);
+	// A save was just written: register it and trust it without checking
+	void addWrittenFile(const Common::String &fileName);
 
 	static Common::String encodeKey(const Common::String &key);
 	static Common::String decodeKey(const Common::String &name);
 
+	// The stamp appended to every saved movie, after the RIFX data, which
+	// readers ignore since they go by the size in the header:
+	//   version, original size, original CRC-32, trailer size, 'SVMS'
+	// The original is the game file the save stands in for, as found
+	// beneath the saves; its size is kNoOriginal if there was none.
+	struct Stamp {
+		uint32 version = 0;
+		uint32 origSize = 0;
+		uint32 origCrc = 0;
+	};
+	static const uint32 kNoOriginal = 0xFFFFFFFF;
+	// Stamp the original the save at 'key' would stand in for
+	static Stamp stampFor(const Common::String &key);
+	static void writeStamp(Common::WriteStream *stream, const Stamp &stamp);
+
 private:
+	Common::String keyFor(const Common::String &fileName) const;
+	bool isTrusted(const Common::String &key) const;
+
 	typedef Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> FileMap;
 	FileMap _files;
+	typedef Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> TrustMap;
+	mutable TrustMap _trusted;
 	Common::String _target;
 };
 
