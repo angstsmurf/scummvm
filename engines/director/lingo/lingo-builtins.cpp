@@ -3718,6 +3718,11 @@ void LB::b_updateStage(int nargs) {
 	// The sprites are drawn now: Lingo reads their new rects from here on
 	for (auto &it : score->_channels)
 		it->_hasLingoBbox = false;
+	// updateStage draws even while "the updateLock" is set. Safecracker
+	// checks the lock itself before calling updateStage to keep the stage
+	// still.
+	bool updateLock = window->_updateLock;
+	window->_updateLock = false;
 	if (window->_puppetTransition) {
 		window->playTransition(score->getCurrentFrameNum(), kRenderModeNormal, window->_puppetTransition->duration, window->_puppetTransition->area, window->_puppetTransition->chunkSize, window->_puppetTransition->type, score->_currentFrame->_mainChannels.scoreCachedPaletteId);
 		delete window->_puppetTransition;
@@ -3725,6 +3730,7 @@ void LB::b_updateStage(int nargs) {
 	} else {
 		movie->getWindow()->render();
 	}
+	window->_updateLock = updateLock;
 
 	// play any puppet sounds that have been queued
 	score->playSoundChannel(true);

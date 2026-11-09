@@ -1180,6 +1180,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		d.type = STRING;
 		d.u.s = new Common::String(g_director->_traceLogFile.toString(Common::Path::kNativeSeparator));
 		break;
+	case kTheUpdateLock:
+		d = (int)g_director->getCurrentWindow()->_updateLock;
+		break;
 	case kTheUpdateMovieEnabled:
 		d = g_lingo->_updateMovieEnabled;
 		break;
@@ -1539,6 +1542,24 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 			g_director->_traceLogFile.clear();
 		}
 	}
+		break;
+	case kTheUpdateLock:
+		{
+			// In the D5 projector (FUN_10026ed0), locking only sets a flag
+			// that makes every stage draw a no-op. Unlocking clears it and
+			// updates the whole stage at once, playing the transition of a
+			// frame entered while locked.
+			Window *window = g_director->getCurrentWindow();
+			bool lock = bool(d.asInt());
+			if (window->_updateLock && !lock) {
+				window->_updateLock = false;
+				if (movie) {
+					movie->getScore()->updateWidgets(movie->_videoPlayback);
+					movie->getScore()->renderUnlockedStage();
+				}
+			}
+			window->_updateLock = lock;
+		}
 		break;
 	case kTheUpdateMovieEnabled:
 		g_lingo->_updateMovieEnabled = bool(d.asInt());

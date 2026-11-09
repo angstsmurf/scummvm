@@ -93,6 +93,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 
 	_numChannelsDisplayed = 0;
 	_skipTransition = false;
+	_frameDrawPending = false;
 	_skipIdle = false;
 	_idleWentToFrame = false;
 
@@ -987,7 +988,15 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 	// If we have transitions, sounds start in parallel
 	playSoundChannel(false, sound1Changed, sound2Changed);
 
-	if (_skipTransition) {
+	_frameDrawPending = _window->_updateLock;
+	if (_window->_updateLock) {
+		// The D5 projector skips the whole frame draw while the stage is
+		// locked, transition included (FUN_1005c5d4). The frame stays
+		// pending for the unlock to draw.
+		updateSprites(mode);
+		incrementFilmLoops();
+		_skipTransition = false;
+	} else if (_skipTransition) {
 		incrementFilmLoops();
 		_window->render();
 		_skipTransition = false;
@@ -1013,6 +1022,18 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 	}
 	uint32 end = g_system->getMillis(false);
 	debugC(5, kDebugEvents, "Score::renderFrame() finished in %d millis", end - start);
+}
+
+void Score::renderUnlockedStage() {
+	// Unlocking runs the normal stage update in the D5 projector
+	// (FUN_10024a00 -> FUN_10024ed8 -> FUN_1005c5d4). A frame entered
+	// while locked has not been drawn yet, so its transition plays now.
+	if (_frameDrawPending) {
+		_frameDrawPending = false;
+		if (renderTransition(_curFrameNumber, kRenderModeNormal))
+			return;
+	}
+	_window->render();
 }
 
 bool Score::renderTransition(uint16 frameId, RenderMode mode) {

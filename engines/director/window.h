@@ -258,6 +258,9 @@ public:
 	Common::List<MovieReference> _movieStack;
 	bool _newMovieStarted;
 	bool _newMovieFirstDraw;
+	// "the updateLock" (D5+): while set, the stage is not drawn. It stays set
+	// across movie switches, like in the original.
+	bool _updateLock = false;
 	bool _skipFrameAdvance;
 	bool _resetScreen;
 	bool _playbackPaused;
