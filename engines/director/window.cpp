@@ -705,6 +705,8 @@ bool Window::loadNextMovie() {
 	if (_currentMovie) {
 		debug(0, "@@@@   Unloading movie '%s' in '%s'", utf8ToPrintable(_currentMovie->getMacName()).c_str(), _currentPath.c_str());
 
+		_currentMovie->keepOpenCasts();
+
 		delete _currentMovie;
 		_currentMovie = nullptr;
 	}

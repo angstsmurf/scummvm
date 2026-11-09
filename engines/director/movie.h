@@ -228,6 +228,8 @@ public:
 	bool _isModified = false;
 	void markModified(CastMemberID memberID);
 	void saveChanges();
+	// Before switching to another movie
+	void keepOpenCasts();
 
 	// For an embedded movie, the movie that hosts it. Its scripts share the
 	// host's handler scope, so getHandler() falls back to the parent.
