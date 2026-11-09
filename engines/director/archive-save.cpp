@@ -43,7 +43,7 @@
 
 namespace Director {
 
-bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, bool sessionOnly) {
+bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mode) {
 	if (_rifxType == MKTAG('F', 'G', 'D', 'M') || _rifxType == MKTAG('F', 'G', 'D', 'C')) {
 		warning("STUB: RIFXArchive::writeToFile(): saving Afterburner movies is not supported");
 		return false;
@@ -65,6 +65,9 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, bool sessio
 		// isn't found by lookups for files of the same name elsewhere,
 		// e.g. a cast MAIN.CST falling back to MAIN.DXR.
 		saveKey = getPathName().toString('/');
+	} else if (mode == kSaveWhileOpen) {
+		// Only a library that is a file of its own can be found again
+		return false;
 	} else {
 		// If the filename is empty, we save the movie with the name of the current movie
 		if (filename.empty()) {
@@ -251,7 +254,13 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, bool sessio
 	}
 
 	SavedArchive *saved = (SavedArchive *)SearchMan.getArchive(kSavedFilesArchive);
-	if (sessionOnly) {
+	if (mode == kSaveWhileOpen) {
+		saved->addOpenFile(saveFileName, getPathName(), out.getData(), out.size());
+		debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Kept the changes to %s while it is open (%d bytes)", saveFileName.c_str(), (int)out.size());
+		g_director->markArchiveStale(getPathName());
+		return true;
+	}
+	if (mode == kSaveForSession) {
 		saved->addSessionFile(saveFileName, out.getData(), out.size());
 		debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Kept the movie as %s for this session (%d bytes)", saveFileName.c_str(), (int)out.size());
 		g_director->markArchiveStale(getPathName());
@@ -1008,7 +1017,7 @@ SavedArchive::SavedArchive(const Common::String &target) {
 }
 
 bool SavedArchive::hasFile(const Common::Path &path) const {
-	if (_sessionFiles.contains(path.toString()))
+	if (_openFiles.contains(path.toString()) || _sessionFiles.contains(path.toString()))
 		return true;
 	return _files.contains(path.toString()) && isTrusted(path.toString());
 }
@@ -1016,12 +1025,18 @@ bool SavedArchive::hasFile(const Common::Path &path) const {
 int SavedArchive::listMembers(Common::ArchiveMemberList &list) const {
 	int count = 0;
 
+	for (OpenMap::const_iterator i = _openFiles.begin(); i != _openFiles.end(); ++i) {
+		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
+		++count;
+	}
 	for (SessionMap::const_iterator i = _sessionFiles.begin(); i != _sessionFiles.end(); ++i) {
+		if (_openFiles.contains(i->_key))
+			continue;
 		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
 		++count;
 	}
 	for (FileMap::const_iterator i = _files.begin(); i != _files.end(); ++i) {
-		if (_sessionFiles.contains(i->_key) || !isTrusted(i->_key))
+		if (_openFiles.contains(i->_key) || _sessionFiles.contains(i->_key) || !isTrusted(i->_key))
 			continue;
 		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
 		++count;
@@ -1038,6 +1053,10 @@ const Common::ArchiveMemberPtr SavedArchive::getMember(const Common::Path &path)
 }
 
 Common::SeekableReadStream *SavedArchive::openSave(const Common::String &key) const {
+	OpenMap::const_iterator open = _openFiles.find(key);
+	if (open != _openFiles.end())
+		return new Common::MemoryReadStream(open->_value.data.data(), open->_value.data.size());
+
 	SessionMap::const_iterator session = _sessionFiles.find(key);
 	if (session != _sessionFiles.end())
 		return new Common::MemoryReadStream(session->_value.data(), session->_value.size());
@@ -1132,13 +1151,45 @@ void SavedArchive::addWrittenFile(const Common::String &fileName) {
 	Common::String key = keyFor(fileName);
 	_trusted[key] = true;
 	_sessionFiles.erase(key);
+	_openFiles.erase(key);
 }
 
 void SavedArchive::addSessionFile(const Common::String &fileName, const byte *data, uint32 size) {
-	Common::Array<byte> &buf = _sessionFiles[keyFor(fileName)];
+	Common::String key = keyFor(fileName);
+	Common::Array<byte> &buf = _sessionFiles[key];
 	buf.resize(size);
 	if (size)
 		memcpy(buf.data(), data, size);
+	_openFiles.erase(key);
+}
+
+void SavedArchive::addOpenFile(const Common::String &fileName, const Common::Path &path, const byte *data, uint32 size) {
+	OpenFile &file = _openFiles[keyFor(fileName)];
+	file.path = path;
+	file.data.resize(size);
+	if (size)
+		memcpy(file.data.data(), data, size);
+}
+
+void SavedArchive::closeOpenFiles(const Common::Array<Common::Path> &inUse) {
+	Common::Array<Common::String> closed;
+	for (OpenMap::const_iterator i = _openFiles.begin(); i != _openFiles.end(); ++i) {
+		bool used = false;
+		for (auto &path : inUse) {
+			if (path == i->_value.path) {
+				used = true;
+				break;
+			}
+		}
+		if (!used)
+			closed.push_back(i->_key);
+	}
+	for (auto &key : closed) {
+		debugC(3, kDebugSaving, "SavedArchive::closeOpenFiles: Dropped the changes to %s", key.c_str());
+		// Have the library read from its file again the next time
+		g_director->markArchiveStale(_openFiles[key].path);
+		_openFiles.erase(key);
+	}
 }
 
 // Bump this whenever the movie writer changes its output; raise

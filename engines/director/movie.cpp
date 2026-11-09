@@ -616,14 +616,43 @@ void Movie::markModified(CastMemberID memberID) {
 // a mistake in it could break the game for good.
 void Movie::saveChanges() {
 	if (_isModified) {
-		_movieArchive->writeToFile(Common::String(), this, true);
+		_movieArchive->writeToFile(Common::String(), this, Archive::kSaveForSession);
 		_isModified = false;
 	}
 	for (auto &it : _casts) {
 		Cast *cast = it._value;
 		if (!cast->_isExternal || !cast->_isModified || !cast->getArchive())
 			continue;
-		cast->getArchive()->writeToFile(Common::String(), this, true);
+		cast->getArchive()->writeToFile(Common::String(), this, Archive::kSaveForSession);
+		cast->_isModified = false;
+	}
+}
+
+// Director keeps an external cast library open across a movie switch when
+// the next movie uses the same file, and that movie sees the changes Lingo
+// made to it, saved or not. Once a movie that doesn't use the library is
+// loaded, it is closed and its unsaved changes are gone. ScummVM loads the
+// casts afresh for every movie, so keep the changes in memory instead:
+// drop those of libraries this movie didn't use, which were closed when it
+// was loaded, and keep the ones this movie made.
+void Movie::keepOpenCasts() {
+	SavedArchive *saved = (SavedArchive *)SearchMan.getArchive(kSavedFilesArchive);
+	if (!saved)
+		return;
+
+	Common::Array<Common::Path> inUse;
+	for (auto &it : _casts) {
+		Cast *cast = it._value;
+		if (cast->_isExternal && cast->getArchive())
+			inUse.push_back(cast->getArchive()->getPathName());
+	}
+	saved->closeOpenFiles(inUse);
+
+	for (auto &it : _casts) {
+		Cast *cast = it._value;
+		if (!cast->_isExternal || !cast->_isModified || !cast->getArchive())
+			continue;
+		cast->getArchive()->writeToFile(Common::String(), this, Archive::kSaveWhileOpen);
 		cast->_isModified = false;
 	}
 }

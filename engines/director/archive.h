@@ -83,8 +83,16 @@ public:
 
 	virtual bool openFile(const Common::Path &path);
 	virtual bool openStream(Common::SeekableReadStream *stream, uint32 offset = 0) = 0;
-	// A session-only save is kept in memory until ScummVM quits
-	virtual bool writeToFile(Common::String filename, Movie *movie, bool sessionOnly = false) {
+	// Where writeToFile() puts the movie
+	enum SaveMode {
+		kSaveToDisk,
+		// Kept in memory until ScummVM quits
+		kSaveForSession,
+		// Kept in memory while the cast library stays open: only until the
+		// next movie switch that leaves it unused (SavedArchive::closeOpenFiles)
+		kSaveWhileOpen
+	};
+	virtual bool writeToFile(Common::String filename, Movie *movie, SaveMode mode = kSaveToDisk) {
 		// Saving Director movies was introduced in Director 4
 		// However, from DirectorEngine::createArchive, it is evident that after Director 4 only RIFX Archives were written
 		warning("Archive::writeToFile(): saving non-RIFX archives is not supported");
@@ -171,7 +179,7 @@ public:
 	~RIFXArchive() override;
 
 	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0) override;
-	bool writeToFile(Common::String filename, Movie *movie, bool sessionOnly = false) override;
+	bool writeToFile(Common::String filename, Movie *movie, SaveMode mode = kSaveToDisk) override;
 
 	Common::SeekableReadStreamEndian *getFirstResource(uint32 tag) override;
 	virtual Common::SeekableReadStreamEndian *getFirstResource(uint32 tag, bool fileEndianness);
@@ -305,6 +313,14 @@ public:
 	// Keep a save in memory instead, for the rest of the session. It takes
 	// the place of any save on disk for the same file until one is written.
 	void addSessionFile(const Common::String &fileName, const byte *data, uint32 size);
+	// Keep the changes to an open cast library in memory, so the next movie
+	// that uses the same file gets them, like Director, which keeps the
+	// library open across the movie switch. It takes the place of the
+	// session and disk saves until a save is made or the library closes.
+	void addOpenFile(const Common::String &fileName, const Common::Path &path, const byte *data, uint32 size);
+	// Close every library that kept changes but is not among the files
+	// still in use, dropping its changes
+	void closeOpenFiles(const Common::Array<Common::Path> &inUse);
 
 	static Common::String encodeKey(const Common::String &key);
 	static Common::String decodeKey(const Common::String &name);
@@ -355,6 +371,12 @@ private:
 	mutable TrustMap _trusted;
 	typedef Common::HashMap<Common::String, Common::Array<byte>, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SessionMap;
 	SessionMap _sessionFiles;
+	struct OpenFile {
+		Common::Path path;
+		Common::Array<byte> data;
+	};
+	typedef Common::HashMap<Common::String, OpenFile, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> OpenMap;
+	OpenMap _openFiles;
 	Common::String _target;
 };
 
