@@ -1043,7 +1043,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			score->invalidateRectsForMember(this);
 			_regX = d.u.farr->arr[0].asInt();
 			_regY = d.u.farr->arr[1].asInt();
-			_modified = true;
+			setModified(true);
 		} else {
 			warning("BitmapCastMember::setField(): Wrong Datum type %d for kTheRegPoint", d.type);
 		}
@@ -1069,7 +1069,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			}
 			if (newClut != _clut) {
 				_clut = newClut;
-				_modified = true;
+				setModified(true);
 			}
 			return;
 		}
@@ -1102,7 +1102,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			}
 			if (newClut != _clut) {
 				_clut = newClut;
-				_modified = true;
+				setModified(true);
 			}
 		}
 		return;

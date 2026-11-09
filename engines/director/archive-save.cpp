@@ -125,8 +125,17 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 			break;
 
 		case MKTAG('C', 'A', 'S', 't'):
-			cast = movie->getCastByLibResourceID(it->libResourceId);
-			cast->saveCastData(saveFile, it);
+			// A 'CASt' that no 'CAS*' lists (e.g. in Mac Safecracker's
+			// MAIN_*.DXR) belongs to no cast: keep its original bytes
+			cast = it->libResourceId ? movie->getCastByLibResourceID(it->libResourceId) : nullptr;
+			if (cast) {
+				cast->saveCastData(saveFile, it);
+			} else {
+				saveFile->seek(it->offset, SEEK_SET);
+				saveFile->writeUint32LE(it->tag);
+				saveFile->writeUint32LE(it->size);
+				saveFile->writeStream(getResource(it->tag, it->index));
+			}
 			break;
 
 		case MKTAG('V', 'W', 'C', 'F'):
@@ -148,17 +157,14 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			if (movie->getScore()->getVWSCResourceSize() == 0) {
-				// The serializer can't handle this score (malformed detail
-				// index or unsupported version); keep the original bytes
-				warning("STUB: RIFXArchive::writeToFile(): score not serializable; keeping the original VWSC bytes");
-				saveFile->seek(it->offset, SEEK_SET);
-				saveFile->writeUint32LE(it->tag);
-				saveFile->writeUint32LE(it->size);
-				saveFile->writeStream(getResource(it->tag, it->index));
-			} else {
-				movie->getScore()->writeVWSCResource(saveFile, it->offset);
-			}
+			// The score is never edited at runtime (beginRecording is a
+			// stub), so the original bytes are exact. Re-serializing it
+			// changed Safecracker's MAIN enough to break it when reloaded.
+			debugC(7, kDebugSaving, "Saving resource %s as it is, without modification", tag2str(it->tag));
+			saveFile->seek(it->offset, SEEK_SET);
+			saveFile->writeUint32LE(it->tag);
+			saveFile->writeUint32LE(it->size);
+			saveFile->writeStream(getResource(it->tag, it->index));
 			break;
 
 		case MKTAG('B', 'I', 'T', 'D'):
@@ -169,7 +175,10 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 				CastMember *member = findResourceOwner(movie, it->tag, it->index);
 				// The owner is not always the type the tag implies, e.g. a D4
 				// script cast member owns its source text in an 'STXT'
-				if (member) {
+				// Unchanged members keep their original data, as in Director,
+				// which rewrites only dirty resources: e.g. the bitmap writer
+				// doesn't compress, and stores 16-bit pixels interleaved
+				if (member && member->needsSaving()) {
 					if (it->tag == MKTAG('B', 'I', 'T', 'D') && member->_type == kCastBitmap) {
 						((BitmapCastMember *)member)->writeBITDResource(saveFile, it->offset);
 						continue;
@@ -348,12 +357,17 @@ bool RIFXArchive::writeCast(Common::SeekableWriteStream *writeStream, uint32 off
 	// We can't just write all the 'CASt' indices randomly, we have to sort them by castId
 	// Since the order they appear matters, they are given castIds accordingly
 	uint32 maxCastId = 0;
+	bool empty = true;
 	for (auto &it : _types[castTag]) {
 		if (it._value.libResourceId == libResourceId) {
 			castIndexes[it._value.castId] = it._value.index;
 			maxCastId = MAX(maxCastId, it._value.castId);
+			empty = false;
 		}
 	}
+	// A cast without members has an empty 'CAS*'
+	if (empty)
+		return true;
 
 	debugC(5, kDebugSaving, "RIFXArchive::writeCast: Writing CAS* resource: size: %d, maxCastID: %d, libResourceID: %d", casSize, maxCastId, libResourceId);
 	debugCN(5, kDebugSaving, "'CASt' indexes: [");
@@ -510,9 +524,10 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 
 		case MKTAG('C', 'A', 'S', 't'):
 			{
-				cast = movie->getCastByLibResourceID(it->libResourceId);
+				// A 'CASt' that no 'CAS*' lists has no cast; keep its original bytes
+				cast = it->libResourceId ? movie->getCastByLibResourceID(it->libResourceId) : nullptr;
 				// The castIds of cast members start from _castArrayStart
-				CastMember *target = cast->getCastMember(it->castId + cast->_castArrayStart);
+				CastMember *target = cast ? cast->getCastMember(it->castId + cast->_castArrayStart) : nullptr;
 
 				if (target && !cast->keepOriginalCastBytes(target)) {
 					resSize = target->getCastResourceSize();
@@ -565,7 +580,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('S', 'T', 'X', 'T'):
 			{
 				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && (member->_type == kCastText || member->_type == kCastButton)) {
+				if (member && member->needsSaving() && (member->_type == kCastText || member->_type == kCastButton)) {
 					resSize = ((TextCastMember *)member)->getSTXTResourceSize();
 					it->size = resSize;
 				} else {
@@ -581,7 +596,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('C', 'L', 'U', 'T'):
 			{
 				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->_type == kCastPalette) {
+				if (member && member->needsSaving() && member->_type == kCastPalette) {
 					resSize = ((PaletteCastMember *)member)->getPaletteDataSize();
 					it->size = resSize;
 				} else {
@@ -596,7 +611,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('B', 'I', 'T', 'D'):
 			{
 				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->_type == kCastBitmap) {
+				if (member && member->needsSaving() && member->_type == kCastBitmap) {
 					resSize = ((BitmapCastMember *)member)->getBITDResourceSize();
 					it->size = resSize;
 				} else {
@@ -611,7 +626,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('S', 'C', 'V', 'W'):
 			{
 				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->_type == kCastFilmLoop) {
+				if (member && member->needsSaving() && member->_type == kCastFilmLoop) {
 					resSize = ((FilmLoopCastMember *)member)->getSCVWResourceSize();
 					it->size = resSize;
 				} else {
@@ -624,12 +639,8 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			resSize = movie->getScore()->getVWSCResourceSize();
-			if (resSize == 0) {
-				// Not serializable; the original bytes are kept (see writeToFile())
-				resSize = it->size;
-			}
-			it->size = resSize;
+			// The original bytes are kept (see writeToFile())
+			resSize = it->size;
 			it->offset = currentSize;
 			currentSize += resSize + 8;		// The size doesn't include the header and the size entry
 			break;
@@ -690,16 +701,20 @@ uint32 RIFXArchive::getArchiveSize(Common::Array<Resource *> resources) {
 uint32 RIFXArchive::getCASResourceSize(uint32 libResourceID) {
 	uint castTag = MKTAG('C', 'A', 'S', 't');
 	uint32 maxCastId = 0;
+	bool empty = true;
 
 	// maxCastId is the basically the number of cast members present in the cast
 	// This is the number of entries present in the 'CAS*' resource
 	for (auto &it : _types[castTag]) {
 		if (it._value.libResourceId == libResourceID) {
 			maxCastId = MAX(maxCastId, it._value.castId);
+			empty = false;
 		}
 	}
 
-	return (maxCastId + 1) * 4;
+	// A cast without members (e.g. Safecracker's empty internal casts) has
+	// an empty 'CAS*', not a single null entry
+	return empty ? 0 : (maxCastId + 1) * 4;
 }
 
 uint32 RIFXArchive::getKeyTableResourceSize() {
@@ -760,7 +775,7 @@ CastMember *RIFXArchive::findResourceOwner(Movie *movie, uint32 tag, uint16 inde
 		return nullptr;
 
 	const Resource &parent = castResMap[parentIndex];
-	Cast *cast = movie->getCastByLibResourceID(parent.libResourceId);
+	Cast *cast = parent.libResourceId ? movie->getCastByLibResourceID(parent.libResourceId) : nullptr;
 	return cast ? cast->getCastMember(parent.castId + cast->_castArrayStart) : nullptr;
 }
 

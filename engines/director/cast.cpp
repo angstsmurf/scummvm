@@ -693,8 +693,14 @@ void Cast::saveConfig(Common::SeekableWriteStream *writeStream, uint32 offset, u
 
 	writeStream->writeUint16BE(_castArrayStartForChecksum);    // 12
 
-	// computeChecksum() reads this field; keep it in sync with the disk
-	_castArrayEndForChecksum = _castArrayStartForChecksum + _castArchive->getResourceIDList(MKTAG('C', 'A', 'S', 't')).size();
+	// computeChecksum() reads this field; keep it in sync with the disk.
+	// Grow it only for members created at runtime past the end: the loaded
+	// value already covers the file's members, and counting the 'CASt'
+	// resources of every internal cast (Safecracker's MAIN has several)
+	// made it far too big
+	for (auto &it : *_loadedCast)
+		if (it._value && it._value->_index == -1)
+			_castArrayEndForChecksum = MAX<uint16>(_castArrayEndForChecksum, it._key);
 	writeStream->writeUint16BE(_castArrayEndForChecksum);      // 14
 
 	writeStream->writeByte(_readRate);              // 16
@@ -991,11 +997,16 @@ void Cast::loadCast() {
 	}
 }
 
-// Members without a version-capable writer, and members whose in-memory
-// type differs from the type stored on disk (e.g. promoted Xtras), keep
-// their original 'CASt' bytes when saving
+// Members without a version-capable writer, unchanged members, and members
+// whose in-memory type differs from the type stored on disk (e.g. promoted
+// Xtras), keep their original 'CASt' bytes when saving
 bool Cast::keepOriginalCastBytes(CastMember *target) {
 	if (!target || !target->canWriteCastData())
+		return true;
+	// Like Director, which rewrites only dirty resources, members loaded
+	// from the file and left unchanged keep their original bytes too: the
+	// writers don't round-trip every field
+	if (!target->needsSaving())
 		return true;
 	return target->_sourceType != kCastTypeNull && target->_sourceType != target->_type;
 }

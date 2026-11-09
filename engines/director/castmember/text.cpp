@@ -220,7 +220,7 @@ void TextCastMember::setColors(uint32 *fgcolor, uint32 *bgcolor) {
 	if (target) {
 		target->setColors(_fgcolor, _bgcolor);
 	} else {
-		_modified = true;
+		setModified(true);
 	}
 }
 
@@ -239,7 +239,7 @@ Graphics::TextAlign TextCastMember::getAlignment() {
 void TextCastMember::setBackColor(uint32 bgCol) {
 	_bgcolor = bgCol;
 	_bgColorSet = true;
-	_modified = true;
+	setModified(true);
 }
 
 uint32 TextCastMember::getBackColor() {
@@ -258,7 +258,7 @@ uint32 TextCastMember::getForeColor(int start, int end) {
 
 void TextCastMember::setForeColor(uint32 fgCol) {
 	_fgcolor = fgCol;
-	_modified = true;
+	setModified(true);
 }
 
 void TextCastMember::setForeColor(uint32 fgCol, int start, int end) {
@@ -272,7 +272,7 @@ void TextCastMember::setForeColor(uint32 fgCol, int start, int end) {
 
 		return target->setTextColor(fgCol, start, end);
 	}
-	_modified = true;
+	setModified(true);
 }
 
 
@@ -502,7 +502,7 @@ void TextCastMember::setRawText(const Common::String &text) {
 	// If text has changed, use the cached formatting from first STXT in this castmember.
 	Common::U32String formatting = Common::String::format("\001\016%04x%02x%04x%04x%04x%04x", _fontId, _textSlant, _fontSize, _fgpalinfo1, _fgpalinfo2, _fgpalinfo3);
 	_ftext = formatting + _ptext;
-	_modified = true;
+	setModified(true);
 }
 
 int TextCastMember::getLineCount() {
@@ -603,7 +603,7 @@ void TextCastMember::setTextSize(int textSize) {
 		target->draw();
 	}
 	_fontSize = textSize;
-	_modified = true;
+	setModified(true);
 }
 
 void TextCastMember::setTextSize(int textSize, int start, int end) {
@@ -614,7 +614,7 @@ void TextCastMember::setTextSize(int textSize, int start, int end) {
 		_ftext = target->getTextChunk(0, 0, -1, -1, true);
 		target->draw();
 	}
-	_modified = true;
+	setModified(true);
 }
 
 Common::String TextCastMember::getTextStyle() {
@@ -644,7 +644,7 @@ void TextCastMember::setTextStyle(const Common::String &textStyle) {
 		_ftext = target->getTextChunk(0, 0, -1, -1, true);
 		target->draw();
 	}
-	_modified = true;
+	setModified(true);
 }
 
 void TextCastMember::scrollByLine(int count) {
@@ -661,13 +661,16 @@ void TextCastMember::setTextStyle(const Common::String &textStyle, int start, in
 		_ftext = target->getTextChunk(0, 0, -1, -1, true);
 		target->draw();
 	}
-	_modified = true;
+	setModified(true);
 }
 
 void TextCastMember::updateFromWidget(Graphics::MacWidget *widget, bool spriteEditable) {
 	if (widget && (spriteEditable || _editable)) {
 		Common::String content = ((Graphics::MacText *)widget)->getEditedString();
 		content.replace('\n', '\r');
+		// Text typed by the user is a change the movie save must keep
+		if (!_ptext.equals(Common::U32String(content)))
+			_isChanged = true;
 		_ptext = content;
 
 		// This string will be formatted with the default formatting
@@ -890,7 +893,7 @@ void TextCastMember::setField(int field, const Datum &d) {
 			}
 
 			_textAlign = align;
-			_modified = true;
+			setModified(true);
 		}
 		return;
 	case kTheTextFont:
@@ -898,7 +901,7 @@ void TextCastMember::setField(int field, const Datum &d) {
 		return;
 	case kTheTextHeight:
 		_lineSpacing = d.asInt();
-		_modified = true;
+		setModified(true);
 		return;
 	case kTheTextSize:
 		setTextSize(d.asInt());
