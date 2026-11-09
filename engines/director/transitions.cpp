@@ -1262,19 +1262,20 @@ void Window::initTransParams(TransParams &t, Common::Rect &clipRect) {
 	switch (transProps[t.type].dir) {
 	case kTransDirHorizontal:
 		t.steps = MIN(MAX(w / t.chunkSize, (uint)1), maxSteps);
-		t.xStepSize = (w * TSTEP_FRAC) / t.steps;
+		// Round up, so that the last step covers the whole distance
+		t.xStepSize = (w * TSTEP_FRAC + t.steps - 1) / t.steps;
 		break;
 
 	case kTransDirVertical:
 		t.steps = MIN(MAX(h / t.chunkSize, (uint)1), maxSteps);
-		t.yStepSize = (h * TSTEP_FRAC) / t.steps;
+		t.yStepSize = (h * TSTEP_FRAC + t.steps - 1) / t.steps;
 		break;
 
 	case kTransDirBoth:
 		t.steps = MIN(MAX(m / t.chunkSize, (uint)1), maxSteps);
 
-		t.xStepSize = (w * TSTEP_FRAC) / t.steps;
-		t.yStepSize = (h * TSTEP_FRAC) / t.steps;
+		t.xStepSize = (w * TSTEP_FRAC + t.steps - 1) / t.steps;
+		t.yStepSize = (h * TSTEP_FRAC + t.steps - 1) / t.steps;
 		break;
 
 	// Multipass algorithms, using pixel sizing
