@@ -222,9 +222,12 @@ public:
 	// or recolour it.
 	bool _isEmbedded = false;
 
-	// Set when Lingo changes a cast member, so the movie can be saved when
-	// it branches to another movie while updateMovieEnabled is set.
+	// Set when Lingo changes the movie or one of its internal cast members,
+	// so the movie can be saved when it branches to another movie while
+	// updateMovieEnabled is set. External casts keep their own flag.
 	bool _isModified = false;
+	void markModified(CastMemberID memberID);
+	void saveChanges();
 
 	// For an embedded movie, the movie that hosts it. Its scripts share the
 	// host's handler scope, so getHandler() falls back to the parent.

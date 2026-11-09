@@ -175,6 +175,9 @@ public:
 	uint16 _castLibID;
 	uint32 _libResourceId;
 	bool _isExternal;
+	// An external cast changed by Lingo, saved to its own file on a branch
+	// while updateMovieEnabled is set
+	bool _isModified = false;
 
 	CharMap _macCharsToWin;
 	CharMap _winCharsToMac;
