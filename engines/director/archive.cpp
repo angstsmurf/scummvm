@@ -609,6 +609,7 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 		_stream = stream;
 	}
 
+	_startOffset = startOffset;
 	stream->seek(startOffset);
 
 	uint32 moreOffset = 0;

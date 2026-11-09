@@ -324,8 +324,9 @@ Common::Error DirectorEngine::run() {
 
 	gameQuirks(_gameDescription->desc.gameId, _gameDescription->desc.platform);
 	// Mix in all the saved files for the current target
-	// Assign higher priority to save games to load them before original game files
-	SearchMan.add(kSavedFilesArchive, new SavedArchive(_targetName), 1);
+	// Assign higher priority to save games to load them before original game files,
+	// including those read from installer archives (priority 5)
+	SearchMan.add(kSavedFilesArchive, new SavedArchive(_targetName), 10);
 
 	_wm->setDesktopMode(_wmMode);
 

@@ -56,16 +56,26 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		}
 	}
 
-	// If the filename is empty, we save the movie with the name of the current movie
-	if (filename.empty()) {
-		filename = movie->getMacName();
-	}
+	Common::String saveKey;
+	if (filename.empty() && !getPathName().empty() && _startOffset == 0) {
+		// Director writes the movie back over its own file. Key the save
+		// by that file's path, so it only stands in for this movie and
+		// isn't found by lookups for files of the same name elsewhere,
+		// e.g. a cast MAIN.CST falling back to MAIN.DXR.
+		saveKey = getPathName().toString('/');
+	} else {
+		// If the filename is empty, we save the movie with the name of the current movie
+		if (filename.empty()) {
+			filename = movie->getMacName();
+		}
 
-	// Normalise the name the same way the movie loader does, so the key 
-	// the save is stored under matches the one used when the movie is later loaded by fileName.
-	// Otherwise e.g. saving "C:\SCORES.DXR" and loading it back (which resolves
-	// to "SCORES.DXR") would not find the saved file.
-	Common::String saveFileName = g_director->getTargetName() + "-" + convertPath(filename);
+		// Normalise the name the same way the movie loader does, so the key
+		// the save is stored under matches the one used when the movie is later loaded by fileName.
+		// Otherwise e.g. saving "C:\SCORES.DXR" and loading it back (which resolves
+		// to "SCORES.DXR") would not find the saved file.
+		saveKey = convertPath(filename);
+	}
+	Common::String saveFileName = g_director->getTargetName() + "-" + SavedArchive::encodeKey(saveKey);
 	// Don't open the save file as compressed which doesn't support seeking
 	Common::OutSaveFile *saveFile = g_engine->getSaveFileManager()->openForSaving(saveFileName, false);
 
@@ -226,7 +236,8 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 	// reopening the movie in the same session would show its contents
 	// from before the save (Opera Fatal's save slots).
 	g_director->markArchiveStale(getPathName());
-	g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
+	if (!filename.empty())
+		g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
 
 	delete saveFile;
 	for (auto it : builtResources) {
@@ -832,13 +843,59 @@ Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common
 	return result;
 }
 
+// A save file name can't hold a path, so a movie saved over its own file
+// stores the path with '/' escaped as "%2F" (and '%' as "%25").
+Common::String SavedArchive::encodeKey(const Common::String &key) {
+	if (!key.contains('/'))
+		return key;
+
+	Common::String res;
+	for (uint i = 0; i < key.size(); i++) {
+		if (key[i] == '/')
+			res += "%2F";
+		else if (key[i] == '%')
+			res += "%25";
+		else
+			res += key[i];
+	}
+	return res;
+}
+
+Common::String SavedArchive::decodeKey(const Common::String &name) {
+	Common::String res;
+	for (uint i = 0; i < name.size(); i++) {
+		if (name[i] == '%' && i + 2 < name.size()) {
+			Common::String code = name.substr(i + 1, 2);
+			if (code.equalsIgnoreCase("2F")) {
+				res += '/';
+				i += 2;
+				continue;
+			}
+			if (code == "25") {
+				res += '%';
+				i += 2;
+				continue;
+			}
+		}
+		res += name[i];
+	}
+	return res;
+}
+
 bool SavedArchive::_addFile(const Common::String &fileName) {
 	// Derive the original file name from the save file name
 	// Save files are named target_name-save_filename
-	// Normalise it with convertPath.
-	Common::String origFileName = convertPath(fileName.substr(_target.size() + 1));
+	Common::String name = fileName.substr(_target.size() + 1);
+	Common::String origFileName;
+	if (name.contains("%2F") || name.contains("%2f")) {
+		// A movie saved over its own file, keyed by its path
+		origFileName = decodeKey(name);
+	} else {
+		// Normalise it with convertPath.
+		origFileName = convertPath(name);
+	}
 	if (!_files.contains(origFileName)) {
-		debugC(3, kDebugLoading, "Found save file: %s -> %s", fileName.c_str(), fileName.c_str());
+		debugC(3, kDebugLoading, "Found save file: %s -> %s", fileName.c_str(), origFileName.c_str());
 
 		_files[origFileName] = fileName;
 		return true;
