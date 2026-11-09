@@ -67,6 +67,10 @@ struct TransParams {
 	uint16 targetPalLength;
 	byte tempPal[768];
 
+	uint32 startTime;
+	uint32 nextAbortCheck;
+	bool abortPending;
+
 	TransParams() : tempPal() {
 		type = kTransNone;
 		frame = 0;
@@ -84,6 +88,10 @@ struct TransParams {
 		sourcePalLength = 0;
 		targetPal = nullptr;
 		targetPalLength = 0;
+
+		startTime = 0;
+		nextAbortCheck = 0;
+		abortPending = false;
 	}
 
 	TransParams(uint16 d, uint16 a, uint16 c, TransitionType t) :
@@ -100,6 +108,10 @@ struct TransParams {
 		sourcePalLength = 0;
 		targetPal = nullptr;
 		targetPalLength = 0;
+
+		startTime = 0;
+		nextAbortCheck = 0;
+		abortPending = false;
 	}
 };
 
@@ -121,6 +133,7 @@ public:
 	// transitions.cpp
 	void exitTransition(TransParams &t, Graphics::ManagedSurface *nextFrame, Common::Rect clipRect);
 	void stepTransition(TransParams &t, int step);
+	bool checkTransitionAbort(TransParams &t);
 	void playTransition(uint frame, RenderMode mode, uint16 transDuration, uint8 transArea, uint8 transChunkSize, TransitionType transType, CastMemberID paletteId);
 	void initTransParams(TransParams &t, Common::Rect &clipRect);
 	void dissolveTrans(TransParams &t, Common::Rect &clipRect, Graphics::ManagedSurface *tmpSurface);
