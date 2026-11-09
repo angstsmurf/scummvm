@@ -608,17 +608,22 @@ void Movie::markModified(CastMemberID memberID) {
 
 // Director saves the movie, and each external cast library, that Lingo
 // changed when it branches to another movie with updateMovieEnabled set.
-// Each is written back over its own file.
+// Each is written back over its own file. Here they are only kept for the
+// session: the game files are often on a CD, where the save fails
+// silently, and games use updateMovieEnabled to keep runtime changes when
+// they come back to a movie rather than to save progress. A save that
+// persisted would replace the game file in every later session, so
+// a mistake in it could break the game for good.
 void Movie::saveChanges() {
 	if (_isModified) {
-		_movieArchive->writeToFile(Common::String(), this);
+		_movieArchive->writeToFile(Common::String(), this, true);
 		_isModified = false;
 	}
 	for (auto &it : _casts) {
 		Cast *cast = it._value;
 		if (!cast->_isExternal || !cast->_isModified || !cast->getArchive())
 			continue;
-		cast->getArchive()->writeToFile(Common::String(), this);
+		cast->getArchive()->writeToFile(Common::String(), this, true);
 		cast->_isModified = false;
 	}
 }

@@ -83,7 +83,8 @@ public:
 
 	virtual bool openFile(const Common::Path &path);
 	virtual bool openStream(Common::SeekableReadStream *stream, uint32 offset = 0) = 0;
-	virtual bool writeToFile(Common::String filename, Movie *movie) {
+	// A session-only save is kept in memory until ScummVM quits
+	virtual bool writeToFile(Common::String filename, Movie *movie, bool sessionOnly = false) {
 		// Saving Director movies was introduced in Director 4
 		// However, from DirectorEngine::createArchive, it is evident that after Director 4 only RIFX Archives were written
 		warning("Archive::writeToFile(): saving non-RIFX archives is not supported");
@@ -170,7 +171,7 @@ public:
 	~RIFXArchive() override;
 
 	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0) override;
-	bool writeToFile(Common::String filename, Movie *movie) override;
+	bool writeToFile(Common::String filename, Movie *movie, bool sessionOnly = false) override;
 
 	Common::SeekableReadStreamEndian *getFirstResource(uint32 tag) override;
 	virtual Common::SeekableReadStreamEndian *getFirstResource(uint32 tag, bool fileEndianness);
@@ -301,6 +302,9 @@ public:
 	bool _addFile(const Common::String &path);
 	// A save was just written: register it and trust it without checking
 	void addWrittenFile(const Common::String &fileName);
+	// Keep a save in memory instead, for the rest of the session. It takes
+	// the place of any save on disk for the same file until one is written.
+	void addSessionFile(const Common::String &fileName, const byte *data, uint32 size);
 
 	static Common::String encodeKey(const Common::String &key);
 	static Common::String decodeKey(const Common::String &name);
@@ -340,6 +344,8 @@ private:
 	// Read an overlay's header up to its patches
 	static bool readOverlayHeader(Common::SeekableReadStream *stream, Common::String &baseKey, uint32 &baseSize, uint32 &baseCrc, uint32 &movieSize, uint32 &patchCount);
 	Common::SeekableReadStream *buildOverlay(Common::SeekableReadStream *save) const;
+	// The save for 'key', from memory or disk
+	Common::SeekableReadStream *openSave(const Common::String &key) const;
 	Common::String keyFor(const Common::String &fileName) const;
 	bool isTrusted(const Common::String &key) const;
 
@@ -347,6 +353,8 @@ private:
 	FileMap _files;
 	typedef Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> TrustMap;
 	mutable TrustMap _trusted;
+	typedef Common::HashMap<Common::String, Common::Array<byte>, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SessionMap;
+	SessionMap _sessionFiles;
 	Common::String _target;
 };
 
