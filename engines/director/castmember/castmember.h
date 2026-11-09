@@ -66,6 +66,8 @@ public:
 	virtual bool isModified() { return _modified; }
 	virtual bool needsReload() { return _needsReload; }
 	bool isChanged() const { return _isChanged; }
+	// Changed at runtime, or created at runtime with no original data
+	bool needsSaving() const { return _isChanged || _index == -1; }
 	void setModified(bool modified);
 	virtual Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) { return nullptr; }
 	virtual void updateWidget(Graphics::MacWidget *widget, Channel *channel) {}

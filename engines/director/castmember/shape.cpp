@@ -98,12 +98,12 @@ ShapeCastMember::ShapeCastMember(Cast *cast, uint16 castId, ShapeCastMember &sou
 
 void ShapeCastMember::setBackColor(uint32 bgCol) {
 	_bgCol = bgCol;
-	_modified = true;
+	setModified(true);
 }
 
 void ShapeCastMember::setForeColor(uint32 fgCol) {
 	_fgCol = fgCol;
-	_modified = true;
+	setModified(true);
 }
 
 bool ShapeCastMember::hasField(int field) {
