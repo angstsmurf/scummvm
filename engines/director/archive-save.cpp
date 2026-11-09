@@ -43,7 +43,7 @@
 
 namespace Director {
 
-bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
+bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, bool sessionOnly) {
 	if (_rifxType == MKTAG('F', 'G', 'D', 'M') || _rifxType == MKTAG('F', 'G', 'D', 'C')) {
 		warning("STUB: RIFXArchive::writeToFile(): saving Afterburner movies is not supported");
 		return false;
@@ -250,6 +250,16 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		delete it;
 	}
 
+	SavedArchive *saved = (SavedArchive *)SearchMan.getArchive(kSavedFilesArchive);
+	if (sessionOnly) {
+		saved->addSessionFile(saveFileName, out.getData(), out.size());
+		debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Kept the movie as %s for this session (%d bytes)", saveFileName.c_str(), (int)out.size());
+		g_director->markArchiveStale(getPathName());
+		if (!filename.empty())
+			g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
+		return true;
+	}
+
 	// Don't open the save file as compressed which doesn't support seeking
 	Common::OutSaveFile *outFile = g_engine->getSaveFileManager()->openForSaving(saveFileName, false);
 	if (!outFile) {
@@ -267,7 +277,7 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 	debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Saved the movie as file %s (%d bytes)", saveFileName.c_str(), (int)out.size());
 
 	// Add to search index
-	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->addWrittenFile(saveFileName);
+	saved->addWrittenFile(saveFileName);
 
 	// The cached archives for the saved file are out of date now. Have
 	// them read back from disk the next time the file is opened, or
@@ -998,14 +1008,20 @@ SavedArchive::SavedArchive(const Common::String &target) {
 }
 
 bool SavedArchive::hasFile(const Common::Path &path) const {
+	if (_sessionFiles.contains(path.toString()))
+		return true;
 	return _files.contains(path.toString()) && isTrusted(path.toString());
 }
 
 int SavedArchive::listMembers(Common::ArchiveMemberList &list) const {
 	int count = 0;
 
+	for (SessionMap::const_iterator i = _sessionFiles.begin(); i != _sessionFiles.end(); ++i) {
+		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
+		++count;
+	}
 	for (FileMap::const_iterator i = _files.begin(); i != _files.end(); ++i) {
-		if (!isTrusted(i->_key))
+		if (_sessionFiles.contains(i->_key) || !isTrusted(i->_key))
 			continue;
 		list.push_back(Common::ArchiveMemberList::value_type(new Common::GenericArchiveMember(i->_key, *this)));
 		++count;
@@ -1021,17 +1037,20 @@ const Common::ArchiveMemberPtr SavedArchive::getMember(const Common::Path &path)
 	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
 }
 
-Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common::Path &path) const {
-	FileMap::const_iterator fDesc = _files.find(path.toString());
+Common::SeekableReadStream *SavedArchive::openSave(const Common::String &key) const {
+	SessionMap::const_iterator session = _sessionFiles.find(key);
+	if (session != _sessionFiles.end())
+		return new Common::MemoryReadStream(session->_value.data(), session->_value.size());
+
+	FileMap::const_iterator fDesc = _files.find(key);
 	if (fDesc == _files.end() || !isTrusted(fDesc->_key))
 		return nullptr;
+	return g_engine->getSaveFileManager()->openForLoading(fDesc->_value);
+}
 
-	// Buffer the save file data into memory.
-	// We have to do this because openForLoading will return a stream backed by a
-	// FSNode, and subsequently calling openForSaving on the same file will cause
-	// that stream to become completely empty. RIFXArchive::writeToFile needs to
-	// be able to read from that stream while saving!
-	Common::SeekableReadStream *stream = g_engine->getSaveFileManager()->openForLoading(fDesc->_value);
+Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common::Path &path) const {
+	Common::String key = path.toString();
+	Common::SeekableReadStream *stream = openSave(key);
 	if (!stream)
 		return nullptr;
 
@@ -1039,11 +1058,17 @@ Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common
 		Common::SeekableReadStream *result = buildOverlay(stream);
 		delete stream;
 		if (!result)
-			warning("SavedArchive: can't read the saved movie '%s'", fDesc->_value.c_str());
+			warning("SavedArchive: can't read the saved movie for '%s'", key.c_str());
 		return result;
 	}
 	stream->seek(0);
 
+	// Buffer the save file data into memory.
+	// We have to do this because openForLoading will return a stream backed by a
+	// FSNode, and subsequently calling openForSaving on the same file will cause
+	// that stream to become completely empty. RIFXArchive::writeToFile needs to
+	// be able to read from that stream while saving! A session save's buffer
+	// is replaced when the movie is saved again.
 	byte *data = (byte *)calloc(stream->size(), sizeof(byte));
 	stream->read(data, stream->size());
 	Common::MemoryReadStream *result = new Common::MemoryReadStream(data, stream->size(), DisposeAfterUse::YES);
@@ -1104,7 +1129,16 @@ Common::String SavedArchive::keyFor(const Common::String &fileName) const {
 
 void SavedArchive::addWrittenFile(const Common::String &fileName) {
 	_addFile(fileName);
-	_trusted[keyFor(fileName)] = true;
+	Common::String key = keyFor(fileName);
+	_trusted[key] = true;
+	_sessionFiles.erase(key);
+}
+
+void SavedArchive::addSessionFile(const Common::String &fileName, const byte *data, uint32 size) {
+	Common::Array<byte> &buf = _sessionFiles[keyFor(fileName)];
+	buf.resize(size);
+	if (size)
+		memcpy(buf.data(), data, size);
 }
 
 // Bump this whenever the movie writer changes its output; raise
@@ -1213,8 +1247,8 @@ Common::SeekableReadStream *SavedArchive::buildOverlay(Common::SeekableReadStrea
 }
 
 Common::String SavedArchive::baseKeyFor(const Common::String &key) const {
-	if (_files.contains(key) && isTrusted(key)) {
-		Common::ScopedPtr<Common::SeekableReadStream> save(g_engine->getSaveFileManager()->openForLoading(_files.getVal(key)));
+	{
+		Common::ScopedPtr<Common::SeekableReadStream> save(openSave(key));
 		Common::String baseKey;
 		uint32 baseSize, baseCrc, movieSize, patchCount;
 		if (save && readOverlayHeader(save.get(), baseKey, baseSize, baseCrc, movieSize, patchCount))
