@@ -137,7 +137,7 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		case MKTAG('C', 'A', 'S', 't'):
 			// A 'CASt' that no 'CAS*' lists (e.g. in Mac Safecracker's
 			// MAIN_*.DXR) belongs to no cast: keep its original bytes
-			cast = it->libResourceId ? movie->getCastByLibResourceID(it->libResourceId) : nullptr;
+			cast = it->libResourceId ? findCast(movie, it->libResourceId) : nullptr;
 			if (cast) {
 				cast->saveCastData(saveFile, it);
 			} else {
@@ -150,10 +150,9 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 
 		case MKTAG('V', 'W', 'C', 'F'):
 		case MKTAG('D', 'R', 'C', 'F'):
-			// There is only one config resource, that is for the internal cast
-			// The external casts don't have a config
-			// movie->getCast() returns the internal cast
-			cast = movie->getCast();
+			// There is only one config resource: the internal cast's in a
+			// movie, the external cast's own in a cast file
+			cast = findConfigCast(movie);
 			if (cast->getConfigSize() == 0) {
 				// Unsupported version (D10+): keep the original bytes
 				debugC(7, kDebugSaving, "Saving resource %s as it is, without modification", tag2str(it->tag));
@@ -410,9 +409,16 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 	Cast *cast = nullptr;
 	ResourceMap &castResMap = _types[MKTAG('C', 'A', 'S', 't')];
 
-	// Iterate over all the casts
+	// A cast file's single library id, from its own KEY* table
+	uint32 castFileLibResourceId = 1024;
+	if (_types.contains(MKTAG('C', 'A', 'S', '*')) && !_types[MKTAG('C', 'A', 'S', '*')].empty())
+		castFileLibResourceId = _types[MKTAG('C', 'A', 'S', '*')].begin()->_value.libResourceId;
+
+	// Iterate over the casts stored in this file
 	for (auto it : *(movie->getCasts())) {
 		cast = it._value;
+		if (cast->getArchive().get() != this)
+			continue;
 
 		// Iterate over all the loaded members of the cast to check for new cast members
 		for (auto jt : *(cast->_loadedCast)) {
@@ -436,7 +442,9 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 					res->tag = MKTAG('C', 'A', 'S', 't');
 					res->accessed = true;
 
-					res->libResourceId = cast->_libResourceId;
+					// An external cast's members belong to the cast file's own
+					// library, whatever id the movie's MCsL gives it
+					res->libResourceId = cast->_isExternal ? castFileLibResourceId : cast->_libResourceId;
 					res->index = newResIndex;
 					res->castId = jt._value->getID() - cast->_castArrayStart;
 					_resources.push_back(res);
@@ -536,7 +544,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('C', 'A', 'S', 't'):
 			{
 				// A 'CASt' that no 'CAS*' lists has no cast; keep its original bytes
-				cast = it->libResourceId ? movie->getCastByLibResourceID(it->libResourceId) : nullptr;
+				cast = it->libResourceId ? findCast(movie, it->libResourceId) : nullptr;
 				// The castIds of cast members start from _castArrayStart
 				CastMember *target = cast ? cast->getCastMember(it->castId + cast->_castArrayStart) : nullptr;
 
@@ -570,9 +578,9 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 		case MKTAG('V', 'W', 'C', 'F'):
 		case MKTAG('D', 'R', 'C', 'F'):
 			{
-				// Only one config resource per movie
+				// Only one config resource per file
 				// No need to update the key mapping
-				cast = movie->getCast();
+				cast = findConfigCast(movie);
 				resSize = cast->getConfigSize();
 
 				it->offset = currentSize;
@@ -786,8 +794,30 @@ CastMember *RIFXArchive::findResourceOwner(Movie *movie, uint32 tag, uint16 inde
 		return nullptr;
 
 	const Resource &parent = castResMap[parentIndex];
-	Cast *cast = parent.libResourceId ? movie->getCastByLibResourceID(parent.libResourceId) : nullptr;
+	Cast *cast = parent.libResourceId ? findCast(movie, parent.libResourceId) : nullptr;
 	return cast ? cast->getCastMember(parent.castId + cast->_castArrayStart) : nullptr;
+}
+
+// The movie's cast whose members this file stores under libResourceId. A
+// cast file holds a single library, which may have a different id from
+// the one in the movie's MCsL (and may share it with the internal cast)
+Cast *RIFXArchive::findCast(Movie *movie, uint32 libResourceId) {
+	for (auto &it : *movie->getCasts()) {
+		Cast *cast = it._value;
+		if (cast->getArchive().get() != this)
+			continue;
+		if (cast->_isExternal || cast->_libResourceId == libResourceId)
+			return cast;
+	}
+	return nullptr;
+}
+
+Cast *RIFXArchive::findConfigCast(Movie *movie) {
+	for (auto &it : *movie->getCasts()) {
+		if (it._value->_isExternal && it._value->getArchive().get() == this)
+			return it._value;
+	}
+	return movie->getCast();
 }
 
 SavedArchive::SavedArchive(const Common::String &target) {

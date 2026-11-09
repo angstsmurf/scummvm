@@ -2249,7 +2249,7 @@ void Lingo::setTheCast(Datum &id1, int field, Datum &d) {
 		cast->duplicateCastMember(replacement, nullptr, id.member);
 		Score *score = movie->getScore();
 		score->refreshPointersForCastMemberID(id);
-		movie->_isModified = true;
+		movie->markModified(id);
 		return;
 	}
 
@@ -2259,7 +2259,7 @@ void Lingo::setTheCast(Datum &id1, int field, Datum &d) {
 	}
 
 	member->setField(field, d);
-	movie->_isModified = true;
+	movie->markModified(id);
 }
 
 Datum Lingo::getTheCastLib(Datum &id1, int field) {
@@ -2419,7 +2419,7 @@ void Lingo::setTheField(Datum &id1, int field, Datum &d) {
 	}
 
 	member->setField(field, d);
-	movie->_isModified = true;
+	movie->markModified(id);
 }
 
 Datum Lingo::getTheChunk(Datum &chunk, int field) {
@@ -2777,13 +2777,13 @@ void Lingo::setObjectProp(Datum &obj, Common::String &propName, Datum &val) {
 			cast->duplicateCastMember(replacement, nullptr, id.member);
 			Score *score = movie->getScore();
 			score->refreshPointersForCastMemberID(id);
-			movie->_isModified = true;
+			movie->markModified(id);
 			return;
 		}
 
 		if (member->hasProp(propName)) {
 			member->setProp(propName, val);
-			movie->_isModified = true;
+			movie->markModified(id);
 		} else {
 			g_lingo->lingoError("Lingo::setObjectProp(): %s has no property '%s'", id.asString().c_str(), propName.c_str());
 		}

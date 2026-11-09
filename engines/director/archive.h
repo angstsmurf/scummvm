@@ -35,6 +35,7 @@ class Path;
 
 namespace Director {
 
+class Cast;
 class CastMember;
 class Movie;
 
@@ -85,7 +86,7 @@ public:
 	virtual bool writeToFile(Common::String filename, Movie *movie) {
 		// Saving Director movies was introduced in Director 4
 		// However, from DirectorEngine::createArchive, it is evident that after Director 4 only RIFX Archives were written
-		error("Archive::writeToFile was called on a non-RIFX Archive, which is not allowed");
+		warning("Archive::writeToFile(): saving non-RIFX archives is not supported");
 		return false;
 	}
 	virtual void close();
@@ -207,6 +208,8 @@ private:
 	static const uint32 kNoParent = 0xFFFFFFFF;
 	uint32 findParentIndex(uint32 tag, uint16 index);	// kNoParent when absent
 	CastMember *findResourceOwner(Movie *movie, uint32 tag, uint16 index);	// nullptr when unresolvable
+	Cast *findCast(Movie *movie, uint32 libResourceId);	// the movie's cast stored in this archive
+	Cast *findConfigCast(Movie *movie);	// the cast whose config this archive holds
 
 	/* Memory Map data to save the file */
 	uint32 _metaTag;

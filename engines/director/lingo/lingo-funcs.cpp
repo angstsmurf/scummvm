@@ -76,10 +76,10 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 		if (calledfromgo)
 			resetLingoGo();
 
-		if (_updateMovieEnabled && _vm->getCurrentMovie()->_isModified) {
-			// Save the movie when branching to another movie, but only
-			// if Lingo changed it, like Director does.
-			LB::b_saveMovie(0);
+		if (_updateMovieEnabled) {
+			// Save the movie and its external casts when branching to
+			// another movie, but only those Lingo changed, like Director
+			_vm->getCurrentMovie()->saveChanges();
 		}
 
 		score->_playState = kPlayStopped;

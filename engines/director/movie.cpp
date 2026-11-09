@@ -598,6 +598,31 @@ Cast *Movie::getCast(CastMemberID memberID) {
 	return nullptr;
 }
 
+void Movie::markModified(CastMemberID memberID) {
+	Cast *cast = _casts.getValOrDefault(memberID.castLib, nullptr);
+	if (cast && cast->_isExternal)
+		cast->_isModified = true;
+	else
+		_isModified = true;
+}
+
+// Director saves the movie, and each external cast library, that Lingo
+// changed when it branches to another movie with updateMovieEnabled set.
+// Each is written back over its own file.
+void Movie::saveChanges() {
+	if (_isModified) {
+		_movieArchive->writeToFile(Common::String(), this);
+		_isModified = false;
+	}
+	for (auto &it : _casts) {
+		Cast *cast = it._value;
+		if (!cast->_isExternal || !cast->_isModified || !cast->getArchive())
+			continue;
+		cast->getArchive()->writeToFile(Common::String(), this);
+		cast->_isModified = false;
+	}
+}
+
 Cast *Movie::getCastByLibResourceID(uint32 libresourceID) {
 	for (auto it : _casts) {
 		if (it._value->_libResourceId == libresourceID) {
@@ -628,7 +653,7 @@ bool Movie::eraseCastMember(CastMemberID memberID) {
 	if (_casts.contains(memberID.castLib)) {
 		bool result = _casts.getVal(memberID.castLib)->eraseCastMember(memberID.member);
 		_score->refreshPointersForCastMemberID(memberID);
-		_isModified = true;
+		markModified(memberID);
 		return result;
 	}
 
@@ -665,7 +690,7 @@ bool Movie::duplicateCastMember(CastMemberID source, CastMemberID target) {
 		debugC(3, kDebugLoading, "Movie::DuplicateCastMember(): copying cast data from %s to %s (%s)", source.asString().c_str(), target.asString().c_str(), castType2str(sourceMember->_type));
 		bool result = targetCast->duplicateCastMember(sourceMember, sourceInfo, target.member);
 		_score->refreshPointersForCastMemberID(target);
-		_isModified = true;
+		markModified(target);
 		return result;
 	}
 	return false;
