@@ -391,6 +391,9 @@ bool Movie::processSysEvent(Common::Event &event) {
 		if (_timeOutKeyDown)
 			_lastTimeOut = _lastEventTime;
 
+		if (!_lingo->_state->callstack.empty() || _lingo->_currentInputEvent.type != VOIDSYM)
+			_vm->_keyHeldByLingo = true;
+
 		{
 			uint16 widgetSpriteId = sc->getSpriteIDOfActiveWidget();
 			result = processInputEvent(kEventKeyDown, widgetSpriteId);

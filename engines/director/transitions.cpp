@@ -159,9 +159,13 @@ void Window::stepTransition(TransParams &t, int step) {
 // (checked in Svea Rike) only peeks at the event queue: once 250 ms of the
 // transition have passed, and every 250 ms after that, it ends the transition
 // early if a keyDown is pending while the exitLock is off. A mouseDown only
-// counts while the menu bar is shown, but a Mac projector hides it during
-// playback, so there a click never ends a transition.
+// counts while the menu bar is shown, but a projector hides it during
+// playback (the Win32 Safecracker projector does the same with SetMenu), so
+// a click never ends a transition on either platform.
 // Every event, mouseUp included, stays queued and reaches Lingo afterwards.
+// That includes a key typed while Lingo ran before the transition: ScummVM
+// has already taken it from the queue for Lingo, so it is tracked by
+// _keyHeldByLingo instead (T_TABT02: the key ends the wipe at the first check).
 bool Window::checkTransitionAbort(TransParams &t) {
 	Common::Array<Common::Event> held;
 	Common::Event event;
@@ -173,11 +177,6 @@ bool Window::checkTransitionAbort(TransParams &t) {
 			_vm->processEventQUIT();
 			quit = true;
 			continue;
-		case Common::EVENT_LBUTTONDOWN:
-		case Common::EVENT_RBUTTONDOWN:
-			if (_vm->getPlatform() != Common::kPlatformMacintosh)
-				t.abortPending = true;
-			break;
 		case Common::EVENT_KEYDOWN:
 			if (!g_lingo->_exitLock)
 				t.abortPending = true;
@@ -191,6 +190,9 @@ bool Window::checkTransitionAbort(TransParams &t) {
 		else
 			_vm->getMacWindowManager()->processEvent(event);
 	}
+
+	if (_vm->_keyHeldByLingo && !g_lingo->_exitLock)
+		t.abortPending = true;
 
 	// Hand the held events back in order; pollEvent returns them before new ones
 	for (auto &e : held)

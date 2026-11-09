@@ -254,6 +254,10 @@ public:
 	void processEventQUIT();
 	int getMacTicks();
 	Common::Array<Common::Event> _injectedEvents;
+	// A key was typed while Lingo was running. The original leaves it in the
+	// system queue until the frame loop next takes input, so a transition
+	// played in the meantime still sees it (see Window::checkTransitionAbort).
+	bool _keyHeldByLingo = false;
 	// Queued input from the UnitTest XObject, delivered once due (in getMillis() time)
 	struct PostedEvent {
 		uint32 due;

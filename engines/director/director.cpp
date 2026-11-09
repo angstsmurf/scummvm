@@ -395,6 +395,8 @@ Common::Error DirectorEngine::run() {
 	bool loop = true;
 
 	while (loop) {
+		// The frame loop takes input here, so a key typed during Lingo has now left the queue
+		_keyHeldByLingo = false;
 		if (_stage->getCurrentMovie())
 			processSysEvents();
 
