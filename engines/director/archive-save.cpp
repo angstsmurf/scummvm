@@ -78,23 +78,28 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		saveKey = convertPath(filename);
 	}
 	Common::String saveFileName = g_director->getTargetName() + "-" + SavedArchive::encodeKey(saveKey);
-	// Read the original before the save is opened, which could replace it
-	SavedArchive::Stamp stamp = SavedArchive::stampFor(saveKey);
-	// Don't open the save file as compressed which doesn't support seeking
-	Common::OutSaveFile *saveFile = g_engine->getSaveFileManager()->openForSaving(saveFileName, false);
-
-	if (!saveFile) {
-		warning("RIFXArchive::writeToFile: Failed to open file %s for saving", saveFileName.c_str());
-		return false;
-	}
 
 	// Update the resources, their sizes and offsets
 	Common::Array<Resource *> builtResources = rebuildResources(movie);
 	// ignoring the startOffset
 	// For RIFX stream, moreoffset = 0, we won't be writing macbinary
-	// Don't need to allocate this much size in case 'junk' and 'free' resources are ignored
-	// Or might need to allocate even more size if extra chunks are written
 	_size = getArchiveSize(builtResources);
+
+	// Build the whole movie in memory first, zero-filled since the writers
+	// seek past what has been written
+	uint32 imageSize = _size + 12;
+	Common::MemoryWriteStreamDynamic image(DisposeAfterUse::YES);
+	{
+		byte zeros[1024] = {};
+		for (uint32 left = imageSize; left > 0;) {
+			uint32 n = MIN<uint32>(left, sizeof(zeros));
+			image.write(zeros, n);
+			left -= n;
+		}
+		image.seek(0);
+	}
+	Common::SeekableWriteStream *saveFile = &image;
+
 	saveFile->writeUint32LE(_metaTag); // The _metaTag is "RIFX" or "XFIR"
 
 	// We need to recompute the chunk size here, to accommodate any resournce changes
@@ -213,6 +218,13 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 			// fall through
 
 		default:
+			if (it->tag == MKTAG('f', 'r', 'e', 'e') || it->tag == MKTAG('j', 'u', 'n', 'k')) {
+				// Written without their data (see rebuildResources())
+				saveFile->seek(it->offset, SEEK_SET);
+				saveFile->writeUint32LE(it->tag);
+				saveFile->writeUint32LE(0);
+				break;
+			}
 			debugC(7, kDebugSaving, "Saving resource %s as it is, without modification", tag2str(it->tag));
 			saveFile->seek(it->offset, SEEK_SET);
 			saveFile->writeUint32LE(it->tag);
@@ -222,15 +234,38 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 		}
 	}
 
-	saveFile->seek(0, SEEK_END);
-	SavedArchive::writeStamp(saveFile, stamp);
+	if (image.size() != (int64)imageSize)
+		warning("RIFXArchive::writeToFile: '%s' came out %d bytes instead of %d", saveFileName.c_str(), (int)image.size(), imageSize);
 
-	if (saveFile) {
-		saveFile->flush();
-		debugC(3, kDebugSaving, "RIFXArchive::writeStream: Saved the movie as file %s", saveFileName.c_str());
-	} else {
-		warning("RIFXArchive::writeStream: Error saving the file %s", saveFileName.c_str());
+	// Prefer saving only the changes over the game file, so the game
+	// file's own data is used for everything else. A full copy, stamped
+	// with the original it stands in for, is the fallback.
+	Common::MemoryWriteStreamDynamic out(DisposeAfterUse::YES);
+	if (!writeOverlay(&out, image.getData(), imageSize, builtResources)) {
+		out.write(image.getData(), imageSize);
+		SavedArchive::writeStamp(&out, SavedArchive::stampFor(saveKey));
 	}
+
+	for (auto it : builtResources) {
+		delete it;
+	}
+
+	// Don't open the save file as compressed which doesn't support seeking
+	Common::OutSaveFile *outFile = g_engine->getSaveFileManager()->openForSaving(saveFileName, false);
+	if (!outFile) {
+		warning("RIFXArchive::writeToFile: Failed to open file %s for saving", saveFileName.c_str());
+		return false;
+	}
+	outFile->write(out.getData(), out.size());
+	outFile->finalize();
+	bool ok = !outFile->err();
+	delete outFile;
+	if (!ok) {
+		warning("RIFXArchive::writeToFile: Error saving the file %s", saveFileName.c_str());
+		return false;
+	}
+	debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Saved the movie as file %s (%d bytes)", saveFileName.c_str(), (int)out.size());
+
 	// Add to search index
 	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->addWrittenFile(saveFileName);
 
@@ -242,10 +277,138 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 	if (!filename.empty())
 		g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
 
-	delete saveFile;
-	for (auto it : builtResources) {
-		delete it;
+	return true;
+}
+
+bool RIFXArchive::writeOverlay(Common::WriteStream *out, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources) {
+	// The movie must be a file of its own, read from the game files
+	if (_startOffset != 0 || getPathName().empty())
+		return false;
+	if (_rifxType != MKTAG('M', 'V', '9', '3') && _rifxType != MKTAG('M', 'C', '9', '5'))
+		return false;
+
+	SavedArchive *saved = (SavedArchive *)SearchMan.getArchive(kSavedFilesArchive);
+	if (!saved)
+		return false;
+	Common::String baseKey = saved->baseKeyFor(getPathName().toString('/'));
+
+	uint32 baseSize = 0;
+	byte *base = SavedArchive::readOriginal(baseKey, baseSize);
+	if (!base)
+		return false;
+
+	uint32 hdrLen = 12 + 8 + getImapSize();
+	uint32 baseTag = baseSize >= 4 ? READ_BE_UINT32(base) : 0;
+	if (baseSize < hdrLen || (baseTag != MKTAG('R', 'I', 'F', 'X') && baseTag != MKTAG('X', 'F', 'I', 'R'))) {
+		// e.g. a MacBinary file, whose data fork doesn't start at 0
+		free(base);
+		return false;
 	}
+	uint32 baseCrc = Common::CRC32().crcFast(base, baseSize);
+
+	// Resources whose data is unchanged stay where they are in the game
+	// file; the rest go to a tail after it. The chunk headers aren't
+	// compared: the readers go by the memory map, and a big-endian game
+	// file has its headers swapped compared to the little-endian image.
+	Common::MemoryWriteStreamDynamic tail(DisposeAfterUse::YES);
+	if (baseSize & 1)
+		tail.writeByte(0);
+
+	Common::Array<uint32> newOffsets;
+	newOffsets.resize(builtResources.size());
+	uint32 mmapIndex = 0, rifxIndex = 0;
+	bool haveMmap = false;
+	uint32 kept = 0, moved = 0;
+
+	for (uint i = 0; i < builtResources.size(); i++) {
+		const Resource *res = builtResources[i];
+		switch (res->tag) {
+		case MKTAG('R', 'I', 'F', 'X'):
+		case MKTAG('X', 'F', 'I', 'R'):
+			rifxIndex = i;
+			newOffsets[i] = 0;
+			continue;
+		case MKTAG('i', 'm', 'a', 'p'):
+			newOffsets[i] = 12;
+			continue;
+		case MKTAG('m', 'm', 'a', 'p'):
+			mmapIndex = i;
+			haveMmap = true;
+			continue;
+		default:
+			break;
+		}
+
+		if ((uint64)res->offset + 8 + res->size > imageSize) {
+			warning("RIFXArchive::writeOverlay: '%s' %d lies outside the movie", tag2str(res->tag), i);
+			free(base);
+			return false;
+		}
+		const byte *data = image + res->offset;
+
+		// builtResources are copies of _resources, which hold the offsets
+		// in the file this archive was read from
+		const Resource *orig = i < _resources.size() ? _resources[i] : nullptr;
+		if (orig && orig->offset >= (int32)hdrLen && (uint64)orig->offset + 8 + res->size <= baseSize &&
+				!memcmp(base + orig->offset + 8, data + 8, res->size)) {
+			newOffsets[i] = orig->offset;
+			kept++;
+			continue;
+		}
+
+		newOffsets[i] = baseSize + tail.pos();
+		tail.write(data, 8 + res->size);
+		if (tail.pos() & 1)
+			tail.writeByte(0);
+		moved++;
+	}
+	free(base);
+
+	if (!haveMmap) {
+		warning("RIFXArchive::writeOverlay: no mmap");
+		return false;
+	}
+
+	// The memory map goes last, with the new offsets
+	const Resource *mmap = builtResources[mmapIndex];
+	uint32 mmapPos = tail.pos();
+	uint32 mmapOffset = baseSize + mmapPos;
+	newOffsets[mmapIndex] = mmapOffset;
+	tail.write(image + mmap->offset, 8 + mmap->size);
+
+	uint32 movieSize = baseSize + tail.size();
+	byte *tailData = tail.getData();
+	// As laid out by writeMemoryMap(): a 24-byte header, 20-byte entries
+	uint32 entries = mmapPos + 8 + 24;
+	for (uint i = 0; i < builtResources.size(); i++) {
+		uint32 entry = entries + i * 20;
+		WRITE_LE_UINT32(tailData + entry + 8, newOffsets[i]);
+	}
+	// The RIFX entry's size is the movie's
+	WRITE_LE_UINT32(tailData + entries + rifxIndex * 20 + 4, movieSize - 8);
+
+	// The new RIFX header and imap
+	byte *header = (byte *)malloc(hdrLen);
+	memcpy(header, image, hdrLen);
+	WRITE_LE_UINT32(header + 4, movieSize - 8);
+	WRITE_LE_UINT32(header + 12 + 12, mmapOffset);
+
+	SavedArchive::writeOverlayHeader(out, baseKey, baseSize, baseCrc, movieSize, 2);
+	out->writeUint32BE(0);
+	out->writeUint32BE(hdrLen);
+	out->write(header, hdrLen);
+	out->writeUint32BE(baseSize);
+	out->writeUint32BE(tail.size());
+	out->write(tailData, tail.size());
+	free(header);
+
+	SavedArchive::Stamp stamp;
+	stamp.origSize = baseSize;
+	stamp.origCrc = baseCrc;
+	SavedArchive::writeStamp(out, stamp);
+
+	debugC(3, kDebugSaving, "RIFXArchive::writeOverlay: over '%s': %d resources kept, %d saved, %d of %d bytes",
+		baseKey.c_str(), kept, moved, (int)tail.size() + hdrLen, movieSize);
 	return true;
 }
 
@@ -872,6 +1035,15 @@ Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common
 	if (!stream)
 		return nullptr;
 
+	if (stream->size() >= 4 && stream->readUint32BE() == kOverlayTag) {
+		Common::SeekableReadStream *result = buildOverlay(stream);
+		delete stream;
+		if (!result)
+			warning("SavedArchive: can't read the saved movie '%s'", fDesc->_value.c_str());
+		return result;
+	}
+	stream->seek(0);
+
 	byte *data = (byte *)calloc(stream->size(), sizeof(byte));
 	stream->read(data, stream->size());
 	Common::MemoryReadStream *result = new Common::MemoryReadStream(data, stream->size(), DisposeAfterUse::YES);
@@ -939,7 +1111,8 @@ void SavedArchive::addWrittenFile(const Common::String &fileName) {
 // kMinTrustedVersion to it when the change fixes saves that broke a game,
 // so saves written before the fix are ignored and the game files used
 // instead. 1: unchanged resources kept verbatim (e02180d7893).
-static const uint32 kSavedMovieVersion = 1;
+// 2: overlays, holding only the changes to the game file.
+static const uint32 kSavedMovieVersion = 2;
 static const uint32 kMinTrustedVersion = 1;
 static const uint32 kStampTag = MKTAG('S', 'V', 'M', 'S');
 static const uint32 kStampSize = 5 * 4;
@@ -949,26 +1122,109 @@ SavedArchive::Stamp SavedArchive::stampFor(const Common::String &key) {
 	stamp.version = kSavedMovieVersion;
 	stamp.origSize = kNoOriginal;
 
-	// The original is whatever a lookup would find if there were no save
-	Common::Archive *saved = SearchMan.getArchive(kSavedFilesArchive);
-	Common::ScopedPtr<Common::SeekableReadStream> orig(SearchMan.createReadStreamForMemberNext(Common::Path(key), saved));
-	if (!orig)
+	uint32 size;
+	byte *data = readOriginal(key, size);
+	if (!data)
 		return stamp;
-
-	uint32 size = orig->size();
-	byte *data = (byte *)malloc(size ? size : 1);
-	if (!data || orig->read(data, size) != size) {
-		free(data);
-		return stamp;
-	}
 	stamp.origSize = size;
 	stamp.origCrc = Common::CRC32().crcFast(data, size);
 	free(data);
 	return stamp;
 }
 
+byte *SavedArchive::readOriginal(const Common::String &key, uint32 &size) {
+	size = 0;
+	if (key.empty())
+		return nullptr;
+
+	// The original is whatever a lookup would find if there were no save
+	Common::Archive *saved = SearchMan.getArchive(kSavedFilesArchive);
+	Common::ScopedPtr<Common::SeekableReadStream> orig(SearchMan.createReadStreamForMemberNext(Common::Path(key), saved));
+	if (!orig)
+		return nullptr;
+
+	size = orig->size();
+	byte *data = (byte *)malloc(size ? size : 1);
+	if (!data || orig->read(data, size) != size) {
+		free(data);
+		size = 0;
+		return nullptr;
+	}
+	return data;
+}
+
+void SavedArchive::writeOverlayHeader(Common::WriteStream *stream, const Common::String &baseKey, uint32 baseSize, uint32 baseCrc, uint32 movieSize, uint32 patchCount) {
+	stream->writeUint32BE(kOverlayTag);
+	stream->writeUint32BE(baseKey.size());
+	stream->writeString(baseKey);
+	stream->writeUint32BE(baseSize);
+	stream->writeUint32BE(baseCrc);
+	stream->writeUint32BE(movieSize);
+	stream->writeUint32BE(patchCount);
+}
+
+bool SavedArchive::readOverlayHeader(Common::SeekableReadStream *stream, Common::String &baseKey, uint32 &baseSize, uint32 &baseCrc, uint32 &movieSize, uint32 &patchCount) {
+	stream->seek(0);
+	if (stream->readUint32BE() != kOverlayTag)
+		return false;
+	uint32 keyLen = stream->readUint32BE();
+	if (keyLen > 4096 || stream->eos())
+		return false;
+	baseKey = stream->readString(0, keyLen);
+	baseSize = stream->readUint32BE();
+	baseCrc = stream->readUint32BE();
+	movieSize = stream->readUint32BE();
+	patchCount = stream->readUint32BE();
+	return !stream->eos() && !stream->err() && !baseKey.empty();
+}
+
+// The movie an overlay save stands for: its game file with the patches
+Common::SeekableReadStream *SavedArchive::buildOverlay(Common::SeekableReadStream *save) const {
+	Common::String baseKey;
+	uint32 baseSize, baseCrc, movieSize, patchCount;
+	if (!readOverlayHeader(save, baseKey, baseSize, baseCrc, movieSize, patchCount))
+		return nullptr;
+
+	uint32 size;
+	byte *base = readOriginal(baseKey, size);
+	if (!base)
+		return nullptr;
+	if (size != baseSize || Common::CRC32().crcFast(base, size) != baseCrc || movieSize < baseSize) {
+		free(base);
+		return nullptr;
+	}
+
+	byte *data = (byte *)realloc(base, movieSize ? movieSize : 1);
+	if (!data) {
+		free(base);
+		return nullptr;
+	}
+	memset(data + baseSize, 0, movieSize - baseSize);
+
+	for (uint32 i = 0; i < patchCount; i++) {
+		uint32 offset = save->readUint32BE();
+		uint32 len = save->readUint32BE();
+		if (save->eos() || offset > movieSize || len > movieSize - offset || save->read(data + offset, len) != len) {
+			free(data);
+			return nullptr;
+		}
+	}
+	return new Common::MemoryReadStream(data, movieSize, DisposeAfterUse::YES);
+}
+
+Common::String SavedArchive::baseKeyFor(const Common::String &key) const {
+	if (_files.contains(key) && isTrusted(key)) {
+		Common::ScopedPtr<Common::SeekableReadStream> save(g_engine->getSaveFileManager()->openForLoading(_files.getVal(key)));
+		Common::String baseKey;
+		uint32 baseSize, baseCrc, movieSize, patchCount;
+		if (save && readOverlayHeader(save.get(), baseKey, baseSize, baseCrc, movieSize, patchCount))
+			return baseKey;
+	}
+	return key;
+}
+
 void SavedArchive::writeStamp(Common::WriteStream *stream, const Stamp &stamp) {
-	stream->writeUint32BE(stamp.version);
+	stream->writeUint32BE(kSavedMovieVersion);
 	stream->writeUint32BE(stamp.origSize);
 	stream->writeUint32BE(stamp.origCrc);
 	stream->writeUint32BE(kStampSize);
@@ -986,11 +1242,20 @@ bool SavedArchive::isTrusted(const Common::String &key) const {
 		return t->_value;
 
 	const Common::String &fileName = _files.getVal(key);
-	const char *reason = nullptr;
+	Common::String reason;
 	Stamp stamp;
 	bool stamped = false;
 
 	Common::ScopedPtr<Common::SeekableReadStream> save(g_engine->getSaveFileManager()->openForLoading(fileName));
+	// An overlay is checked against the game file it was made from
+	Common::String baseKey = key;
+	bool overlay = false;
+	if (save) {
+		uint32 baseSize, baseCrc, movieSize, patchCount;
+		overlay = readOverlayHeader(save.get(), baseKey, baseSize, baseCrc, movieSize, patchCount);
+		if (!overlay)
+			baseKey = key;
+	}
 	if (save && save->size() >= kStampSize) {
 		save->seek(save->size() - 8);
 		uint32 stampSize = save->readUint32BE();
@@ -1005,6 +1270,8 @@ bool SavedArchive::isTrusted(const Common::String &key) const {
 
 	if (!save) {
 		reason = "it can't be read";
+	} else if (overlay && !stamped) {
+		reason = "it is damaged";
 	} else if (!stamped) {
 		// Saves keyed by path were only made by unstamped development
 		// builds, some with the faulty writer. Older saves, keyed by
@@ -1013,16 +1280,18 @@ bool SavedArchive::isTrusted(const Common::String &key) const {
 			reason = "it was made by an older version of ScummVM";
 	} else if (stamp.version < kMinTrustedVersion) {
 		reason = "it was made by an older version of ScummVM";
-	} else if (stamp.origSize != kNoOriginal) {
-		Stamp now = stampFor(key);
-		if (now.origSize != stamp.origSize || now.origCrc != stamp.origCrc)
+	} else if (overlay || stamp.origSize != kNoOriginal) {
+		Stamp now = stampFor(baseKey);
+		if (overlay && now.origSize == kNoOriginal)
+			reason = Common::String::format("the game file it was made from, '%s', is missing", baseKey.c_str());
+		else if (now.origSize != stamp.origSize || now.origCrc != stamp.origCrc)
 			reason = "the game file it stands in for has changed";
 	}
 
-	if (reason)
-		warning("SavedArchive: ignoring saved movie '%s' for '%s': %s. Delete it to stop this warning", fileName.c_str(), key.c_str(), reason);
-	_trusted[key] = !reason;
-	return !reason;
+	if (!reason.empty())
+		warning("SavedArchive: ignoring saved movie '%s' for '%s': %s. Delete it to stop this warning", fileName.c_str(), key.c_str(), reason.c_str());
+	_trusted[key] = reason.empty();
+	return reason.empty();
 }
 
 bool SavedArchive::_addFile(const Common::String &fileName) {

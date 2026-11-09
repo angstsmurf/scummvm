@@ -192,6 +192,8 @@ private:
 	bool writeAfterBurnerMap(Common::SeekableWriteStream *writeStreaa);	// Parallel to readAfterBurnerMap
 	bool writeKeyTable(Common::SeekableWriteStream *writeStream, uint32 offset);	// Parallel to readKeyTable
 	bool writeCast(Common::SeekableWriteStream *writeStream, uint32 offset, uint32 castLib);	// Parallel to readCast
+	// Write the movie image as changes over the game file it was made from
+	bool writeOverlay(Common::WriteStream *out, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources);
 
 	uint32 getArchiveSize(Common::Array<Resource *> resources);
 	uint32 getMmapSize();
@@ -308,6 +310,7 @@ public:
 	//   version, original size, original CRC-32, trailer size, 'SVMS'
 	// The original is the game file the save stands in for, as found
 	// beneath the saves; its size is kNoOriginal if there was none.
+	// An overlay save is stamped with the game file it was made from.
 	struct Stamp {
 		uint32 version = 0;
 		uint32 origSize = 0;
@@ -318,7 +321,25 @@ public:
 	static Stamp stampFor(const Common::String &key);
 	static void writeStamp(Common::WriteStream *stream, const Stamp &stamp);
 
+	// The game file beneath the saves, read into memory (free() it), or nullptr
+	static byte *readOriginal(const Common::String &key, uint32 &size);
+
+	// An overlay save holds only what changed in a game file:
+	//   'SVMO', base key length, base key, base size, base CRC-32,
+	//   movie size, patch count, then each patch: offset, length, data
+	// followed by the stamp. All numbers are big endian. The movie is the
+	// base with the patches applied: a new RIFX header and imap, and a
+	// tail after the base with the changed resources and a new mmap.
+	static const uint32 kOverlayTag = MKTAG('S', 'V', 'M', 'O');
+	static void writeOverlayHeader(Common::WriteStream *stream, const Common::String &baseKey, uint32 baseSize, uint32 baseCrc, uint32 movieSize, uint32 patchCount);
+	// The game file an existing save of 'key' was made from: its base if it
+	// is an overlay, otherwise the game file at 'key' itself
+	Common::String baseKeyFor(const Common::String &key) const;
+
 private:
+	// Read an overlay's header up to its patches
+	static bool readOverlayHeader(Common::SeekableReadStream *stream, Common::String &baseKey, uint32 &baseSize, uint32 &baseCrc, uint32 &movieSize, uint32 &patchCount);
+	Common::SeekableReadStream *buildOverlay(Common::SeekableReadStream *save) const;
 	Common::String keyFor(const Common::String &fileName) const;
 	bool isTrusted(const Common::String &key) const;
 
