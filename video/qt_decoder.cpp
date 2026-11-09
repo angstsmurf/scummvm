@@ -168,7 +168,15 @@ Common::QuickTimeParser::SampleDesc *QuickTimeDecoder::readSampleDesc(Common::Qu
 			// Initialize the palette
 			entry->_palette.resize(256, false);
 
-			if (colorGreyscale) {
+			if (colorGreyscale && format == MKTAG('c', 'v', 'i', 'd')) {
+				// Greyscale Cinepak stores luma, so 0 is black. The
+				// inverted QuickTime ramp below would turn it into a
+				// negative.
+				debugC(0, kDebugLevelGVideo, "Cinepak greyscale palette");
+
+				for (uint16 j = 0; j < 256; j++)
+					entry->_palette.set(j, j, j, j);
+			} else if (colorGreyscale) {
 				debugC(0, kDebugLevelGVideo, "Greyscale palette");
 
 				// compute the greyscale palette
