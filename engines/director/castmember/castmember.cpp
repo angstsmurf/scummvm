@@ -38,7 +38,15 @@ void EditInfo::read(Common::ReadStreamEndian *stream) {
 	selEnd = stream->readUint32();
 	version = stream->readByte();
 	rulerFlag = stream->readByte();
-	// We're ignoring 2 bytes here
+	// Keep whatever follows (2 unknown bytes in D5), so a rewritten
+	// cast info doesn't drop it
+	trailer.clear();
+	while (true) {
+		byte b = stream->readByte();
+		if (stream->eos())
+			break;
+		trailer.push_back(b);
+	}
 	valid = true;
 	debugC(3, kDebugLoading, "  EditInfo: rect: [%s],  selStart: %d,  selEnd: %d,  version: %d,  rulerFlag: %d", rect.toString().c_str(), selStart, selEnd, version, rulerFlag);
 }
@@ -49,6 +57,8 @@ void EditInfo::write(Common::WriteStream *stream) {
 	stream->writeUint32BE(selEnd);
 	stream->writeByte(version);
 	stream->writeByte(rulerFlag);
+	if (!trailer.empty())
+		stream->write(trailer.data(), trailer.size());
 }
 
 CastMember::CastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream) : Object<CastMember>("CastMember") {

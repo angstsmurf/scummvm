@@ -1374,7 +1374,7 @@ uint32 Cast::getCastInfoStringLength(uint32 stringIndex, CastMemberInfo *ci) {
 	case 5:
 		// Need a better check to see if the script edit info is valid
 		if (ci->scriptEditInfo.valid) {
-			return 18;		// The length of an edit info
+			return ci->scriptEditInfo.size();
 		}
 		return 0;
 
@@ -1388,14 +1388,14 @@ uint32 Cast::getCastInfoStringLength(uint32 stringIndex, CastMemberInfo *ci) {
 	case 7:
 		// Need a better check to see if text edit info is valid
 		if (ci->textEditInfo.valid) {
-			return 18;		// The length of an edit info
+			return ci->textEditInfo.size();
 		}
 		return 0;
 
 	case 8:
 		// Need a better check to see if text edit info is valid
 		if (ci->rteEditInfo.valid) {
-			return 18;		// The length of an edit info
+			return ci->rteEditInfo.size();
 		}
 		return 0;
 

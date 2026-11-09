@@ -158,11 +158,13 @@ struct EditInfo {
 	int32 selEnd;
 	byte version;
 	byte rulerFlag;
+	Common::Array<byte> trailer;	// e.g. 2 more bytes in D5, kept for writing
 	bool valid;
 
 	EditInfo(): valid(false) {}
 	void read(Common::ReadStreamEndian *stream);
 	void write(Common::WriteStream *stream);
+	uint32 size() const { return 18 + trailer.size(); }
 
 	Common::String toString() {
 		return Common::String::format("rect: [%s] selStart: %d selEnd: %d version: %d rulerFlag: %d valid: %d",
