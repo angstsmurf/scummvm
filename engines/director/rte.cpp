@@ -124,12 +124,14 @@ Graphics::ManagedSurface *RTE2::createSurface(uint32 foreColor, uint32 bgColor, 
 	result->create((int16)_width, (int16)_height, pf);
 
 	if (renderBg) {
-		// Fill it with the background colour
+		// Fill it with the background colour and blend the alpha text map onto it
 		result->fillRect(Common::Rect(_width, _height), bgColor);
+		result->blitFrom(surface, nullptr);
+	} else {
+		// Keep the text colour and alpha as decoded: blending onto the empty
+		// surface would darken every anti-aliased pixel towards black
+		result->copyFrom(surface);
 	}
-
-	// Blit the alpha text map
-	result->blitFrom(surface, nullptr);
 
 	surface.free();
 
