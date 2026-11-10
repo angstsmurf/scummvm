@@ -102,6 +102,7 @@ public:
 	bool setFOV(float fov);
 	bool isPano360() const;
 	float getPanRange() const;
+	float getMaxFOV() const;
 	int getCurrentNodeID() { return _currentSample == -1 ? 0 : _panoTrack->panoSamples[_currentSample].hdr.nodeID; }
 	Common::String getCurrentNodeName();
 
