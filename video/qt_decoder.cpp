@@ -96,6 +96,11 @@ void QuickTimeDecoder::close() {
 }
 
 const Graphics::Surface *QuickTimeDecoder::decodeNextFrame() {
+	// The QTVR 1.0 player keeps rotating an object while the button is held
+	// down in the border around the drag box
+	if (_qtvrType == QTVRType::OBJECT)
+		updateObjectEdgeRotation();
+
 	const Graphics::Surface *frame = VideoDecoder::decodeNextFrame();
 
 	if (isVR())
@@ -344,8 +349,12 @@ QuickTimeDecoder::VideoTrackHandler::VideoTrackHandler(QuickTimeDecoder *decoder
 	_delayedFrameToBufferTo = -1;
 	enterNewEditListEntry(true, true); // might set _curFrame
 
-	if (decoder->_qtvrType == QTVRType::OBJECT)
-		_curFrame = getFrameCount() / 2;
+	// The QTVR 1.0 player opens an object movie at the NAVG initial view
+	if (decoder->_qtvrType == QTVRType::OBJECT) {
+		decoder->_objectHPan = decoder->_nav.initialHPan;
+		decoder->_objectVPan = decoder->_nav.initialVPan;
+		_curFrame = CLIP<int>(decoder->getObjectFrame(decoder->_objectHPan, decoder->_objectVPan), 0, getFrameCount() - 1);
+	}
 
 	_durationOverride = -1;
 	_scaledSurface = 0;

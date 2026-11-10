@@ -414,6 +414,41 @@ void QuickTimeDecoder::setCurrentColumn(int column) {
 	}
 }
 
+// The QTVR 1.0 navigable player wraps the columns only when the pan range is
+// a full turn; otherwise it stops at the first and last column. Safecracker's
+// infirmary book (R14LABOK.MOV, -150..150) must not wrap to the first page
+int QuickTimeDecoder::limitObjectColumn(int column) const {
+	if (_nav.columns < 1)
+		return 0;
+
+	if (_nav.endHPan - _nav.startHPan == 360.0f) {
+		column %= _nav.columns;
+		return column < 0 ? column + _nav.columns : column;
+	}
+
+	return CLIP<int>(column, 0, _nav.columns - 1);
+}
+
+// Frame for a view, as the QTVR 1.0 navigable player maps its pan and tilt
+int QuickTimeDecoder::getObjectFrame(float hPan, float vPan) const {
+	int column = 0;
+	int row = 0;
+
+	float hRange = _nav.endHPan - _nav.startHPan;
+	if (hRange != 0.0f && _nav.columns > 1) {
+		if (hRange == 360.0f)
+			column = limitObjectColumn((int)floor((hPan - _nav.startHPan) / 360.0f * _nav.columns + 0.5f));
+		else
+			column = limitObjectColumn((int)floor((hPan - _nav.startHPan) / hRange * (_nav.columns - 1) + 0.5f));
+	}
+
+	float vRange = _nav.startVPan - _nav.endVPan;
+	if (vRange != 0.0f && _nav.rows > 1)
+		row = CLIP<int>((int)floor((_nav.startVPan - vPan) / vRange * (_nav.rows - 1) + 0.5f), 0, _nav.rows - 1);
+
+	return row * _nav.columns + column;
+}
+
 void QuickTimeDecoder::nudge(const Common::String &direction) {
 	VideoTrackHandler *track = (VideoTrackHandler *)_nextVideoTrack;
 
@@ -423,9 +458,9 @@ void QuickTimeDecoder::nudge(const Common::String &direction) {
 	int newFrame = curFrame;
 
 	if (direction.equalsIgnoreCase("left")) {
-		newFrame = (curFrame - 1 - currentRowStart) % _nav.columns + currentRowStart;
+		newFrame = limitObjectColumn(curFrame - 1 - currentRowStart) + currentRowStart;
 	} else if (direction.equalsIgnoreCase("right")) {
-		newFrame = (curFrame + 1 - currentRowStart) % _nav.columns + currentRowStart;
+		newFrame = limitObjectColumn(curFrame + 1 - currentRowStart) + currentRowStart;
 	} else if (direction.equalsIgnoreCase("up")) {
 		newFrame = curFrame - _nav.columns;
 		if (newFrame < 0)
@@ -1552,49 +1587,50 @@ void QuickTimeDecoder::handleMouseMove(int16 x, int16 y) {
 	_cursorPos = Common::Point(x, y);
 }
 
+// The QTVR 1.0 navigable player (FUN_1000377c) turns an object by a pan and
+// tilt that follow the mouse continuously at field of view / smaller side of
+// the drag box per pixel. A mostly horizontal drag leaves the tilt alone, and a
+// mostly vertical one the pan. Once a drag has started inside the box it goes
+// on outside it; a click in the border instead rotates the object until the
+// mouse enters the box (see updateObjectEdgeRotation)
 void QuickTimeDecoder::handleObjectMouseMove(int16 x, int16 y) {
 	if (!_isMouseButtonDown)
 		return;
 
-	VideoTrackHandler *track = (VideoTrackHandler *)_nextVideoTrack;
+	_objectMouse = Common::Point(x, y);
 
-	// HACK: FIXME: Hard coded for now
-	const int sensitivity = 10;
-	const float speedFactor = 0.1f;
+	Common::Rect box = getObjectBox();
 
-	int16 mouseDeltaX = x - _prevMouse.x;
-	int16 mouseDeltaY = y - _prevMouse.y;
+	if (!_objectDragging) {
+		if (!box.contains(x, y))
+			return;
 
-	float speedX = (float)mouseDeltaX * speedFactor;
-	float speedY = (float)mouseDeltaY * speedFactor;
-
-	bool changed = false;
-
-	if (ABS(mouseDeltaY) >= sensitivity) {
-		int newFrame = track->getCurFrame() - round(speedY) * _nav.columns;
-
-		if (newFrame >= 0 && newFrame < track->getFrameCount()) {
-			track->setCurFrame(newFrame);
-			changed = true;
-		}
+		// The drag starts from the mouse-down point
+		_objectDragging = true;
+		_objectEdge = 0;
 	}
 
-	if (ABS(mouseDeltaX) >= sensitivity) {
-		int currentRow = track->getCurFrame() / _nav.columns;
-		int currentRowStart = currentRow * _nav.columns;
+	int dx = _prevMouse.x - x;
+	int dy = _prevMouse.y - y;
 
-		int newFrame = (track->getCurFrame() - (int)roundf(speedX) - currentRowStart) % _nav.columns + currentRowStart;
+	if (dx == 0 && dy == 0)
+		return;
 
-		if (newFrame >= 0 && newFrame < track->getFrameCount()) {
-			track->setCurFrame(newFrame);
-			changed = true;
-		}
+	if (dx != 0) {
+		int slope = ABS(dy * 0x10000 / dx);
+
+		if (slope < 0x93ce)			// tan 30
+			dy = 0;
+		else if (slope > 0x1bb67)	// tan 60
+			dx = 0;
 	}
 
-	if (changed) {
-		_prevMouse.x = x;
-		_prevMouse.y = y;
-	}
+	float rate = _nav.field_of_view / MAX<int>(1, MIN(box.width(), box.height()));
+
+	syncObjectView();
+	setObjectView(_objectHPan + dx * rate, _objectVPan - dy * rate);
+
+	_prevMouse = Common::Point(x, y);
 }
 
 void QuickTimeDecoder::handlePanoMouseMove(int16 x, int16 y) {
@@ -1615,22 +1651,169 @@ void QuickTimeDecoder::handleMouseButton(bool isDown, int16 x, int16 y, bool rep
 }
 
 void QuickTimeDecoder::handleObjectMouseButton(bool isDown, int16 x, int16 y, bool repeat) {
-	if (isDown) {
-		if (y < _curBbox.top) {
-			setCurrentRow(getCurrentRow() + 1);
-		} else if (y > _curBbox.bottom) {
-			setCurrentRow(getCurrentRow() - 1);
-		} else if (x < _curBbox.left) {
-			setCurrentColumn((getCurrentColumn() + 1) % _nav.columns);
-		} else if (x > _curBbox.right) {
-			setCurrentColumn((getCurrentColumn() - 1 + _nav.columns) % _nav.columns);
-		} else {
-			_prevMouse.x = x;
-			_prevMouse.y = y;
-		}
+	_isMouseButtonDown = isDown;
+
+	if (!isDown) {
+		_objectDragging = false;
+		_objectEdge = 0;
+		return;
 	}
 
-	_isMouseButtonDown = isDown;
+	if (repeat)
+		return;
+
+	_prevMouse = _objectMouse = Common::Point(x, y);
+	_objectEdge = 0;
+	_objectDragging = getObjectBox().contains(x, y);
+
+	if (!_objectDragging)
+		updateObjectEdgeRotation();
+}
+
+// The drag box is the movie box inset by a tenth of its smaller side (FUN_10000ea0)
+Common::Rect QuickTimeDecoder::getObjectBox() {
+	int w = getWidth();
+	int h = getHeight();
+	int size = MAX(0, MIN(w, h));
+	int inset = size / 10;
+
+	if (size <= inset * 4)
+		inset = 3;
+
+	return Common::Rect(inset, inset, MAX(inset, w - inset), MAX(inset, h - inset));
+}
+
+// Which border of the drag box the mouse is in (FUN_10002bcc): 8 above, 4
+// below, 1 left, 2 right, 0 inside. The side the mouse is furthest past wins,
+// and depth is how far past it is
+int QuickTimeDecoder::getObjectEdge(int16 x, int16 y, int &dRow, int &dCol, int &depth) {
+	Common::Rect box = getObjectBox();
+	int code = 0;
+	int v = 0;
+	int h = 0;
+
+	dRow = dCol = 0;
+
+	if (y < box.top) {
+		dRow = 1;
+		code = 8;
+		v = box.top - y;
+	} else if (y >= box.bottom) {
+		dRow = -1;
+		code = 4;
+		v = y - box.bottom + 1;
+	}
+
+	if (x < box.left)
+		h = box.left - x;
+	else if (x >= box.right)
+		h = x - box.right + 1;
+
+	if (h > v) {
+		dCol = x < box.left ? 1 : -1;
+		code = x < box.left ? 1 : 2;
+		dRow = 0;
+		v = 0;
+	} else {
+		h = 0;
+	}
+
+	depth = h + v;
+	return code;
+}
+
+// Holding the button in the border (FUN_10002cd8) first steps one column or
+// row, then turns by depth / 6 degrees per tick, at most 34 degrees at a time
+void QuickTimeDecoder::updateObjectEdgeRotation() {
+	if (!_isMouseButtonDown || _objectDragging || !_nextVideoTrack)
+		return;
+
+	int dRow, dCol, depth;
+	int edge = getObjectEdge(_objectMouse.x, _objectMouse.y, dRow, dCol, depth);
+
+	if (!edge)
+		return;
+
+	uint32 now = g_system->getMillis();
+
+	syncObjectView();
+
+	if (edge != _objectEdge) {
+		_objectEdge = edge;
+		_objectEdgeTime = now;
+		setObjectColumnRow(getCurrentColumn() + dCol, getCurrentRow() + dRow);
+		return;
+	}
+
+	uint32 ticks = (now - _objectEdgeTime) * 60 / 1000;
+	if (!ticks)
+		return;
+
+	_objectEdgeTime += ticks * 1000 / 60;
+
+	float step = MIN(ticks * depth / 6.0f, 34.0f);
+	setObjectView(_objectHPan + dCol * step, _objectVPan - dRow * step);
+}
+
+// Keep the pan and tilt within the movie's range (FUN_100018d0) and show the
+// frame for them
+void QuickTimeDecoder::setObjectView(float hPan, float vPan) {
+	float hRange = _nav.endHPan - _nav.startHPan;
+
+	if (hRange == 360.0f) {
+		hPan = fmod(hPan - _nav.startHPan, 360.0f);
+		if (hPan < 0.0f)
+			hPan += 360.0f;
+		hPan += _nav.startHPan;
+	} else {
+		hPan = CLIP(hPan, MIN(_nav.startHPan, _nav.endHPan), MAX(_nav.startHPan, _nav.endHPan));
+	}
+
+	vPan = CLIP(vPan, MIN(_nav.startVPan, _nav.endVPan), MAX(_nav.startVPan, _nav.endVPan));
+
+	_objectHPan = hPan;
+	_objectVPan = vPan;
+
+	VideoTrackHandler *track = (VideoTrackHandler *)_nextVideoTrack;
+	int frame = getObjectFrame(hPan, vPan);
+
+	if (frame != track->getCurFrame() && frame >= 0 && frame < track->getFrameCount())
+		track->setCurFrame(frame);
+}
+
+// Show a column and row, with the pan and tilt they were shot at (FUN_10001978)
+void QuickTimeDecoder::setObjectColumnRow(int column, int row) {
+	column = limitObjectColumn(column);
+	row = CLIP<int>(row, 0, MAX<int>(_nav.rows, 1) - 1);
+
+	float hRange = _nav.endHPan - _nav.startHPan;
+
+	if (_nav.columns <= 1)
+		_objectHPan = _nav.startHPan;
+	else if (hRange == 360.0f)
+		_objectHPan = _nav.startHPan + column * 360.0f / _nav.columns;
+	else
+		_objectHPan = _nav.startHPan + column * hRange / (_nav.columns - 1);
+
+	if (_nav.rows <= 1)
+		_objectVPan = _nav.endVPan;
+	else
+		_objectVPan = _nav.startVPan - row * (_nav.startVPan - _nav.endVPan) / (_nav.rows - 1);
+
+	VideoTrackHandler *track = (VideoTrackHandler *)_nextVideoTrack;
+	int frame = row * _nav.columns + column;
+
+	if (frame != track->getCurFrame() && frame >= 0 && frame < track->getFrameCount())
+		track->setCurFrame(frame);
+}
+
+// Lingo and the keys set frames directly; take the view from the frame then
+void QuickTimeDecoder::syncObjectView() {
+	VideoTrackHandler *track = (VideoTrackHandler *)_nextVideoTrack;
+	int frame = track->getCurFrame();
+
+	if (frame >= 0 && _nav.columns > 0 && getObjectFrame(_objectHPan, _objectVPan) != frame)
+		setObjectColumnRow(frame % _nav.columns, frame / _nav.columns);
 }
 
 // Mouse offset from the mouse-down point as the QTVR 1.0 controller scales it:
@@ -1880,11 +2063,11 @@ void QuickTimeDecoder::updateQTVRCursor(int16 x, int16 y) {
 
 		if (y < _curBbox.top)
 			setCursor(tiltIdx == 16 ? kCurObjUpLimit : kCurObjUp);
-		else if (y > _curBbox.bottom)
+		else if (y >= _curBbox.bottom)
 			setCursor(tiltIdx == 0 ? kCurObjDownLimit : kCurObjDown);
 		else if (x < _curBbox.left)
 			setCursor(kCurObjLeft90 + tiltIdx);
-		else if (x > _curBbox.right)
+		else if (x >= _curBbox.right)
 			setCursor(kCurObjRight90 + tiltIdx);
 		else
 			setCursor(_isMouseButtonDown ? kCurGrab : kCurHand);
@@ -2083,11 +2266,7 @@ void QuickTimeDecoder::setCursor(int curId) {
 }
 
 void QuickTimeDecoder::computeInteractivityZones() {
-	_curBbox.left = MIN(20, getWidth() / 10);
-	_curBbox.right = getWidth() - _curBbox.left;
-
-	_curBbox.top = MIN(20, getHeight() / 10);
-	_curBbox.bottom = getHeight() - _curBbox.top;
+	_curBbox = getObjectBox();
 }
 
 } // End of namespace Video
