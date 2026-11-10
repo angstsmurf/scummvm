@@ -526,6 +526,14 @@ bool EventRecorder::openRecordFile(const Common::String &fileName) {
 	return true;
 }
 
+// Detection md5s may carry a mode prefix ("d:", "t:", "rt:", ...). The record
+// file stores each hash as a name followed by exactly 32 characters, so keep
+// only the hash itself.
+static Common::String bareMd5(const char *md5) {
+	const char *colon = strrchr(md5, ':');
+	return Common::String(colon ? colon + 1 : md5);
+}
+
 bool EventRecorder::checkGameHash(const ADGameDescription *gameDesc) {
 	if (_playbackFile->getHeader().hashRecords.size() == 0) {
 		warning("Engine doesn't contain description table, skipping hash check");
@@ -540,7 +548,7 @@ bool EventRecorder::checkGameHash(const ADGameDescription *gameDesc) {
 			debugC(1, kDebugLevelEventRec, "playback:action=\"Check game hash\" filename=%s filehash=%s storedhash=\"\" result=different", fileDesc->fileName, fileDesc->md5);
 			return false;
 		}
-		if (_playbackFile->getHeader().hashRecords[fileDesc->fileName] != fileDesc->md5) {
+		if (_playbackFile->getHeader().hashRecords[fileDesc->fileName] != bareMd5(fileDesc->md5)) {
 			warning("Incorrect version of game file %s. Stored MD5 is %s. MD5 of loaded game is %s", fileDesc->fileName, _playbackFile->getHeader().hashRecords[fileDesc->fileName].c_str(), fileDesc->md5);
 			debugC(1, kDebugLevelEventRec, "playback:action=\"Check game hash\" filename=%s filehash=%s storedhash=%s result=different", fileDesc->fileName, fileDesc->md5, _playbackFile->getHeader().hashRecords[fileDesc->fileName].c_str());
 			return false;
@@ -733,7 +741,7 @@ bool EventRecorder::notifyEvent(const Common::Event &ev) {
 void EventRecorder::setGameMd5(const ADGameDescription *gameDesc) {
 	for (const ADGameFileDescription *fileDesc = gameDesc->filesDescriptions; fileDesc->fileName; fileDesc++) {
 		if (fileDesc->md5 != nullptr) {
-			_recordFile->getHeader().hashRecords[fileDesc->fileName] = fileDesc->md5;
+			_recordFile->getHeader().hashRecords[fileDesc->fileName] = bareMd5(fileDesc->md5);
 		}
 	}
 }
