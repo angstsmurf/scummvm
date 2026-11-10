@@ -4318,10 +4318,23 @@ void LB::b_charPosToLoc(int nargs) {
 }
 
 void LB::b_linePosToLocV(int nargs) {
-	g_lingo->printSTUBWithArglist("b_linePosToLocV", nargs);
-	g_lingo->dropStack(nargs);
-	Datum res(0);
-	g_lingo->push(res);
+	// Distance in pixels from the top of a field member to the top of a line
+	Datum lineNum = g_lingo->pop();
+	Datum memberRef = g_lingo->pop();
+
+	CastMember *member = g_director->getCurrentMovie()->getCastMember(memberRef.asMemberID());
+	if (!member || member->_type != kCastText) {
+		g_lingo->lingoError("b_linePosToLocV: %s is not a field", memberRef.asString().c_str());
+		g_lingo->push(0);
+		return;
+	}
+
+	// MacText line numbers start at 0, Lingo line numbers at 1
+	int y = 0;
+	for (int i = 0; i < lineNum.asInt() - 1; i++)
+		y += ((TextCastMember *)member)->getLineHeight(i);
+
+	g_lingo->push(y);
 }
 
 void LB::b_locToCharPos(int nargs) {
