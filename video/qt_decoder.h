@@ -98,7 +98,10 @@ public:
 	void setTiltAngle(float tiltAngle);
 	float getFOV() const { return _fov; }
 	float getHFOV() const { return _hfov; }
+	float getHalfHFOV() const;
 	bool setFOV(float fov);
+	bool isPano360() const;
+	float getPanRange() const;
 	int getCurrentNodeID() { return _currentSample == -1 ? 0 : _panoTrack->panoSamples[_currentSample].hdr.nodeID; }
 	Common::String getCurrentNodeName();
 

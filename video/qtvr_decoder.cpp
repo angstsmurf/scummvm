@@ -176,6 +176,9 @@ void QuickTimeDecoder::setWarpMode(int warpMode) {
 	// 0 No warping. This reproduces the source panorama directly,
 	//   without warping it at all.
 
+	// The mode changes the horizontal field of view, so clamp the pan again
+	setPanAngle(_panAngle);
+
 	PanoTrackHandler *track = ((PanoTrackHandler *)getTrack(_panoTrack->targetTrack));
 	track->setDirty();
 }
@@ -294,20 +297,59 @@ void QuickTimeDecoder::setTargetSize(uint16 w, uint16 h) {
 	// Set up the _hfov properly for the very first frame of the pano
 	// After our setFOV will handle the _hfov
 	_hfov = _fov * (float)_width / (float)_height;
+
+	// The view width limits how far a partial panorama can pan
+	if (_qtvrType == QTVRType::PANORAMA)
+		setPanAngle(_panAngle);
+}
+
+bool QuickTimeDecoder::isPano360() const {
+	PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
+
+	return desc->_hPanStart == desc->_hPanEnd || (desc->_hPanStart == 0.0f && desc->_hPanEnd == 360.0f);
+}
+
+// The horizontal angle the panorama image covers, in degrees
+float QuickTimeDecoder::getPanRange() const {
+	PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
+
+	if (isPano360())
+		return 360.0f;
+
+	return ABS(desc->_hPanEnd - desc->_hPanStart);
+}
+
+// Half of the horizontal field of view actually shown, in degrees.
+// See projectPanorama(): warp mode 0 spreads _hfov linearly over the
+// width, the other modes project a plane whose half width is
+// tan(fov / 2) * w / h (mhlr UpdateHFOV)
+float QuickTimeDecoder::getHalfHFOV() const {
+	// No view size until setTargetSize(), which clamps the pan again
+	if (_width == 0 || _height == 0)
+		return 0.0f;
+
+	if (_warpMode == 0)
+		return _hfov / 2.0f;
+
+	return atan(tan(_fov * M_PI / 360.0) * _width / _height) * 180.0 / M_PI;
 }
 
 void QuickTimeDecoder::setPanAngle(float angle) {
 	PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
 
-	float panRange = abs(desc->_hPanEnd - desc->_hPanStart);
-	angle = fmod(angle, panRange);
+	if (isPano360()) {
+		angle = fmod(angle, 360.0f);
+	} else {
+		// A partial panorama doesn't wrap. Keep the view's edges
+		// inside it, like ClampPanAngle in the QTVR 1.0 mhlr
+		float panMin = MIN(desc->_hPanStart, desc->_hPanEnd);
+		float panMax = MAX(desc->_hPanStart, desc->_hPanEnd);
+		float halfHFOV = getHalfHFOV();
 
-	if (desc->_hPanStart != desc->_hPanEnd && (desc->_hPanStart != 0.0 || desc->_hPanEnd != 360.0)) {
-		if (angle < desc->_hPanStart + _hfov) {
-			angle = desc->_hPanStart + _hfov;
-		} else if (angle > desc->_hPanEnd - _hfov) {
-			angle = desc->_hPanEnd - _hfov;
-		}
+		if (panMax - panMin <= 2.0f * halfHFOV)
+			angle = (panMin + panMax) / 2.0f;
+		else
+			angle = CLIP(angle, panMin + halfHFOV, panMax - halfHFOV);
 	}
 
 	if (_panAngle != angle) {
@@ -1054,6 +1096,10 @@ Common::Point QuickTimeDecoder::PanoTrackHandler::projectPoint(int16 mx, int16 m
 	mousePixelVector[1] = topRightVector[1] + yRatio * (bottomRightVector[1] - topRightVector[1]);
 	mousePixelVector[2] = topRightVector[2] + yRatio * (bottomRightVector[2] - topRightVector[2]);
 
+	// The panorama image spans panRange degrees, not necessarily a full circle
+	float panRange = _decoder->getPanRange();
+	float panRangeRadians = panRange * M_PI / 180.0f;
+
 	float t, xCoord = 0, yawRatio = 0;
 	float horizontalFovRadians = _decoder->_hfov * M_PI / 180.0f;
 	float verticalFovRadians = _decoder->_fov * M_PI / 180.0f;
@@ -1073,7 +1119,7 @@ Common::Point QuickTimeDecoder::PanoTrackHandler::projectPoint(int16 mx, int16 m
 
 	if (warpMode == 0) {
 		t = (float)mx / (float)(w) - 0.5f;
-		xCoord = t * horizontalFovRadians / M_PI / 2.0f;
+		xCoord = t * horizontalFovRadians / panRangeRadians;
 		yawRatio = xCoord;
 	} else {
 		t = ((float)(mx - w / 2) / (float)w * 2.0);
@@ -1082,10 +1128,10 @@ Common::Point QuickTimeDecoder::PanoTrackHandler::projectPoint(int16 mx, int16 m
 		} else if (warpMode == 2) {
 			xCoord = t * mousePixelVector[0] / mousePixelVector[2];
 		}
-		yawRatio = atan(xCoord) / (2.0 * M_PI);
+		yawRatio = atan(xCoord) / panRangeRadians;
 	}
 
-	float angleT = (360.0f - _decoder->_panAngle) / 360.0f;
+	float angleT = (panRange - _decoder->_panAngle) / panRange;
 
 	// panorama is turned 90 degrees, width is height
 	hotX = (1.0f - (angleT + yawRatio)) * (float)hotHeight;
@@ -1243,7 +1289,10 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		maxProjectedY = -tan(tiltRadians - halfFovRadians);
 	}
 
-	float panRange = abs(desc->_hPanEnd - desc->_hPanStart);
+	// The panorama image spans panRange degrees, not necessarily a full circle
+	// (mhlr Engine_SetPanoGeometry: panoCircumference = 2 pi width / range)
+	float panRange = _decoder->getPanRange();
+	float panRangeRadians = panRange * M_PI / 180.0f;
 	float angleT = fmod((panRange - panAngle) / panRange, 1.0f);
 	if (angleT < 0.0f) {
 		angleT += 1.0f;
@@ -1319,7 +1368,7 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 			}
 
 			float normalizedX = (float)xFloat / (float)(w - 1);
-			cylinderAngleOffsets[x] = normalizedX * horizontalFovRadians / M_PI / 2.0f;  // Scale to FOV
+			cylinderAngleOffsets[x] = normalizedX * horizontalFovRadians / panRangeRadians;  // Scale to FOV
 		}
 	} else {
 		for (uint16 x = 0; x < halfWidthRoundedUp; x++) {
@@ -1344,7 +1393,7 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 				cylinderProjectionRanges[x * 2 + v] = (newY - minTiltY) / (maxTiltY - minTiltY);
 			}
 
-			cylinderAngleOffsets[x] = atan(xCoord) * 0.5f / M_PI;
+			cylinderAngleOffsets[x] = atan(xCoord) / panRangeRadians;
 		}
 	}
 
@@ -1896,8 +1945,7 @@ void QuickTimeDecoder::handlePanoMouseButton(bool isDown, int16 x, int16 y, bool
 	if (ABS(mouseDeltaX) <= 2 && ABS(mouseDeltaY) <= 2 && now - _dragStartTime < 500)
 		return;
 
-	// Half of the horizontal field of view actually shown, see projectPanorama()
-	float halfHFOV = atan(tan(_fov * M_PI / 360.0) * _width / _height) * 180.0 / M_PI;
+	float halfHFOV = getHalfHFOV();
 
 	float dx = panoDragFraction(mouseDeltaX, _width);
 	float dy = panoDragFraction(mouseDeltaY, _height);
@@ -2136,7 +2184,10 @@ void QuickTimeDecoder::updateQTVRCursor(int16 x, int16 y) {
 		} else {
 			int res = 0;
 			PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
-			bool pano360 = !(desc->_hPanStart != desc->_hPanEnd && (desc->_hPanStart != 0.0 || desc->_hPanEnd != 360.0));
+			bool pano360 = isPano360();
+			float halfHFOV = getHalfHFOV();
+			float panMin = MIN(desc->_hPanStart, desc->_hPanEnd);
+			float panMax = MAX(desc->_hPanStart, desc->_hPanEnd);
 			debugC(4, kDebugLevelGVideo, "pano360: %d _panAngle: %f [%f - %f] +%f  -%f fov: %f hfov: %f", pano360, _panAngle, desc->_hPanStart, desc->_hPanEnd, desc->_hPanStart + _fov, desc->_hPanEnd - _fov, _fov, _hfov);
 
 			// left
@@ -2145,7 +2196,7 @@ void QuickTimeDecoder::updateQTVRCursor(int16 x, int16 y) {
 				res <<= 1;
 
 				// left stop
-				if (!pano360 && _panAngle >= desc->_hPanEnd - _hfov)
+				if (!pano360 && _panAngle >= panMax - halfHFOV)
 					res |= 1;
 				res <<= 1;
 			} else {
@@ -2158,7 +2209,7 @@ void QuickTimeDecoder::updateQTVRCursor(int16 x, int16 y) {
 				res <<= 1;
 
 				// right stop
-				if (!pano360 && _panAngle <= desc->_hPanStart + _hfov)
+				if (!pano360 && _panAngle <= panMin + halfHFOV)
 					res |= 1;
 				res <<= 1;
 			} else {
