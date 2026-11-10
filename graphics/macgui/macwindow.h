@@ -156,6 +156,12 @@ public:
 	bool draw(ManagedSurface *g, bool forceRedraw = false) override = 0;
 
 	/**
+	 * The area of the target surface the last draw(g) changed, in its
+	 * coordinates. The WM copies only this area to the screen.
+	 */
+	virtual Common::Rect getLastDrawnArea() { return getDimensions(); }
+
+	/**
 	 * Method called by the WM when there is an event concerning the window.
 	 * Note that depending on the subclass of the window, it might not be called
 	 * if the window is not active.
@@ -273,6 +279,7 @@ public:
 	 * @param forceRedraw If true, the borders are guarranteed to redraw.
 	 */
 	bool draw(ManagedSurface *g, bool forceRedraw = false) override;
+	Common::Rect getLastDrawnArea() override { return _lastDrawnArea; }
 
 	bool draw(bool forceRedraw = false) override;
 	void blit(ManagedSurface *g, Common::Rect &dest) override;
@@ -421,6 +428,7 @@ protected:
 	void drawBorder();
 	uint32 getBorderTransColor() const;
 	static bool isSurfaceAllColor(const ManagedSurface &surface, uint32 color);
+	Common::Rect blitChangedContent(ManagedSurface *g);
 	WindowClick isInBorder(int x, int y) const;
 
 protected:
@@ -429,6 +437,7 @@ protected:
 	bool _borderIsDirty;
 	bool _borderIsEmpty;
 	Common::Rect _innerDims;
+	Common::Rect _lastDrawnArea;
 
 	Common::List<Common::Rect> _dirtyRects;
 	bool _hasScrollBar;
