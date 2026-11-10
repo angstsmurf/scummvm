@@ -176,8 +176,9 @@ void QuickTimeDecoder::setWarpMode(int warpMode) {
 	// 0 No warping. This reproduces the source panorama directly,
 	//   without warping it at all.
 
-	// The mode changes the horizontal field of view, so clamp the pan again
+	// The mode changes the horizontal field of view, so clamp the pan and tilt again
 	setPanAngle(_panAngle);
+	setTiltAngle(_tiltAngle);
 
 	PanoTrackHandler *track = ((PanoTrackHandler *)getTrack(_panoTrack->targetTrack));
 	track->setDirty();
@@ -298,9 +299,11 @@ void QuickTimeDecoder::setTargetSize(uint16 w, uint16 h) {
 	// After our setFOV will handle the _hfov
 	_hfov = _fov * (float)_width / (float)_height;
 
-	// The view width limits how far a partial panorama can pan
-	if (_qtvrType == QTVRType::PANORAMA)
+	// The view width limits how far a partial panorama can pan and tilt
+	if (_qtvrType == QTVRType::PANORAMA) {
 		setPanAngle(_panAngle);
+		setTiltAngle(_tiltAngle);
+	}
 }
 
 bool QuickTimeDecoder::isPano360() const {
@@ -368,6 +371,22 @@ void QuickTimeDecoder::setTiltAngle(float angle) {
 		angle = desc->_vPanBottom + _fov / 2;
 	} else if (angle > desc->_vPanTop - _fov / 2) {
 		angle = desc->_vPanTop - _fov / 2;
+	}
+
+	// Tilting widens the top or bottom edge of the view. Like ClampTiltAngle in
+	// the QTVR 1.0 mhlr, stop a partial panorama before that edge spans more
+	// than its pan range: the corner of the view at tilt t sits at the yaw
+	// atan(tan(halfH) * cos(halfV) / cos(t + halfV)), which must stay within half
+	// the pan range. The mhlr skips this for a wrapping panorama it has cached
+	// whole, which is always the case here
+	if (!isPano360() && _width != 0 && _height != 0) {
+		float halfV = _fov * M_PI / 360.0f;
+		float halfH = getHalfHFOV() * M_PI / 180.0f;
+		float maxHalfH = getPanRange() * M_PI / 360.0f;
+		float tiltLimit = acos(CLIP(cos(halfV) * tan(halfH) / tan(maxHalfH), -1.0f, 1.0f));
+		float maxTilt = MAX(0.0f, (tiltLimit - halfV) * 180.0f / (float)M_PI);
+
+		angle = CLIP(angle, -maxTilt, maxTilt);
 	}
 
 	if (_tiltAngle != angle) {
