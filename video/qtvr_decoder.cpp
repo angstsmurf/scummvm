@@ -900,6 +900,22 @@ void QuickTimeDecoder::PanoTrackHandler::initPanorama() {
 	_decoder->goToNode(_decoder->_panoTrack->panoInfo.defNodeID);
 }
 
+// Surface::getPixel and setPixel check the pixel size on every call. The
+// panorama loops below touch every output pixel each frame, so index 32-bit
+// pixels directly.
+static inline uint32 readPanoPixel(const Graphics::Surface *s, int x, int y) {
+	if (s->format.bytesPerPixel == 4)
+		return *(const uint32 *)((const byte *)s->getPixels() + y * s->pitch + x * 4);
+	return s->getPixel(x, y);
+}
+
+static inline void writePanoPixel(Graphics::Surface *s, int x, int y, uint32 pixel) {
+	if (s->format.bytesPerPixel == 4)
+		*(uint32 *)((byte *)s->getPixels() + y * s->pitch + x * 4) = pixel;
+	else
+		s->setPixel(x, y, pixel);
+}
+
 // Unpacks and packs pixels with plain shifts when every channel is 8 bits
 // wide, otherwise through PixelFormat. Gives the same values either way.
 struct PanoPixelCodec {
@@ -966,10 +982,10 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 
 				// Couldn't find a better way to do this
 				// Should I write a function in the Surface or PixelFormat class?
-				int32 p00 = sourceSurface->getPixel(x, y);
-				int32 p01 = sourceSurface->getPixel(x, y1);
-				int32 p10 = sourceSurface->getPixel(x1, y);
-				int32 p11 = sourceSurface->getPixel(x1, y1);
+				int32 p00 = readPanoPixel(sourceSurface, x, y);
+				int32 p01 = readPanoPixel(sourceSurface, x, y1);
+				int32 p10 = readPanoPixel(sourceSurface, x1, y);
+				int32 p11 = readPanoPixel(sourceSurface, x1, y1);
 
 				uint8 a00, r00, g00, b00;
 				uint8 a01, r01, g01, b01;
@@ -990,10 +1006,10 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 					(g00 + g01 + g10 + g11) >> 2,
 					(b00 + b01 + b10 + b11) >> 2);
 
-				target->setPixel(x * 2, y * 2, avgPixel00);
-				target->setPixel(x * 2, y * 2 + 1, avgPixel01);
-				target->setPixel(x * 2 + 1, y * 2, avgPixel10);
-				target->setPixel(x * 2 + 1, y * 2 + 1,avgPixel11);
+				writePanoPixel(target, x * 2, y * 2, avgPixel00);
+				writePanoPixel(target, x * 2, y * 2 + 1, avgPixel01);
+				writePanoPixel(target, x * 2 + 1, y * 2, avgPixel10);
+				writePanoPixel(target, x * 2 + 1, y * 2 + 1,avgPixel11);
 			}
 		}
 	} else {
@@ -1003,8 +1019,8 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 			for (uint x = 0; x < w; ++x) {
 				uint x1 = (x + 1) % w;
 
-				int32 p00 = sourceSurface->getPixel(x, y);
-				int32 p01 = sourceSurface->getPixel(x1, y);
+				int32 p00 = readPanoPixel(sourceSurface, x, y);
+				int32 p01 = readPanoPixel(sourceSurface, x1, y);
 
 				uint8 a00, r00, g00, b00;
 				uint8 a01, r01, g01, b01;
@@ -1014,8 +1030,8 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 				int32 avgPixel00 = p00;
 				int32 avgPixel01 = codec.pack((a00 + a01) >> 1, (r00 + r01) >> 1, (g00 + g01) >> 1, (b00 + b01) >> 1);
 
-				target->setPixel(x * 2, y, avgPixel00);
-				target->setPixel(x * 2 + 1, y, avgPixel01);
+				writePanoPixel(target, x * 2, y, avgPixel00);
+				writePanoPixel(target, x * 2 + 1, y, avgPixel01);
 			}
 		}
 	}
@@ -1066,7 +1082,7 @@ void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSur
 			for (uint8 row = 0; row < scaleFactor; row++) {
 				for (uint8 column = 0; column < scaleFactor; column++) {
 					uint8 a00, r00, g00, b00;
-					uint32 pixel00 = sourceSurface->getPixel(MIN((x * scaleFactor + row), w - 1), MIN((y * scaleFactor + column), h - 1));
+					uint32 pixel00 = readPanoPixel(sourceSurface, MIN((x * scaleFactor + row), w - 1), MIN((y * scaleFactor + column), h - 1));
 					codec.unpack(pixel00, a00, r00, g00, b00);
 
 					avgA += a00;
@@ -1082,7 +1098,7 @@ void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSur
 			avgB /= scaleSquare;
 
 			uint32 avgPixel = codec.pack(avgA, avgR, avgG, avgB);
-			_projectedPano->setPixel(x, y, avgPixel);
+			writePanoPixel(_projectedPano, x, y, avgPixel);
 		}
 	}
 }
@@ -1582,13 +1598,13 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 				sourceYCoord = panoHeight - 1;
 
 			// Our panorma is apparently vertical, that's why we're passing Y co-ord before X co-ord
-			uint32 pixel1 = sourceSurface->getPixel(sourceYCoord, leftSourceXCoord);
-			uint32 pixel2 = sourceSurface->getPixel(sourceYCoord, rightSourceXCoord);
+			uint32 pixel1 = readPanoPixel(sourceSurface, sourceYCoord, leftSourceXCoord);
+			uint32 pixel2 = readPanoPixel(sourceSurface, sourceYCoord, rightSourceXCoord);
 
 			if (blendLeft)
-				pixel1 = averagePixels(sourceSurface->format, pixel1, sourceSurface->getPixel(sourceYCoord, leftNextSourceXCoord));
+				pixel1 = averagePixels(sourceSurface->format, pixel1, readPanoPixel(sourceSurface, sourceYCoord, leftNextSourceXCoord));
 			if (blendRight)
-				pixel2 = averagePixels(sourceSurface->format, pixel2, sourceSurface->getPixel(sourceYCoord, rightNextSourceXCoord));
+				pixel2 = averagePixels(sourceSurface->format, pixel2, readPanoPixel(sourceSurface, sourceYCoord, rightNextSourceXCoord));
 
 			if (_decoder->_renderHotspots) {
 				const byte *col1 = &quickTimeDefaultPalette256[pixel1 * 3];
@@ -1597,8 +1613,8 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 				pixel2 = _planarProjection->format.RGBToColor(col2[0], col2[1], col2[2]);
 			}
 
-			_planarProjection->setPixel(x1, y, pixel1);
-			_planarProjection->setPixel(x2, y, pixel2);
+			writePanoPixel(_planarProjection, x1, y, pixel1);
+			writePanoPixel(_planarProjection, x2, y, pixel2);
 		}
 	}
 
@@ -1652,14 +1668,14 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		// doing divides per pixel is SLOW!
 		for (uint16 x = 0; x < w; x++) {
 			int32 srcX = (x + 0.5f) * xInterpolator + startX;
-			uint32 pixel = _planarProjection->getPixel(srcX, srcY);
+			uint32 pixel = readPanoPixel(_planarProjection, srcX, srcY);
 
 			if (blendRow)
-				pixel = averagePixels(_planarProjection->format, pixel, _planarProjection->getPixel(srcX, srcY + 1));
+				pixel = averagePixels(_planarProjection->format, pixel, readPanoPixel(_planarProjection, srcX, srcY + 1));
 
 			// I increased the size of the surface (made it twice as wide and twice as tall)
 			// Now I'm just getting the perspective projected pixel and creating a 2x2 box
-			aliasedProjectedPano->setPixel(x, y, pixel);
+			writePanoPixel(aliasedProjectedPano, x, y, pixel);
 		}
 	}
 
