@@ -579,6 +579,14 @@ void ManagedSurface::blitFrom(const ManagedSurface &src, const Common::Rect &src
 		blitFromInner(src._innerSurface, srcRect, destRect, src._palette);
 }
 
+template<typename T>
+static bool isRowOpaque(const T *row, int width, uint32 alphaMask) {
+	for (int i = 0; i < width; i++)
+		if ((row[i] & alphaMask) != alphaMask)
+			return false;
+	return true;
+}
+
 void ManagedSurface::blitFromInner(const Surface &src, const Common::Rect &srcRect,
 		const Common::Rect &destRect, const Palette *srcPalette) {
 
@@ -633,6 +641,30 @@ void ManagedSurface::blitFromInner(const Surface &src, const Common::Rect &srcRe
 			if (width > 0)
 				Common::copy(srcP, srcP + width, destP);
 			continue;
+		}
+
+		// Same format and no scaling: a row of opaque pixels is a straight copy.
+		if (isSameFormat && noScale && (destFormat.bytesPerPixel == 2 || destFormat.bytesPerPixel == 4)) {
+			int left = destRect.left, width = srcRect.width();
+			const byte *rowSrc = srcP;
+			byte *rowDest = destP;
+			if (left < 0) {
+				rowSrc -= left * destFormat.bytesPerPixel;
+				rowDest -= left * destFormat.bytesPerPixel;
+				width += left;
+				left = 0;
+			}
+			if (left + width > w)
+				width = w - left;
+			if (width <= 0)
+				continue;
+			bool opaque = alphaMask == 0 ||
+				(destFormat.bytesPerPixel == 4 ? isRowOpaque((const uint32 *)rowSrc, width, alphaMask)
+				                               : isRowOpaque((const uint16 *)rowSrc, width, alphaMask));
+			if (opaque) {
+				memmove(rowDest, rowSrc, width * destFormat.bytesPerPixel);
+				continue;
+			}
 		}
 
 		// Loop through drawing the pixels of the row
@@ -915,8 +947,6 @@ void transBlit(const Surface &src, const Common::Rect &srcRect, ManagedSurface &
 
 			TSRC srcVal = srcLine[flipped ? src.w - scaleXCtr / SCALE_THRESHOLD - 1 : scaleXCtr / SCALE_THRESHOLD];
 			TDEST &destVal = destLine[xCtr];
-
-			dest.format.colorToRGB(destVal, r, g, b);
 
 			// Check if dest pixel is transparent
 			bool isDestPixelTrans = false;
