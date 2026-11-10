@@ -1477,7 +1477,9 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		}
 	}
 
-	if (warpMode != 2) {
+	// Like QTVR 1.0 (mhlr Engine_DrawFrame), skip the row pass when the view is
+	// within 0.001 radians of level: there it maps every pixel to itself
+	if (warpMode != 2 || ABS(tiltAngleRadians) < 0.001f) {
 		boxAverage(_planarProjection, scaleFactor);
 		_dirty = false;
 		return;
