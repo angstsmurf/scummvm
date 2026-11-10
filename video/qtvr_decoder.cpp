@@ -993,6 +993,18 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 
 // Average two pixels, like AverageRows16/32 in the QTVR 1.0 mhlr
 static uint32 averagePixels(const Graphics::PixelFormat &format, uint32 p1, uint32 p2) {
+	// 8 bits per channel: average every byte at once, (x & y) + ((x ^ y) >> 1)
+	// rounds down like the per-channel path below
+	if (format.bytesPerPixel == 4 && format.rLoss == 0 && format.gLoss == 0 && format.bLoss == 0 &&
+	    (format.aLoss == 0 || format.aLoss == 8) &&
+	    ((format.rShift | format.gShift | format.bShift | (format.aLoss ? 0 : format.aShift)) & 7) == 0) {
+		uint32 colorMask = (0xFFu << format.rShift) | (0xFFu << format.gShift) | (0xFFu << format.bShift);
+		if (format.aLoss == 0)
+			colorMask |= 0xFFu << format.aShift;
+		uint32 lowBits = 0x01010101u;
+		return ((p1 & p2) + (((p1 ^ p2) & ~lowBits) >> 1)) & colorMask;
+	}
+
 	uint8 a1, r1, g1, b1, a2, r2, g2, b2;
 	format.colorToARGB(p1, a1, r1, g1, b1);
 	format.colorToARGB(p2, a2, r2, g2, b2);
