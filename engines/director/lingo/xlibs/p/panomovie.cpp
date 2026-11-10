@@ -166,9 +166,23 @@ static void drawMovie(PanoMovieState *m) {
 	Common::Rect dst(m->_rect.left, m->_rect.top, m->_rect.left + dither->w, m->_rect.top + dither->h);
 	dst.clip(Common::Rect(surface->w, surface->h));
 	if (!dst.isEmpty()) {
-		surface->copyRectToSurface(dither->getBasePtr(dst.left - m->_rect.left, dst.top - m->_rect.top),
-			dither->pitch, dst.left, dst.top, dst.width(), dst.height());
-		window->setDirty(true);
+		// mouseOver and trackClick draw every 10 ms whether or not the view
+		// moved. Only touch the stage when its pixels change, or every call
+		// would recomposite and upload the whole window.
+		const int rowBytes = dst.width() * surface->format.bytesPerPixel;
+		bool changed = false;
+		for (int y = dst.top; y < dst.bottom; y++) {
+			const byte *src = (const byte *)dither->getBasePtr(dst.left - m->_rect.left, y - m->_rect.top);
+			byte *dest = (byte *)surface->getBasePtr(dst.left, y);
+			if (memcmp(dest, src, rowBytes) != 0) {
+				memcpy(dest, src, rowBytes);
+				changed = true;
+			}
+		}
+		if (changed) {
+			surface->addDirtyRect(dst);
+			window->setDirty(true);
+		}
 	}
 
 	dither->free();
