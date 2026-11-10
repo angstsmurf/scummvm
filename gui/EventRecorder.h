@@ -143,6 +143,8 @@ public:
 	}
 	void setRedraw(bool redraw) {
 		_needRedraw = redraw;
+		if (redraw)
+			_overlayGuiValid = false;
 	}
 	void setRecordModalDialog(bool record) {
 		_recordModalDialog = record;
@@ -160,6 +162,8 @@ public:
 	void acquireRecording() {
 		assert(_acquireCount >= 0);
 		if (_acquireCount == 0) {
+			// GUI dialogs draw on the overlay while they own it
+			_overlayGuiValid = false;
 			_savedState = _initialized;
 			if (!_recordModalDialog)
 				_initialized = false;
@@ -263,6 +267,8 @@ private:
 	Common::String _recordFileName;
 	bool _fastPlayback;
 	bool _needRedraw;
+	// The control panel is on the overlay and nothing else drew there since
+	bool _overlayGuiValid;
 	bool _processingMillis;
 	bool _playbackQuitPosted;
 };

@@ -61,6 +61,7 @@ EventRecorder::EventRecorder() {
 	_fakeMixerManager = nullptr;
 	_initialized = false;
 	_needRedraw = false;
+	_overlayGuiValid = false;
 	_processingMillis = false;
 	_fastPlayback = false;
 	_lastTimeDate.tm_sec = 0;
@@ -98,6 +99,7 @@ void EventRecorder::deinit() {
 	}
 	setFileHeader();
 	_needRedraw = false;
+	_overlayGuiValid = false;
 	_initialized = false;
 	_recordMode = kPassthrough;
 	delete _fakeMixerManager;
@@ -823,7 +825,16 @@ void EventRecorder::preDrawOverlayGui() {
 		if (g_engine)
 			g_engine->suspendHotspots();
 		g_system->showOverlay();
-		g_gui.checkScreenChange();
+		bool screenChanged = g_gui.checkScreenChange();
+
+		// Repainting the panel uploads the whole overlay, so on most frames
+		// just show what is already there
+		bool hotspots = g_engine && g_engine->isShowingHotspots();
+		if (_overlayGuiValid && !screenChanged && !hotspots && _controlPanel && !_controlPanel->needsRedraw()) {
+			_recordMode = oldMode;
+			return;
+		}
+
 		g_gui.theme()->clearAll();
 		g_gui.theme()->drawToBackbuffer();
 		_controlPanel->drawDialog(kDrawLayerBackground);
@@ -831,6 +842,8 @@ void EventRecorder::preDrawOverlayGui() {
 		g_gui.theme()->copyBackBufferToScreen();
 		_controlPanel->drawDialog(kDrawLayerForeground);
 		g_gui.theme()->updateScreen();
+		_controlPanel->markDrawn();
+		_overlayGuiValid = true;
 		_recordMode = oldMode;
 	}
 }

@@ -36,6 +36,7 @@ private:
 	Common::Point _dragPoint;
 	GUI::StaticTextWidget *_text;
 	Dialog *_dlg;
+	Common::Point _drawnPos;
 
 	bool isMouseOver(int x, int y);
 
@@ -47,6 +48,10 @@ public:
 	void reflowLayout() override;
 
 	void setReplayedTime(uint32 newTime);
+
+	// True when the dialog moved or a widget changed since markDrawn()
+	bool needsRedraw() const;
+	void markDrawn();
 
 	void handleMouseMoved(int x, int y, int button) override;
 	void handleMouseDown(int x, int y, int button, int clickCount) override;
