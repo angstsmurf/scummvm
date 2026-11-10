@@ -955,6 +955,15 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 	return target;
 }
 
+// Average two pixels, like AverageRows16/32 in the QTVR 1.0 mhlr
+static uint32 averagePixels(const Graphics::PixelFormat &format, uint32 p1, uint32 p2) {
+	uint8 a1, r1, g1, b1, a2, r2, g2, b2;
+	format.colorToARGB(p1, a1, r1, g1, b1);
+	format.colorToARGB(p2, a2, r2, g2, b2);
+
+	return format.ARGBToColor((a1 + a2) >> 1, (r1 + r2) >> 1, (g1 + g2) >> 1, (b1 + b2) >> 1);
+}
+
 void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSurface, uint8 scaleFactor) {
 	uint16 h = sourceSurface->h;
 	uint16 w = sourceSurface->w;
@@ -1362,6 +1371,13 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 	// (when you construct a rectangular mosaic out of it) you're projecting on the plane surface
 	uint16 angleOffset = static_cast<uint32>(angleT * panoWidth);
 
+	// QTVR 1.0 (mhlr SetupWarpColumn and WarpRows) smooths its picture: when a
+	// source position falls in the second half of a pixel, it averages that
+	// pixel with the next one. The higher qualities get the same from
+	// upscalePanorama(), so only the 1x render needs it. Hotspot maps hold IDs,
+	// which mustn't be mixed
+	const bool blend = scaleFactor == 1 && !_decoder->_renderHotspots && sourceSurface->format.bytesPerPixel > 1;
+
 	const bool isWidthOdd = ((w % 2) == 1);
 	uint16 halfWidthRoundedUp = (w + 1) / 2;
 	float halfWidthFloat = (float)w * 0.5f;
@@ -1417,11 +1433,15 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 	}
 
 	for (uint16 x = 0; x < halfWidthRoundedUp; x++) {
-		int32 centerXImageCoord = static_cast<int32>(angleOffset);
-		int32 edgeCoordOffset = static_cast<int32>(cylinderAngleOffsets[x] * panoWidth);
+		float edgeCoordOffset = cylinderAngleOffsets[x] * panoWidth;
+		float leftSourcePos = (float)angleOffset - edgeCoordOffset;
+		float rightSourcePos = (float)angleOffset + edgeCoordOffset;
 
-		int32 leftSourceXCoord = centerXImageCoord - edgeCoordOffset;
-		int32 rightSourceXCoord = centerXImageCoord + edgeCoordOffset;
+		int32 leftSourceXCoord = static_cast<int32>(floor(leftSourcePos));
+		int32 rightSourceXCoord = static_cast<int32>(floor(rightSourcePos));
+
+		bool blendLeft = blend && leftSourcePos - leftSourceXCoord >= 0.5f;
+		bool blendRight = blend && rightSourcePos - rightSourceXCoord >= 0.5f;
 
 		int32 topSrcCoord = 0, bottomSrcCoord = 0;
 		if (warpMode != 0) {
@@ -1445,20 +1465,20 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		// According to the sourceSurface's dimensions rather than the original's
 		int factor = scaleFactor == 3 && !_decoder->_renderHotspots ? 2 : 1;
 
-		// Wrap around if out of range
-		leftSourceXCoord = leftSourceXCoord % static_cast<int32>(panoWidth);
-		if (leftSourceXCoord < 0) {
-			leftSourceXCoord += panoWidth;
-		}
+		// Wrap around if out of range. The panorama is stored with x running
+		// backwards
+		auto toSourceRow = [&](int32 coord) {
+			coord %= panoWidth;
+			if (coord < 0)
+				coord += panoWidth;
 
-		leftSourceXCoord = desc->_sceneSizeY * factor - 1 - leftSourceXCoord;
+			return desc->_sceneSizeY * factor - 1 - coord;
+		};
 
-		rightSourceXCoord = rightSourceXCoord % static_cast<int32>(panoWidth);
-		if (rightSourceXCoord < 0) {
-			rightSourceXCoord += panoWidth;
-		}
-
-		rightSourceXCoord = desc->_sceneSizeY * factor - 1 - rightSourceXCoord;
+		int32 leftNextSourceXCoord = toSourceRow(leftSourceXCoord + 1);
+		int32 rightNextSourceXCoord = toSourceRow(rightSourceXCoord + 1);
+		leftSourceXCoord = toSourceRow(leftSourceXCoord);
+		rightSourceXCoord = toSourceRow(rightSourceXCoord);
 
 		uint16 x1 = halfWidthRoundedUp - 1 - x;
 		uint16 x2 = w - halfWidthRoundedUp + x;
@@ -1483,6 +1503,11 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 			// Our panorma is apparently vertical, that's why we're passing Y co-ord before X co-ord
 			uint32 pixel1 = sourceSurface->getPixel(sourceYCoord, leftSourceXCoord);
 			uint32 pixel2 = sourceSurface->getPixel(sourceYCoord, rightSourceXCoord);
+
+			if (blendLeft)
+				pixel1 = averagePixels(sourceSurface->format, pixel1, sourceSurface->getPixel(sourceYCoord, leftNextSourceXCoord));
+			if (blendRight)
+				pixel2 = averagePixels(sourceSurface->format, pixel2, sourceSurface->getPixel(sourceYCoord, rightNextSourceXCoord));
 
 			if (_decoder->_renderHotspots) {
 				const byte *col1 = &quickTimeDefaultPalette256[pixel1 * 3];
@@ -1534,7 +1559,9 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		float xInterpolator = sideEdgeXYInterpolators[y * 2 + 0];
 		float yInterpolator = sideEdgeXYInterpolators[y * 2 + 1];
 
-		int32 srcY = static_cast<int32>(yInterpolator * (float)h);
+		float srcYPos = yInterpolator * (float)h;
+		int32 srcY = static_cast<int32>(srcYPos);
+		bool blendRow = blend && srcYPos - srcY >= 0.5f && srcY + 1 < h;
 		int32 scanlineWidth = static_cast<int32>(xInterpolator * w);
 		int32 startX = (w - scanlineWidth) / 2;
 		//int32 endX = startX + scanlineWidth;
@@ -1544,6 +1571,9 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		for (uint16 x = 0; x < w; x++) {
 			int32 srcX = (x + 0.5f) * xInterpolator + startX;
 			uint32 pixel = _planarProjection->getPixel(srcX, srcY);
+
+			if (blendRow)
+				pixel = averagePixels(_planarProjection->format, pixel, _planarProjection->getPixel(srcX, srcY + 1));
 
 			// I increased the size of the surface (made it twice as wide and twice as tall)
 			// Now I'm just getting the perspective projected pixel and creating a 2x2 box
