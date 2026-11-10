@@ -900,6 +900,37 @@ void QuickTimeDecoder::PanoTrackHandler::initPanorama() {
 	_decoder->goToNode(_decoder->_panoTrack->panoInfo.defNodeID);
 }
 
+// Unpacks and packs pixels with plain shifts when every channel is 8 bits
+// wide, otherwise through PixelFormat. Gives the same values either way.
+struct PanoPixelCodec {
+	const Graphics::PixelFormat &_format;
+	bool _fast, _hasAlpha;
+
+	PanoPixelCodec(const Graphics::PixelFormat &format) : _format(format) {
+		_hasAlpha = format.aLoss == 0;
+		_fast = format.bytesPerPixel == 4 && format.rLoss == 0 && format.gLoss == 0 && format.bLoss == 0 &&
+			(format.aLoss == 0 || format.aLoss == 8);
+	}
+
+	inline void unpack(uint32 p, uint8 &a, uint8 &r, uint8 &g, uint8 &b) const {
+		if (!_fast) {
+			_format.colorToARGB(p, a, r, g, b);
+			return;
+		}
+		a = _hasAlpha ? (p >> _format.aShift) & 0xFF : 0xFF;
+		r = (p >> _format.rShift) & 0xFF;
+		g = (p >> _format.gShift) & 0xFF;
+		b = (p >> _format.bShift) & 0xFF;
+	}
+
+	inline uint32 pack(uint8 a, uint8 r, uint8 g, uint8 b) const {
+		if (!_fast)
+			return _format.ARGBToColor(a, r, g, b);
+		return ((uint32)r << _format.rShift) | ((uint32)g << _format.gShift) | ((uint32)b << _format.bShift) |
+			(_hasAlpha ? (uint32)a << _format.aShift : 0);
+	}
+};
+
 Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics::Surface *sourceSurface, int8 level) {
 	// This algorithm (bilinear upscaling) takes quite some time to complete
 	//
@@ -921,6 +952,7 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 	uint h = sourceSurface->h;
 
 	Graphics::Surface *target = new Graphics::Surface();
+	const PanoPixelCodec codec(sourceSurface->format);
 
 	if (level == 2) {
 		target->create(w * 2, h * 2, sourceSurface->format);
@@ -944,15 +976,15 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 				uint8 a10, r10, g10, b10;
 				uint8 a11, r11, g11, b11;
 
-				sourceSurface->format.colorToARGB(p00, a00, r00, g00, b00);
-				sourceSurface->format.colorToARGB(p01, a01, r01, g01, b01);
-				sourceSurface->format.colorToARGB(p10, a10, r10, g10, b10);
-				sourceSurface->format.colorToARGB(p11, a11, r11, g11, b11);
+				codec.unpack(p00, a00, r00, g00, b00);
+				codec.unpack(p01, a01, r01, g01, b01);
+				codec.unpack(p10, a10, r10, g10, b10);
+				codec.unpack(p11, a11, r11, g11, b11);
 
 				int32 avgPixel00 = p00;
-				int32 avgPixel01 = sourceSurface->format.ARGBToColor((a00 + a01) >> 1, (r00 + r01) >> 1, (g00 + g01) >> 1, (b00 + b01) >> 1);
-				int32 avgPixel10 = sourceSurface->format.ARGBToColor((a00 + a10) >> 1, (r00 + r10) >> 1, (g00 + g10) >> 1, (b00 + b10) >> 1);
-				int32 avgPixel11 =  sourceSurface->format.ARGBToColor(
+				int32 avgPixel01 = codec.pack((a00 + a01) >> 1, (r00 + r01) >> 1, (g00 + g01) >> 1, (b00 + b01) >> 1);
+				int32 avgPixel10 = codec.pack((a00 + a10) >> 1, (r00 + r10) >> 1, (g00 + g10) >> 1, (b00 + b10) >> 1);
+				int32 avgPixel11 =  codec.pack(
 					(a00 + a01 + a10 + a11) >> 2,
 					(r00 + r01 + r10 + r11) >> 2,
 					(g00 + g01 + g10 + g11) >> 2,
@@ -976,11 +1008,11 @@ Graphics::Surface *QuickTimeDecoder::PanoTrackHandler::upscalePanorama(Graphics:
 
 				uint8 a00, r00, g00, b00;
 				uint8 a01, r01, g01, b01;
-				sourceSurface->format.colorToARGB(p00, a00, r00, g00, b00);
-				sourceSurface->format.colorToARGB(p01, a01, r01, g01, b01);
+				codec.unpack(p00, a00, r00, g00, b00);
+				codec.unpack(p01, a01, r01, g01, b01);
 
 				int32 avgPixel00 = p00;
-				int32 avgPixel01 = sourceSurface->format.ARGBToColor((a00 + a01) >> 1, (r00 + r01) >> 1, (g00 + g01) >> 1, (b00 + b01) >> 1);
+				int32 avgPixel01 = codec.pack((a00 + a01) >> 1, (r00 + r01) >> 1, (g00 + g01) >> 1, (b00 + b01) >> 1);
 
 				target->setPixel(x * 2, y, avgPixel00);
 				target->setPixel(x * 2 + 1, y, avgPixel01);
@@ -1024,6 +1056,7 @@ void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSur
 	}
 
 	uint8 scaleSquare = scaleFactor * scaleFactor;
+	const PanoPixelCodec codec(_projectedPano->format);
 
 	// Average out the pixels from the larger image
 	for (uint16 y = 0; y < h / scaleFactor; y++) {
@@ -1034,7 +1067,7 @@ void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSur
 				for (uint8 column = 0; column < scaleFactor; column++) {
 					uint8 a00, r00, g00, b00;
 					uint32 pixel00 = sourceSurface->getPixel(MIN((x * scaleFactor + row), w - 1), MIN((y * scaleFactor + column), h - 1));
-					_projectedPano->format.colorToARGB(pixel00, a00, r00, g00, b00);
+					codec.unpack(pixel00, a00, r00, g00, b00);
 
 					avgA += a00;
 					avgR += r00;
@@ -1048,7 +1081,7 @@ void QuickTimeDecoder::PanoTrackHandler::boxAverage(Graphics::Surface *sourceSur
 			avgG /= scaleSquare;
 			avgB /= scaleSquare;
 
-			uint32 avgPixel = _projectedPano->format.ARGBToColor(avgA, avgR, avgG, avgB);
+			uint32 avgPixel = codec.pack(avgA, avgR, avgG, avgB);
 			_projectedPano->setPixel(x, y, avgPixel);
 		}
 	}
