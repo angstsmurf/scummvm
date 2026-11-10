@@ -1562,9 +1562,10 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 		float srcYPos = yInterpolator * (float)h;
 		int32 srcY = static_cast<int32>(srcYPos);
 		bool blendRow = blend && srcYPos - srcY >= 0.5f && srcY + 1 < h;
-		int32 scanlineWidth = static_cast<int32>(xInterpolator * w);
-		int32 startX = (w - scanlineWidth) / 2;
-		//int32 endX = startX + scanlineWidth;
+		// Keep the fraction of the inset, like WarpRows in the QTVR 1.0 mhlr.
+		// Rounding it shifted every other row by a pixel at 1x, as the
+		// scanline width changes by about a pixel per row when tilted
+		float startX = (float)w * (1.0f - xInterpolator) / 2.0f;
 
 		// It would be better to compute a reciprocal and do this as a multiply instead,
 		// doing divides per pixel is SLOW!
