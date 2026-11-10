@@ -166,10 +166,6 @@ void QuickTimeDecoder::setQuality(float quality) {
 }
 
 void QuickTimeDecoder::setWarpMode(int warpMode) {
-	// Curretnly the warp mode 1 is not implemented correctly
-	// So, forcing the warp mode 1 to warp mode 2
-	if (warpMode == 1) warpMode = 2;
-
 	_warpMode = CLIP(warpMode, 0, 2);
 
 	// 2 Two-dimensional warping. This produces perspectively correct
@@ -1028,6 +1024,18 @@ Common::Point QuickTimeDecoder::PanoTrackHandler::projectPoint(int16 mx, int16 m
 	float verticalFovRadians = _decoder->_fov * M_PI / 180.0f;
 	float tiltAngleRadians = -_decoder->_tiltAngle * M_PI / 180.0f;
 
+	if (warpMode == 1) {
+		// Untilted view plane; the tilt only shifts it (see projectPanorama)
+		float halfFovRadians = verticalFovRadians / 2.0f;
+		float topY = -tan(halfFovRadians - tiltAngleRadians);
+		float bottomY = -tan(-halfFovRadians - tiltAngleRadians);
+
+		maxProjectedX = tan(halfFovRadians) * (float)w / (float)h;
+		mousePixelVector[0] = maxProjectedX;
+		mousePixelVector[1] = topY + ((float)my + 0.5f) / (float)h * (bottomY - topY);
+		mousePixelVector[2] = 1.0f;
+	}
+
 	if (warpMode == 0) {
 		t = (float)mx / (float)(w) - 0.5f;
 		xCoord = t * horizontalFovRadians / M_PI / 2.0f;
@@ -1057,7 +1065,7 @@ Common::Point QuickTimeDecoder::PanoTrackHandler::projectPoint(int16 mx, int16 m
 		// To do that, compute the length of the XZ vector,
 		float xzVectorLen = sqrt(xCoord * xCoord + 1.0f);
 
-		float projectedY = xzVectorLen * mousePixelVector[1] / mousePixelVector[2];
+		float projectedY = mousePixelVector[1] / mousePixelVector[2] / xzVectorLen;
 		float normalizedYCoordinate = (projectedY - minTiltY) / (maxTiltY - minTiltY);
 		hotY = (int)(normalizedYCoordinate * (float)hotWidth);
 	}
@@ -1186,6 +1194,19 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 
 	float minProjectedY = topRightVector[1] / topRightVector[2];
 	float maxProjectedY = bottomRightVector[1] / bottomRightVector[2];
+
+	if (_decoder->_warpMode == 1) {
+		// One-dimensional warping (QTVR 1.0, mhlr 0x10007308 / 0x100082f8):
+		// the view plane stays vertical. The tilt moves its window up or
+		// down instead of rotating it, so vertical lines stay vertical.
+		// Each column only gets the cylinder's cos(angle) vertical scaling.
+		float halfFovRadians = fov * M_PI / 360.0f;
+		float tiltRadians = tiltAngle * M_PI / 180.0f;
+
+		maxProjectedX = tan(halfFovRadians) * (float)w / (float)h;
+		minProjectedY = -tan(tiltRadians + halfFovRadians);
+		maxProjectedY = -tan(tiltRadians - halfFovRadians);
+	}
 
 	float panRange = abs(desc->_hPanEnd - desc->_hPanStart);
 	float angleT = fmod((panRange - panAngle) / panRange, 1.0f);
