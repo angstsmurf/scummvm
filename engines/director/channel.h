@@ -60,6 +60,7 @@ public:
 	bool isStretched();
 	bool isDirty(Sprite *nextSprite = nullptr);
 	bool isEmpty();
+	bool isTextSprite();
 	bool isActiveText();
 	CollisionTest isMouseIn(const Common::Point &pos);
 	bool isMatteIntersect(Channel *channel);

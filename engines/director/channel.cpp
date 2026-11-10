@@ -393,8 +393,17 @@ bool Channel::isEmpty() {
 	return (_sprite->_spriteType == kInactiveSprite);
 }
 
+bool Channel::isTextSprite() {
+	if (_sprite->_spriteType == kTextSprite)
+		return true;
+
+	// A sprite of type 16 takes its type from its cast member.
+	// Director 5 scores give field sprites this type.
+	return _sprite->_spriteType == kCastMemberSprite && _sprite->_cast && _sprite->_cast->_type == kCastText;
+}
+
 bool Channel::isActiveText() {
-	if (_sprite->_spriteType != kTextSprite)
+	if (!isTextSprite())
 		return false;
 
 	if (_widget && _widget->hasAllFocus())
@@ -914,7 +923,7 @@ bool Channel::isTrail() {
 }
 
 int Channel::getMouseChar(int x, int y) {
-	if (_sprite->_spriteType != kTextSprite)
+	if (!isTextSprite())
 		return -1;
 
 	if (!_widget) {
@@ -926,7 +935,7 @@ int Channel::getMouseChar(int x, int y) {
 }
 
 int Channel::getMouseWord(int x, int y) {
-	if (_sprite->_spriteType != kTextSprite)
+	if (!isTextSprite())
 		return -1;
 
 	if (!_widget) {
@@ -938,7 +947,7 @@ int Channel::getMouseWord(int x, int y) {
 }
 
 int Channel::getMouseItem(int x, int y) {
-	if (_sprite->_spriteType != kTextSprite)
+	if (!isTextSprite())
 		return -1;
 
 	if (!_widget) {
@@ -950,7 +959,7 @@ int Channel::getMouseItem(int x, int y) {
 }
 
 int Channel::getMouseLine(int x, int y) {
-	if (_sprite->_spriteType != kTextSprite)
+	if (!isTextSprite())
 		return -1;
 
 	if (!_widget) {
