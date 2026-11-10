@@ -163,6 +163,20 @@ void OnScreenDialog::setReplayedTime(uint32 newTime) {
 OnScreenDialog::~OnScreenDialog() {
 }
 
+bool OnScreenDialog::needsRedraw() const {
+	if (_drawnPos != Common::Point(_x, _y))
+		return true;
+	for (Widget *w = _firstWidget; w; w = w->next()) {
+		if (w->needsRedraw())
+			return true;
+	}
+	return false;
+}
+
+void OnScreenDialog::markDrawn() {
+	_drawnPos = Common::Point(_x, _y);
+}
+
 void OnScreenDialog::handleMouseMoved(int x, int y, int button) {
 	if (_enableDrag) {
 		_x = _x + x - _dragPoint.x;

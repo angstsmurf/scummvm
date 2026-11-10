@@ -111,6 +111,8 @@ private:
 	bool		_needsRedraw;
 
 public:
+	bool needsRedraw() const { return _needsRedraw; }
+
 	static Widget *findWidgetInChain(Widget *start, int x, int y);
 	static Widget *findWidgetInChain(Widget *start, const char *name);
 	static Widget *findWidgetInChain(Widget *w, uint32 type);
