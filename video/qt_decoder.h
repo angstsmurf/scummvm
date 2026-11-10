@@ -106,6 +106,8 @@ public:
 	void setCurrentRow(int row);
 	int getCurrentColumn() { return _nextVideoTrack->getCurFrame() % _nav.columns; }
 	void setCurrentColumn(int column);
+	int getObjectFrame(float hPan, float vPan) const;
+	int limitObjectColumn(int column) const;
 
 	int getZoomState() { return _zoomState; }
 
@@ -183,6 +185,13 @@ private:
 	void cleanupCursors();
 	void computeInteractivityZones();
 
+	Common::Rect getObjectBox();
+	int getObjectEdge(int16 x, int16 y, int &dRow, int &dCol, int &depth);
+	void setObjectView(float hPan, float vPan);
+	void setObjectColumnRow(int column, int row);
+	void syncObjectView();
+	void updateObjectEdgeRotation();
+
 	uint16 _width, _height;
 	// _origin is the top left corner point of the panorama video being played
 	// by director engine or whichever engine is using QTVR decoder currently
@@ -236,6 +245,15 @@ private:
 
 	float _panAngle = 0.0f;
 	float _tiltAngle = 0.0f;
+
+	// Object movie view, kept as the QTVR 1.0 player keeps it: a continuous
+	// pan and tilt that picks the frame
+	float _objectHPan = 0.0f;
+	float _objectVPan = 0.0f;
+	bool _objectDragging = false;
+	int _objectEdge = 0;
+	uint32 _objectEdgeTime = 0;
+	Common::Point _objectMouse;
 	float _fov = 56.0f;
 	float _hfov = 56.0f;
 	int _zoomState = kZoomNone;
