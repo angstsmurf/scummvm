@@ -51,6 +51,7 @@ bool BaseMacWindow::isVisible() { return _visible; }
 MacWindow::MacWindow(int id, bool scrollable, bool resizable, bool editable, MacWindowManager *wm) :
 		BaseMacWindow(id, editable, wm), _scrollable(scrollable), _resizable(resizable) {
 	_borderIsDirty = true;
+	_borderIsEmpty = false;
 
 	_pattern = 0;
 	_hasPattern = false;
@@ -82,6 +83,7 @@ MacWindow::MacWindow(const MacWindow &source) :
 	BaseMacWindow(source),
 
 	_borderIsDirty(source._borderIsDirty),
+	_borderIsEmpty(source._borderIsEmpty),
 	_innerDims(source._innerDims),
 	_dirtyRects(source._dirtyRects),
 	_hasScrollBar(source._hasScrollBar),
@@ -216,11 +218,27 @@ bool MacWindow::draw(bool forceRedraw) {
 	if (!_borderIsDirty && !_contentIsDirty && !forceRedraw)
 		return false;
 
-	if (_borderIsDirty || forceRedraw)
+	if (_borderIsDirty || forceRedraw) {
 		drawBorder();
+		_borderIsEmpty = isSurfaceAllColor(_borderSurface, getBorderTransColor());
+	}
 
 	_contentIsDirty = false;
 
+	return true;
+}
+
+uint32 MacWindow::getBorderTransColor() const {
+	return _wm->_pixelformat.isCLUT8() ? _wm->_colorGreen : 0;
+}
+
+bool MacWindow::isSurfaceAllColor(const ManagedSurface &surface, uint32 color) {
+	for (int y = 0; y < surface.h; y++) {
+		for (int x = 0; x < surface.w; x++) {
+			if (surface.getPixel(x, y) != color)
+				return false;
+		}
+	}
 	return true;
 }
 
@@ -230,9 +248,9 @@ bool MacWindow::draw(ManagedSurface *g, bool forceRedraw) {
 
 	g->blitFrom(*_composeSurface, Common::Rect(0, 0, _composeSurface->w, _composeSurface->h), Common::Point(_innerDims.left, _innerDims.top));
 
-	uint32 transcolor = _wm->_pixelformat.isCLUT8() ? _wm->_colorGreen : 0;
-
-	g->transBlitFrom(_borderSurface, Common::Rect(0, 0, _borderSurface.w, _borderSurface.h), Common::Point(_dims.left, _dims.top), transcolor);
+	// A fully transparent border (e.g. the borderless Director stage) draws nothing
+	if (!_borderIsEmpty)
+		g->transBlitFrom(_borderSurface, Common::Rect(0, 0, _borderSurface.w, _borderSurface.h), Common::Point(_dims.left, _dims.top), getBorderTransColor());
 
 	return true;
 }

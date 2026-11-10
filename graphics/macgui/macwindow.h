@@ -419,12 +419,15 @@ private:
 
 protected:
 	void drawBorder();
+	uint32 getBorderTransColor() const;
+	static bool isSurfaceAllColor(const ManagedSurface &surface, uint32 color);
 	WindowClick isInBorder(int x, int y) const;
 
 protected:
 	ManagedSurface _borderSurface;
 
 	bool _borderIsDirty;
+	bool _borderIsEmpty;
 	Common::Rect _innerDims;
 
 	Common::List<Common::Rect> _dirtyRects;
