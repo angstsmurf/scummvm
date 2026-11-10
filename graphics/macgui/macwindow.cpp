@@ -228,6 +228,45 @@ bool MacWindow::draw(bool forceRedraw) {
 	return true;
 }
 
+Common::Rect MacWindow::blitChangedContent(ManagedSurface *g) {
+	Common::Rect changed;
+	Common::Rect dst(_innerDims);
+	dst.clip(Common::Rect(g->w, g->h));
+	if (dst.isEmpty())
+		return changed;
+
+	const int bpp = g->format.bytesPerPixel;
+	const int width = dst.width();
+	const int srcX = dst.left - _innerDims.left;
+
+	for (int y = dst.top; y < dst.bottom; y++) {
+		const byte *src = (const byte *)_composeSurface->getBasePtr(srcX, y - _innerDims.top);
+		byte *out = (byte *)g->getBasePtr(dst.left, y);
+		if (memcmp(src, out, width * bpp) == 0)
+			continue;
+
+		int left = 0;
+		while (memcmp(src + left * bpp, out + left * bpp, bpp) == 0)
+			left++;
+		int right = width;
+		while (memcmp(src + (right - 1) * bpp, out + (right - 1) * bpp, bpp) == 0)
+			right--;
+
+		memcpy(out + left * bpp, src + left * bpp, (right - left) * bpp);
+
+		Common::Rect row(dst.left + left, y, dst.left + right, y + 1);
+		if (changed.isEmpty())
+			changed = row;
+		else
+			changed.extend(row);
+	}
+
+	if (!changed.isEmpty())
+		g->addDirtyRect(changed);
+
+	return changed;
+}
+
 uint32 MacWindow::getBorderTransColor() const {
 	return _wm->_pixelformat.isCLUT8() ? _wm->_colorGreen : 0;
 }
@@ -243,8 +282,21 @@ bool MacWindow::isSurfaceAllColor(const ManagedSurface &surface, uint32 color) {
 }
 
 bool MacWindow::draw(ManagedSurface *g, bool forceRedraw) {
+	bool borderWasDirty = _borderIsDirty;
+
 	if (!draw(forceRedraw))
 		return false;
+
+	// Without a border on top, g holds exactly the content drawn last time
+	// unless something covered it, so copying the pixels that differ is
+	// enough. Games like Safecracker update the stage every few ms while
+	// only a small part of it changes.
+	if (!forceRedraw && !borderWasDirty && _borderIsEmpty && g->format == _composeSurface->format) {
+		_lastDrawnArea = blitChangedContent(g);
+		return true;
+	}
+
+	_lastDrawnArea = _dims;
 
 	g->blitFrom(*_composeSurface, Common::Rect(0, 0, _composeSurface->w, _composeSurface->h), Common::Point(_innerDims.left, _innerDims.top));
 

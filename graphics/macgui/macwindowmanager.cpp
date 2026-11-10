@@ -1100,8 +1100,12 @@ void MacWindowManager::draw() {
 			}
 		} else if (w->draw(_screen, forceRedraw)) {
 			w->setDirty(false);
-			copyRectToScreen(_screen->getBasePtr(clip.left, clip.top), _screen->pitch, clip.left, clip.top, clip.width(), clip.height());
-			dirtyRects.push_back(clip);
+			Common::Rect area = w->getLastDrawnArea();
+			area.clip(clip);
+			if (!area.isEmpty()) {
+				copyRectToScreen(_screen->getBasePtr(area.left, area.top), _screen->pitch, area.left, area.top, area.width(), area.height());
+				dirtyRects.push_back(area);
+			}
 		}
 	}
 

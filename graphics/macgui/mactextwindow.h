@@ -39,6 +39,7 @@ public:
 	bool processEvent(Common::Event &event) override;
 
 	bool draw(ManagedSurface *g, bool forceRedraw = false) override;
+	Common::Rect getLastDrawnArea() override { return getDimensions(); }
 	bool draw(bool forceRedraw = false) override;
 	void blit(ManagedSurface *g, Common::Rect &dest) override;
 
