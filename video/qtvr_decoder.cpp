@@ -176,7 +176,9 @@ void QuickTimeDecoder::setWarpMode(int warpMode) {
 	// 0 No warping. This reproduces the source panorama directly,
 	//   without warping it at all.
 
-	// The mode changes the horizontal field of view, so clamp the pan and tilt again
+	// The mode changes the horizontal field of view, so clamp the zoom, pan and
+	// tilt again
+	setFOV(_fov);
 	setPanAngle(_panAngle);
 	setTiltAngle(_tiltAngle);
 
@@ -337,6 +339,32 @@ float QuickTimeDecoder::getHalfHFOV() const {
 	return atan(tan(_fov * M_PI / 360.0) * _width / _height) * 180.0 / M_PI;
 }
 
+// The widest vertical field of view that fits in the panorama, in degrees.
+// The view can't be taller than the panorama's vertical range, and for a
+// partial panorama, half its width must stay 0.05 radians short of half the
+// pan range (mhlr GetMaxFOVLimit and UpdateHFOV)
+float QuickTimeDecoder::getMaxFOV() const {
+	PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
+	float maxFOV = 180.0f;
+
+	if (desc->_vPanTop > desc->_vPanBottom)
+		maxFOV = desc->_vPanTop - desc->_vPanBottom;
+
+	if (!isPano360() && _width != 0 && _height != 0) {
+		float maxHalfHFOV = getPanRange() * M_PI / 360.0f - 0.05f;
+		float hfovLimit;
+
+		if (_warpMode == 0)
+			hfovLimit = 2.0f * maxHalfHFOV * 180.0f / (float)M_PI * _height / _width;
+		else
+			hfovLimit = 2.0f * atan(tan(maxHalfHFOV) * _height / _width) * 180.0f / (float)M_PI;
+
+		maxFOV = MIN(maxFOV, MAX(hfovLimit, 0.0f));
+	}
+
+	return maxFOV;
+}
+
 void QuickTimeDecoder::setPanAngle(float angle) {
 	PanoSampleDesc *desc = (PanoSampleDesc *)_panoTrack->sampleDescs[0];
 
@@ -410,6 +438,14 @@ bool QuickTimeDecoder::setFOV(float fov) {
 		success = false;
 	} else if (fov >= desc->_maximumZoom) {
 		fov = desc->_maximumZoom;
+		success = false;
+	}
+
+	// Keep the view inside the panorama, like UpdateHFOV and GetMaxFOVLimit
+	// in the QTVR 1.0 mhlr. These limits win over the minimum zoom
+	float maxFOV = getMaxFOV();
+	if (fov > maxFOV) {
+		fov = maxFOV;
 		success = false;
 	}
 
