@@ -158,6 +158,27 @@ public:
 	Datum createScriptInstance(BehaviorElement *behavior);
 
 private:
+	// How each projector version steps through frames, as measured in the
+	// projectors. The comments at the call sites hold the evidence.
+
+	// D4+ send stepMovie and enterFrame from one routine; a go inside
+	// stepMovie returns to it and enterFrame goes to the frame current then
+	bool enterFrameFollowsStepMovie() const { return _version >= kFileVer400; }
+	// D4+ restart the frame timer when idle goes to another frame, so the
+	// next poll can exit the frame before idle runs again
+	bool goFromIdleRestartsTimer() const { return _version >= kFileVer400; }
+	// D7 returns from the frame step while a "delay" runs, before idle
+	bool delayBlocksIdle() const { return _version >= kFileVer700; }
+	// D4-D6 keep sending exitFrame on every pass while a "delay" runs
+	bool exitFrameRepeatsDuringDelay() const { return _version >= kFileVer400 && _version < kFileVer700; }
+	// D2-D5 rebuild the frame from the score on every jump, even to the
+	// current frame, dropping Lingo changes to non-puppet sprites
+	bool jumpRebuildsFrame() const { return _version < kFileVer600; }
+	// In D4, a click Lingo hasn't handled yet ends a wait for a click
+	bool queuedClickEndsClickWait() const { return _version >= kFileVer400 && _version < kFileVer500; }
+	// D4+ stop nesting go at depth 2 (skipping stepMovie and enterFrame)
+	bool hasGoNestingLimit() const { return _version >= kFileVer400; }
+
 	bool isWaitingForNextFrame();
 	void updateCurrentFrame();
 	void updateNextFrameTime();
