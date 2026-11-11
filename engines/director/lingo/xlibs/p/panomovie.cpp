@@ -94,11 +94,43 @@ static const BuiltinProto navBuiltins[] = {
 
 typedef Common::HashMap<int, PanoMovieState *> PanoMovieMap;
 
-static PanoMovieMap *s_panoMovies = nullptr;
-static PanoMovieMap *s_navMovies = nullptr;
-static int s_nextMovieID = 1;
+// The movies one of the XCMDs has open. The map is created on the first
+// OpenMovie: a static map would be a global constructor.
+struct PanoMovieRegistry {
+	const char *name;
+	PanoMovieMap *movies;
 
-static void disposeAll(PanoMovieMap *&movies) {
+	int add(PanoMovieState *m);
+	PanoMovieState *get(int id) const;
+	void dispose(int id);
+	void disposeAll();
+};
+
+static PanoMovieRegistry s_panoMovies = { "PanoMovie", nullptr };
+static PanoMovieRegistry s_navMovies = { "NavMovie", nullptr };
+static int s_nextMovieID = 1;	// shared by both XCMDs
+
+int PanoMovieRegistry::add(PanoMovieState *m) {
+	if (!movies)
+		movies = new PanoMovieMap();
+	int id = s_nextMovieID++;
+	(*movies)[id] = m;
+	return id;
+}
+
+PanoMovieState *PanoMovieRegistry::get(int id) const {
+	return movies ? movies->getValOrDefault(id, nullptr) : nullptr;
+}
+
+void PanoMovieRegistry::dispose(int id) {
+	PanoMovieState *m = get(id);
+	if (!m)
+		return;
+	movies->erase(id);
+	delete m;
+}
+
+void PanoMovieRegistry::disposeAll() {
 	if (!movies)
 		return;
 	for (auto &it : *movies)
@@ -188,7 +220,7 @@ static void drawMovie(PanoMovieState *m) {
 		m->_offscreen.free();
 }
 
-static Datum openMovie(PanoMovieMap *&movies, const Common::Array<Datum> &args) {
+static Datum openMovie(PanoMovieRegistry &registry, const Common::Array<Datum> &args) {
 	if (args.size() < 4)
 		return errorDatum("OpenMovie needs a window type, file name and location");
 
@@ -226,11 +258,7 @@ static Datum openMovie(PanoMovieMap *&movies, const Common::Array<Datum> &args) 
 			showPoster = true;
 	}
 
-	if (!movies)
-		movies = new PanoMovieMap();
-
-	int id = s_nextMovieID++;
-	(*movies)[id] = m;
+	int id = registry.add(m);
 
 	debugC(5, kDebugXObj, "PanoMovie: opened '%s' as %d at %d,%d,%d,%d", path.toString().c_str(), id,
 		m->_rect.left, m->_rect.top, m->_rect.right, m->_rect.bottom);
@@ -443,20 +471,19 @@ static void setProperty(PanoMovieState *m, const Common::String &prop, const Dat
 		warning("PanoMovie: STUB: set '%s' to '%s'", prop.c_str(), str.c_str());
 }
 
-static Datum directCommand(PanoMovieMap *movies, const Common::Array<Datum> &args) {
+static Datum directCommand(PanoMovieRegistry &registry, const Common::Array<Datum> &args) {
 	if (args.size() < 3)
 		return errorDatum("missing command");
 
 	int id = args[1].asInt();
-	if (!movies || !movies->contains(id))
+	PanoMovieState *m = registry.get(id);
+	if (!m)
 		return errorDatum("no movie %s", args[1].asString().c_str());
 
-	PanoMovieState *m = (*movies)[id];
 	Common::String cmd = args[2].asString();
 
 	if (cmd.equalsIgnoreCase("dispose")) {
-		movies->erase(id);
-		delete m;
+		registry.dispose(id);
 		g_director->getCurrentWindow()->setDirty(true);
 		return Datum("");
 	}
@@ -496,7 +523,7 @@ static Datum directCommand(PanoMovieMap *movies, const Common::Array<Datum> &arg
 	return Datum("");
 }
 
-static Datum runXCMD(const char *name, PanoMovieMap *&movies, int nargs) {
+static Datum runXCMD(PanoMovieRegistry &registry, int nargs) {
 	Common::Array<Datum> args;
 	args.resize(nargs);
 	for (int i = nargs - 1; i >= 0; i--)
@@ -506,16 +533,16 @@ static Datum runXCMD(const char *name, PanoMovieMap *&movies, int nargs) {
 		Common::String s;
 		for (auto &a : args)
 			s += a.asString(true) + " ";
-		debugC(5, kDebugXObj, "%s(%s)", name, s.c_str());
+		debugC(5, kDebugXObj, "%s(%s)", registry.name, s.c_str());
 	}
 
 	Datum res;
 	if (nargs >= 1 && args[0].asString().equalsIgnoreCase("OpenMovie"))
-		res = openMovie(movies, args);
+		res = openMovie(registry, args);
 	else if (nargs >= 1 && args[0].asString().equalsIgnoreCase("Direct"))
-		res = directCommand(movies, args);
+		res = directCommand(registry, args);
 	else
-		res = errorDatum("unknown %s call", name);
+		res = errorDatum("unknown %s call", registry.name);
 
 	g_lingo->_theResult = res;
 	return res;
@@ -527,15 +554,15 @@ void PanoMovieXCMD::open(ObjectType type, const Common::Path &path) {
 
 void PanoMovieXCMD::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(panoBuiltins);
-	disposeAll(s_panoMovies);
+	s_panoMovies.disposeAll();
 }
 
 void PanoMovieXCMD::m_panoMovie(int nargs) {
-	g_lingo->push(runXCMD("PanoMovie", s_panoMovies, nargs));
+	g_lingo->push(runXCMD(s_panoMovies, nargs));
 }
 
 void PanoMovieXCMD::m_panoMovieCmd(int nargs) {
-	runXCMD("PanoMovie", s_panoMovies, nargs);
+	runXCMD(s_panoMovies, nargs);
 }
 
 void NavMovieXCMD::open(ObjectType type, const Common::Path &path) {
@@ -544,15 +571,15 @@ void NavMovieXCMD::open(ObjectType type, const Common::Path &path) {
 
 void NavMovieXCMD::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(navBuiltins);
-	disposeAll(s_navMovies);
+	s_navMovies.disposeAll();
 }
 
 void NavMovieXCMD::m_navMovie(int nargs) {
-	g_lingo->push(runXCMD("NavMovie", s_navMovies, nargs));
+	g_lingo->push(runXCMD(s_navMovies, nargs));
 }
 
 void NavMovieXCMD::m_navMovieCmd(int nargs) {
-	runXCMD("NavMovie", s_navMovies, nargs);
+	runXCMD(s_navMovies, nargs);
 }
 
 ///////////////
