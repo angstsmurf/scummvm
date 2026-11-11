@@ -174,7 +174,7 @@ bool Sprite::operator==(const Sprite &sprite) {
 		_backColorIndex == sprite._backColorIndex &&
 		_blendAmount == sprite._blendAmount &&
 		_ink == sprite._ink &&
-		(_thickness | kTTweened) == (sprite._thickness | kTTweened);
+		getDrawThickness() == sprite.getDrawThickness();
 }
 
 Sprite::Sprite(const Sprite &sprite) {

@@ -25,10 +25,15 @@
 #include "director/cursor.h"
 #include "director/sprite.h"
 
+namespace Common {
+struct KeyState;
+}
+
 namespace Graphics {
 	struct Surface;
 	class ManagedSurface;
 	class MacWidget;
+	class MacText;
 }
 
 namespace Director {
@@ -92,6 +97,8 @@ public:
 	bool canKeepWidget(CastMemberID castId);
 	bool canKeepWidget(Sprite *currentSprite, Sprite *nextSprite);
 
+	bool dropsTypedKey(const Common::KeyState &kbd);
+
 	int getMouseChar(int x, int y);
 	int getMouseWord(int x, int y);
 	int getMouseItem(int x, int y);
@@ -139,6 +146,7 @@ public:
 	Common::Array<Datum> _scriptInstanceList;
 
 private:
+	Graphics::MacText *mouseTextWidget(const char *query);
 	Graphics::ManagedSurface *getSurface();
 	Score *_score;
 };

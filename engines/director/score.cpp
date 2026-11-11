@@ -138,7 +138,7 @@ bool Score::hasPuppetPalette() {
 		return _puppetPalette;
 
 	// A movie in a window shows the stage's palette
-	Movie *stageMovie = g_director->getStage()->getCurrentMovie();
+	Movie *stageMovie = _vm->getStage()->getCurrentMovie();
 	if (stageMovie && stageMovie->getScore())
 		return stageMovie->getScore()->_puppetPalette;
 	return false;
@@ -148,7 +148,7 @@ bool Score::controlsPalette() {
 	// In D4, only the stage's palette channel (and puppetPalette) changes
 	// the screen palette; movies in windows have it disabled.
 	if (_version < kFileVer500)
-		return _window == g_director->getStage();
+		return _window->isStage();
 	return true;
 }
 
@@ -794,10 +794,11 @@ void Score::update() {
 		}
 	}
 
-	// In every projector from D3 to D6, "go" clears any pending delay when it
-	// enters the new frame, so a go from idle during a "delay" cuts the delay
-	// short. That includes "go to the frame": Director 4 re-enters the frame at
-	// once, and only then resumes the handler that called go.
+	// In every projector from D3 to D7 (D7: DIRAPI FUN_68010154), "go" clears
+	// any pending delay when it enters the new frame, so a go from idle during
+	// a "delay" cuts the delay short. That includes "go to the frame":
+	// Director 4 re-enters the frame at once, and only then resumes the
+	// handler that called go. D2 isn't checked; the clear is left ungated.
 	if (_nextFrameDelay && hasJump && !_window->hasPendingMovieSwitch())
 		_nextFrameDelay = 0;
 
@@ -1632,21 +1633,16 @@ void Score::renderCursor(Common::Point pos, bool forceUpdate) {
 		}
 	}
 
-	Cursor *xobjCursor = _vm->getXObjCursor();
-	if (xobjCursor) {
-		if (!forceUpdate && _currentCursor == *xobjCursor)
-			return;
+	// No sprite cursor: an XObject's cursor, else the default one
+	Cursor *cursor = _vm->getXObjCursor();
+	if (!cursor)
+		cursor = &_defaultCursor;
 
-		_vm->_wm->replaceCursor(xobjCursor->_cursorType, xobjCursor);
-		_currentCursor = xobjCursor->getRef();
-		return;
-	}
-
-	if (!forceUpdate && _currentCursor == _defaultCursor)
+	if (!forceUpdate && _currentCursor == *cursor)
 		return;
 
-	_vm->_wm->replaceCursor(_defaultCursor._cursorType, &_defaultCursor);
-	_currentCursor = _defaultCursor.getRef();
+	_vm->_wm->replaceCursor(cursor->_cursorType, cursor);
+	_currentCursor = cursor->getRef();
 }
 
 Common::Array<bool> Score::modifiedMembers() {

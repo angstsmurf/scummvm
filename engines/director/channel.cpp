@@ -321,8 +321,7 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_foreColorIndex != nextSprite->_foreColorIndex ||
 			_sprite->_editable != nextSprite->_editable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
-			// The tweened flag is score authoring data and doesn't affect drawing
-			(_sprite->_thickness | kTTweened) != (nextSprite->_thickness | kTTweened);
+			_sprite->getDrawThickness() != nextSprite->getDrawThickness();
 		if (!_sprite->_moveable)
 			isDirtyFlag |= _sprite->getPosition() != nextSprite->getPosition();
 		if (isStretched() && !hasTextCastMember(_sprite))
@@ -885,52 +884,47 @@ bool Channel::isTrail() {
 			(((DigitalVideoCastMember *)_sprite->_cast)->_directToStage));
 }
 
-int Channel::getMouseChar(int x, int y) {
+// Whether a full "limit to field size" field in this channel drops a key
+// that the keyDown scripts passed on
+bool Channel::dropsTypedKey(const Common::KeyState &kbd) {
+	if (!_sprite->_cast || _sprite->_cast->_type != kCastText || isButtonSprite(_sprite->_spriteType))
+		return false;
+
+	return ((TextCastMember *)_sprite->_cast)->dropsTypedKey((Graphics::MacText *)_widget, kbd);
+}
+
+// The text widget under a mouse query, or null (with a warning if the
+// sprite is text but its widget is missing)
+Graphics::MacText *Channel::mouseTextWidget(const char *query) {
 	if (!isTextSprite())
-		return -1;
+		return nullptr;
 
 	if (!_widget) {
-		warning("Channel::getMouseChar getting mouse char on a non-existing widget");
-		return -1;
+		warning("Channel::%s: the text sprite has no widget", query);
+		return nullptr;
 	}
 
-	return ((Graphics::MacText *)_widget)->getMouseChar(x, y);
+	return (Graphics::MacText *)_widget;
+}
+
+int Channel::getMouseChar(int x, int y) {
+	Graphics::MacText *text = mouseTextWidget("getMouseChar");
+	return text ? text->getMouseChar(x, y) : -1;
 }
 
 int Channel::getMouseWord(int x, int y) {
-	if (!isTextSprite())
-		return -1;
-
-	if (!_widget) {
-		warning("Channel::getMouseWord getting mouse word on a non-existing widget");
-		return -1;
-	}
-
-	return ((Graphics::MacText *)_widget)->getMouseWord(x, y);
+	Graphics::MacText *text = mouseTextWidget("getMouseWord");
+	return text ? text->getMouseWord(x, y) : -1;
 }
 
 int Channel::getMouseItem(int x, int y) {
-	if (!isTextSprite())
-		return -1;
-
-	if (!_widget) {
-		warning("Channel::getMouseItem getting mouse item on a non-existing widget");
-		return -1;
-	}
-
-	return ((Graphics::MacText *)_widget)->getMouseItem(x, y);
+	Graphics::MacText *text = mouseTextWidget("getMouseItem");
+	return text ? text->getMouseItem(x, y) : -1;
 }
 
 int Channel::getMouseLine(int x, int y) {
-	if (!isTextSprite())
-		return -1;
-
-	if (!_widget) {
-		warning("Channel::getMouseLine getting mouse line on a non-existing widget");
-		return -1;
-	}
-
-	return ((Graphics::MacText *)_widget)->getMouseLine(x, y);
+	Graphics::MacText *text = mouseTextWidget("getMouseLine");
+	return text ? text->getMouseLine(x, y) : -1;
 }
 
 bool Channel::hasSubChannels() {

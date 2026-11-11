@@ -412,9 +412,7 @@ bool Movie::processSysEvent(Common::Event &event) {
 			// passed it. A full "limit to field size" field drops it.
 			if (result && widgetSpriteId) {
 				Channel *channel = sc->getChannelById(widgetSpriteId);
-				if (channel && channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastText &&
-						!isButtonSprite(channel->_sprite->_spriteType) &&
-						((TextCastMember *)channel->_sprite->_cast)->dropsTypedKey((Graphics::MacText *)channel->_widget, event.kbd))
+				if (channel && channel->dropsTypedKey(event.kbd))
 					result = false;
 			}
 		}
