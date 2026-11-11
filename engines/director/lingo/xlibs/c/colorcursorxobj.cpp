@@ -90,15 +90,7 @@ void ColorCursorXObj::m_getSetCursor(int nargs) {
 	int crsrId = g_lingo->pop().asInt();
 
 	Cursor *cursor = new Cursor();
-	bool found = false;
-	for (auto &it : g_director->_allOpenResFiles) {
-		if (cursor->readFromArchive(g_director->_allSeenResFiles[it].get(), crsrId)) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
+	if (!cursor->readFromOpenResFiles(crsrId)) {
 		warning("ColorCursorXObj::m_getSetCursor: 'crsr' resource %d not found", crsrId);
 		delete cursor;
 		return;

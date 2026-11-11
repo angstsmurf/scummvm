@@ -159,12 +159,7 @@ static uint32 findMovieEnd(Common::SeekableReadStream *stream, uint32 offset) {
 static Window *findWindow(const Common::String &name) {
 	if (name.empty() || name.equalsIgnoreCase("stage"))
 		return g_director->getStage();
-	const Common::Array<Window *> *windowList = g_director->getWindowList();
-	for (auto &w : *windowList) {
-		if (w->getName().equalsIgnoreCase(name))
-			return w;
-	}
-	return nullptr;
+	return g_director->findWindow(name);
 }
 
 void QTCatMoviePlayerXObj::m_play(int nargs) {

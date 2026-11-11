@@ -277,13 +277,19 @@ Common::SharedPtr<Archive> DirectorEngine::openArchive(const Common::Path &path)
 	}
 	result->setPathName(path);
 	Common::SharedPtr<Archive> arch(result);
+	registerResFile(path, arch);
+
+	return arch;
+}
+
+// Keep a newly opened resource file and put it at the front of the
+// resource chain
+void DirectorEngine::registerResFile(const Common::Path &path, Common::SharedPtr<Archive> arch) {
 	// Movies still using a stale archive keep their own reference to it
 	_allSeenResFiles.setVal(path, arch);
 	_staleResFiles.erase(path);
 
 	addArchiveToOpenList(path);
-
-	return arch;
 }
 
 void Window::loadINIStream() {

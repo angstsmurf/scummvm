@@ -182,6 +182,7 @@ public:
 	Lingo *getLingo() const { return _lingo; }
 	Window *getStage() const { return _stage; }
 	Window *getCurrentWindow() const { return _currentWindow; }
+	Window *findWindow(const Common::String &name) const;
 	Window *getOrCreateWindow(Common::String &name);
 	void forgetWindow(Window *window);
 	bool isWindowRegistered(Window *window) const;
@@ -237,6 +238,7 @@ public:
 	Archive *createArchive();
 	Common::SharedPtr<Archive> openArchive(const Common::Path &movie);
 	void addArchiveToOpenList(const Common::Path &path);
+	void registerResFile(const Common::Path &path, Common::SharedPtr<Archive> arch);
 	void markArchiveStale(const Common::Path &path);
 	Archive *loadEXE(const Common::Path &movie);
 	Archive *loadEXEv3(Common::SeekableReadStream *stream);
