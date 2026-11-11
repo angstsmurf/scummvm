@@ -45,6 +45,7 @@ class SeekableReadStream;
 struct NESegment {
 	static constexpr uint16 kFlagSingleData = 1;
 	static constexpr uint16 kFlagMultipleData = 2;
+	static constexpr uint16 kFlagRelocations = 0x100;
 	static constexpr uint16 kFlagLinkError = 0x2000u;
 	static constexpr uint16 kFlagLibModule = 0x8000u;
 
@@ -86,6 +87,13 @@ public:
 
 	/** Get all NE segments */
 	const Array<NESegment> &getSegments() const { return _segments; }
+
+	/**
+	 * The end of the executable image: the end of its last segment (with
+	 * its relocations) or resource, where data appended to it starts.
+	 * Returns kInvalidAddress if it can't be read.
+	 */
+	uint32 getImageEnd();
 
 	/* Index of NE automatic segment */
 	uint32 getAutomaticSegmentIndex() const { return _autoSegmentIndex; }

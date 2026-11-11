@@ -198,6 +198,32 @@ static const char *const s_resTypeNames[] = {
 	"", "plug_play", "vxd", "ani_cursor", "ani_icon", "html",
 	"manifest"};
 
+uint32 NEResources::getImageEnd() {
+	if (!_exe)
+		return kInvalidAddress;
+
+	uint32 end = 0;
+	for (const NESegment &segment : _segments) {
+		if (segment.offset == 0)
+			continue;
+		uint32 segmentEnd = segment.offset + segment.size;
+		// The relocations follow the segment data
+		if (segment.flags & NESegment::kFlagRelocations) {
+			if (!_exe->seek(segmentEnd))
+				return kInvalidAddress;
+			segmentEnd += 2 + _exe->readUint16LE() * 8;
+			if (_exe->err() || _exe->eos())
+				return kInvalidAddress;
+		}
+		end = MAX(end, segmentEnd);
+	}
+
+	for (const Resource &res : _resources)
+		end = MAX(end, res.offset + res.size);
+
+	return end;
+}
+
 bool NEResources::readResourceTable(uint32 offset) {
 	if (!_exe)
 		return false;
