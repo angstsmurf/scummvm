@@ -2061,14 +2061,7 @@ void LC::c_fieldref() {
 	if (g_director->getVersion() >= 500)
 		castLib = g_lingo->pop();
 	Datum member = g_lingo->pop();
-	CastMemberID memberID(-1, 0);
-	// A script and a field may share a name, so prefer fields.
-	// Checked in D4 for Windows.
-	if (g_director->getVersion() < 500 && member.type == STRING)
-		memberID = member.asMemberID(kCastText);
-	if (memberID.member == -1)
-		memberID = g_lingo->toCastMemberID(member, castLib);
-	Datum res = memberID;
+	Datum res = g_lingo->resolveFieldMember(member, castLib);
 	res.type = FIELDREF;
 	g_lingo->push(res);
 }
