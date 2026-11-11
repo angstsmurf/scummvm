@@ -138,6 +138,10 @@ public:
 	void setRawText(const Common::String &text);
 
 private:
+	// The width of a scrolling field's scroll bar in the D3 to D6 projectors
+	static const int kFieldScrollBarWidth = 16;
+
+	Common::Rect computeFieldDims(const Common::Rect &bbox);
 	Graphics::MacWidget *createWindowOrWidget(Common::Rect &bbox, Common::Rect dims, Graphics::MacFont *macFont);
 
 	uint32 _bgcolor;
