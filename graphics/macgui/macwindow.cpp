@@ -228,33 +228,33 @@ bool MacWindow::draw(bool forceRedraw) {
 	return true;
 }
 
-Common::Rect MacWindow::blitChangedContent(ManagedSurface *g) {
+Common::Rect blitChangedPixels(ManagedSurface *dst, const Surface &src, const Common::Point &destPos) {
 	Common::Rect changed;
-	Common::Rect dst(_innerDims);
-	dst.clip(Common::Rect(g->w, g->h));
-	if (dst.isEmpty())
+	Common::Rect area(destPos.x, destPos.y, destPos.x + src.w, destPos.y + src.h);
+	area.clip(Common::Rect(dst->w, dst->h));
+	if (area.isEmpty())
 		return changed;
 
-	const int bpp = g->format.bytesPerPixel;
-	const int width = dst.width();
-	const int srcX = dst.left - _innerDims.left;
+	const int bpp = dst->format.bytesPerPixel;
+	const int width = area.width();
+	const int srcX = area.left - destPos.x;
 
-	for (int y = dst.top; y < dst.bottom; y++) {
-		const byte *src = (const byte *)_composeSurface->getBasePtr(srcX, y - _innerDims.top);
-		byte *out = (byte *)g->getBasePtr(dst.left, y);
-		if (memcmp(src, out, width * bpp) == 0)
+	for (int y = area.top; y < area.bottom; y++) {
+		const byte *in = (const byte *)src.getBasePtr(srcX, y - destPos.y);
+		byte *out = (byte *)dst->getBasePtr(area.left, y);
+		if (memcmp(in, out, width * bpp) == 0)
 			continue;
 
 		int left = 0;
-		while (memcmp(src + left * bpp, out + left * bpp, bpp) == 0)
+		while (memcmp(in + left * bpp, out + left * bpp, bpp) == 0)
 			left++;
 		int right = width;
-		while (memcmp(src + (right - 1) * bpp, out + (right - 1) * bpp, bpp) == 0)
+		while (memcmp(in + (right - 1) * bpp, out + (right - 1) * bpp, bpp) == 0)
 			right--;
 
-		memcpy(out + left * bpp, src + left * bpp, (right - left) * bpp);
+		memcpy(out + left * bpp, in + left * bpp, (right - left) * bpp);
 
-		Common::Rect row(dst.left + left, y, dst.left + right, y + 1);
+		Common::Rect row(area.left + left, y, area.left + right, y + 1);
 		if (changed.isEmpty())
 			changed = row;
 		else
@@ -262,9 +262,16 @@ Common::Rect MacWindow::blitChangedContent(ManagedSurface *g) {
 	}
 
 	if (!changed.isEmpty())
-		g->addDirtyRect(changed);
+		dst->addDirtyRect(changed);
 
 	return changed;
+}
+
+Common::Rect MacWindow::blitChangedContent(ManagedSurface *g) {
+	Common::Rect content(_innerDims.width(), _innerDims.height());
+	content.clip(Common::Rect(_composeSurface->w, _composeSurface->h));
+	const Surface src = _composeSurface->rawSurface().getSubArea(content);
+	return blitChangedPixels(g, src, Common::Point(_innerDims.left, _innerDims.top));
 }
 
 uint32 MacWindow::getBorderTransColor() const {

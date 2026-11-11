@@ -252,6 +252,11 @@ public:
 	bool pollEvent(Common::Event &event);
 	bool processSysEvents(bool captureClick = false, bool skipWindowManager = false);
 	void processEventQUIT();
+	// Poll for an event inside a modal loop (a video, a transition, an
+	// XObject tracking the mouse). A quit request is handled here, not
+	// returned: it ends the polling and sets 'quit' to tell the caller to
+	// leave its loop.
+	bool pollModalEvent(Common::Event &event, bool &quit);
 	int getMacTicks();
 	Common::Array<Common::Event> _injectedEvents;
 	// A key was typed while Lingo was running. The original leaves it in the

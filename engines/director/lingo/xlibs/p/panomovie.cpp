@@ -51,6 +51,7 @@
 #include "common/tokenizer.h"
 #include "common/formats/quicktime.h"
 
+#include "graphics/macgui/macwindow.h"
 #include "graphics/macgui/macwindowmanager.h"
 
 #include "video/qt_decoder.h"
@@ -126,6 +127,16 @@ PanoMovieState::~PanoMovieState() {
 	}
 }
 
+// The XCMDs report a failure as a string starting with "error: "
+static Datum errorDatum(const char *fmt, ...) GCC_PRINTF(1, 2);
+static Datum errorDatum(const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Common::String msg = Common::String::vformat(fmt, va);
+	va_end(va);
+	return Datum("error: " + msg);
+}
+
 static Common::Array<int> parseNumbers(const Common::String &str) {
 	Common::Array<int> res;
 	Common::StringTokenizer tok(str, ",");
@@ -134,56 +145,43 @@ static Common::Array<int> parseNumbers(const Common::String &str) {
 	return res;
 }
 
-static void drawMovie(PanoMovieState *m) {
-	if (!m->_video)
-		return;
-
+// The frame to show, or nullptr if there is none to show now. An
+// offscreenOnly update renders into the offscreen copy and shows nothing.
+static const Graphics::Surface *acquireFrame(PanoMovieState *m) {
 	const Common::String &mode = m->_video->getUpdateMode();
-	const Graphics::Surface *frame;
 
 	if (mode.equalsIgnoreCase("fromOffscreen") && m->_offscreen.getPixels()) {
 		// Show what the last offscreenOnly update rendered, without
 		// rendering again: Safecracker unlocks the stage between the two,
 		// and a fresh render of a panorama can take a while
-		frame = &m->_offscreen;
-	} else {
-		frame = m->_video->decodeNextFrame();
-		if (!frame)
-			return;
-
-		if (mode.equalsIgnoreCase("offscreenOnly")) {
-			m->_offscreen.free();
-			m->_offscreen.copyFrom(*frame);
-			return;
-		}
+		return &m->_offscreen;
 	}
+
+	const Graphics::Surface *frame = m->_video->decodeNextFrame();
+	if (frame && mode.equalsIgnoreCase("offscreenOnly")) {
+		m->_offscreen.free();
+		m->_offscreen.copyFrom(*frame);
+		return nullptr;
+	}
+	return frame;
+}
+
+static void drawMovie(PanoMovieState *m) {
+	if (!m->_video)
+		return;
+
+	const Graphics::Surface *frame = acquireFrame(m);
+	if (!frame)
+		return;
 
 	Graphics::Surface *dither = frame->convertTo(g_director->_wm->_pixelformat, m->_video->getPalette(), 256, g_director->getPalette(), 256, Graphics::kDitherNaive);
 
+	// mouseOver and trackClick draw every 10 ms whether or not the view
+	// moved. Only touch the stage when its pixels change, or every call
+	// would recomposite and upload the whole window.
 	Window *window = g_director->getCurrentWindow();
-	Graphics::ManagedSurface *surface = window->getSurface();
-
-	Common::Rect dst(m->_rect.left, m->_rect.top, m->_rect.left + dither->w, m->_rect.top + dither->h);
-	dst.clip(Common::Rect(surface->w, surface->h));
-	if (!dst.isEmpty()) {
-		// mouseOver and trackClick draw every 10 ms whether or not the view
-		// moved. Only touch the stage when its pixels change, or every call
-		// would recomposite and upload the whole window.
-		const int rowBytes = dst.width() * surface->format.bytesPerPixel;
-		bool changed = false;
-		for (int y = dst.top; y < dst.bottom; y++) {
-			const byte *src = (const byte *)dither->getBasePtr(dst.left - m->_rect.left, y - m->_rect.top);
-			byte *dest = (byte *)surface->getBasePtr(dst.left, y);
-			if (memcmp(dest, src, rowBytes) != 0) {
-				memcpy(dest, src, rowBytes);
-				changed = true;
-			}
-		}
-		if (changed) {
-			surface->addDirtyRect(dst);
-			window->setDirty(true);
-		}
-	}
+	if (!Graphics::blitChangedPixels(window->getSurface(), *dither, Common::Point(m->_rect.left, m->_rect.top)).isEmpty())
+		window->setDirty(true);
 
 	dither->free();
 	delete dither;
@@ -194,22 +192,22 @@ static void drawMovie(PanoMovieState *m) {
 
 static Datum openMovie(PanoMovieMap *&movies, const Common::Array<Datum> &args) {
 	if (args.size() < 4)
-		return Datum("error: OpenMovie needs a window type, file name and location");
+		return errorDatum("OpenMovie needs a window type, file name and location");
 
 	Common::String pathStr = args[2].asString();
 	Common::Array<int> loc = parseNumbers(args[3].asString());
 	if (loc.size() != 2 && loc.size() != 4)
-		return Datum(Common::String::format("error: bad location '%s'", args[3].asString().c_str()));
+		return errorDatum("bad location '%s'", args[3].asString().c_str());
 
 	Common::Path path = findMoviePath(pathStr);
 	if (path.empty())
-		return Datum(Common::String::format("error: movie file '%s' not found", pathStr.c_str()));
+		return errorDatum("movie file '%s' not found", pathStr.c_str());
 
 	PanoMovieState *m = new PanoMovieState();
 	m->_video = new Video::QuickTimeDecoder();
 	if (!m->_video->loadFile(path)) {
 		delete m;
-		return Datum(Common::String::format("error: failed to load movie file '%s'", path.toString().c_str()));
+		return errorDatum("failed to load movie file '%s'", path.toString().c_str());
 	}
 
 	if (loc.size() == 4) {
@@ -293,11 +291,8 @@ static Datum trackClick(PanoMovieState *m, const Common::Point &pos) {
 
 		Common::Event event;
 		bool released = false;
-		while (g_system->getEventManager()->pollEvent(event)) {
-			if (event.type == Common::EVENT_QUIT) {
-				g_director->processEventQUIT();
-				return Datum(0);
-			}
+		bool quit = false;
+		while (g_director->pollModalEvent(event, quit)) {
 			if (Common::isMouseEvent(event))
 				event.mouse = window->getMousePos();
 			m->_widget->processEvent(event);
@@ -306,6 +301,8 @@ static Datum trackClick(PanoMovieState *m, const Common::Point &pos) {
 				break;
 			}
 		}
+		if (quit)
+			return Datum(0);
 
 		if (!released && !(g_system->getEventManager()->getButtonState() & Common::EventManager::LBUTTON)) {
 			Common::Point p = window->getMousePos();
@@ -343,12 +340,8 @@ static Datum mouseOver(PanoMovieState *m) {
 		drawMovie(m);
 
 		Common::Event event;
-		while (g_system->getEventManager()->pollEvent(event)) {
-			if (event.type == Common::EVENT_QUIT) {
-				g_director->processEventQUIT();
-				return Datum(0);
-			}
-
+		bool quit = false;
+		while (g_director->pollModalEvent(event, quit)) {
 			if (Common::isMouseEvent(event)) {
 				pos = window->getMousePos();
 				event.mouse = pos;
@@ -362,6 +355,8 @@ static Datum mouseOver(PanoMovieState *m) {
 			if (!m->_rect.contains(pos))
 				return Datum(0);
 		}
+		if (quit)
+			return Datum(0);
 
 		if (!m->_mouseOverHandler.empty()) {
 			g_lingo->push(Datum(Common::String::format("%d,%d", pos.x, pos.y)));
@@ -452,11 +447,11 @@ static void setProperty(PanoMovieState *m, const Common::String &prop, const Dat
 
 static Datum directCommand(PanoMovieMap *movies, const Common::Array<Datum> &args) {
 	if (args.size() < 3)
-		return Datum("error: missing command");
+		return errorDatum("missing command");
 
 	int id = args[1].asInt();
 	if (!movies || !movies->contains(id))
-		return Datum(Common::String::format("error: no movie %s", args[1].asString().c_str()));
+		return errorDatum("no movie %s", args[1].asString().c_str());
 
 	PanoMovieState *m = (*movies)[id];
 	Common::String cmd = args[2].asString();
@@ -489,12 +484,12 @@ static Datum directCommand(PanoMovieMap *movies, const Common::Array<Datum> &arg
 	}
 	if (cmd.equalsIgnoreCase("Get")) {
 		if (args.size() < 4)
-			return Datum("error: missing property");
+			return errorDatum("missing property");
 		return getProperty(m, args[3].asString());
 	}
 	if (cmd.equalsIgnoreCase("Set")) {
 		if (args.size() < 5)
-			return Datum("error: missing property value");
+			return errorDatum("missing property value");
 		setProperty(m, args[3].asString(), args[4]);
 		return Datum("");
 	}
@@ -522,7 +517,7 @@ static Datum runXCMD(const char *name, PanoMovieMap *&movies, int nargs) {
 	else if (nargs >= 1 && args[0].asString().equalsIgnoreCase("Direct"))
 		res = directCommand(movies, args);
 	else
-		res = Datum(Common::String::format("error: unknown %s call", name));
+		res = errorDatum("unknown %s call", name);
 
 	g_lingo->_theResult = res;
 	return res;

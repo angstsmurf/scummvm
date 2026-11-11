@@ -166,26 +166,21 @@ void Window::stepTransition(TransParams &t, int step) {
 // That includes a key typed while Lingo ran before the transition: ScummVM
 // has already taken it from the queue for Lingo, so it is tracked by
 // _keyHeldByLingo instead (T_TABT02: the key ends the wipe at the first check).
+// The input that stays queued for Lingo while a transition plays
+static bool isQueuedInputEvent(const Common::Event &event) {
+	return Common::isMouseEvent(event) || event.type == Common::EVENT_KEYDOWN || event.type == Common::EVENT_KEYUP;
+}
+
 bool Window::checkTransitionAbort(TransParams &t) {
 	Common::Array<Common::Event> held;
 	Common::Event event;
 	bool quit = false;
 
-	while (_vm->pollEvent(event)) {
-		switch (event.type) {
-		case Common::EVENT_QUIT:
-			_vm->processEventQUIT();
-			quit = true;
-			continue;
-		case Common::EVENT_KEYDOWN:
-			if (!g_lingo->_exitLock)
-				t.abortPending = true;
-			break;
-		default:
-			break;
-		}
+	while (_vm->pollModalEvent(event, quit)) {
+		if (event.type == Common::EVENT_KEYDOWN && !g_lingo->_exitLock)
+			t.abortPending = true;
 
-		if (Common::isMouseEvent(event) || event.type == Common::EVENT_KEYDOWN || event.type == Common::EVENT_KEYUP)
+		if (isQueuedInputEvent(event))
 			held.push_back(event);
 		else
 			_vm->getMacWindowManager()->processEvent(event);
@@ -283,10 +278,6 @@ void Window::playTransition(uint frame, RenderMode mode, uint16 transDuration, u
 	Common::Rect rfrom, rto;
 
 	initTransParams(t, clipRect);
-
-	t.startTime = g_system->getMillis();
-	t.nextAbortCheck = 250;
-	t.abortPending = false;
 
 	Graphics::ManagedSurface *blitFrom;
 	bool fullredraw = false;
@@ -1244,6 +1235,11 @@ void Window::transZoom(TransParams &t, Common::Rect &clipRect, Graphics::Managed
 }
 
 void Window::initTransParams(TransParams &t, Common::Rect &clipRect) {
+	// The first abort check comes 250 ms in (see checkTransitionAbort())
+	t.startTime = g_system->getMillis();
+	t.nextAbortCheck = 250;
+	t.abortPending = false;
+
 	int w = clipRect.width();
 	int h = clipRect.height();
 	int m = MIN(w, h);
