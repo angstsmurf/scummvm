@@ -92,15 +92,8 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mo
 	// seek past what has been written
 	uint32 imageSize = _size + 12;
 	Common::MemoryWriteStreamDynamic image(DisposeAfterUse::YES);
-	{
-		byte zeros[1024] = {};
-		for (uint32 left = imageSize; left > 0;) {
-			uint32 n = MIN<uint32>(left, sizeof(zeros));
-			image.write(zeros, n);
-			left -= n;
-		}
-		image.seek(0);
-	}
+	image.write(Common::Array<byte>(imageSize, 0).data(), imageSize);
+	image.seek(0);
 	Common::SeekableWriteStream *saveFile = &image;
 
 	saveFile->writeUint32LE(_metaTag); // The _metaTag is "RIFX" or "XFIR"
@@ -257,15 +250,13 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mo
 	if (mode == kSaveWhileOpen) {
 		saved->addOpenFile(saveFileName, getPathName(), out.getData(), out.size());
 		debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Kept the changes to %s while it is open (%d bytes)", saveFileName.c_str(), (int)out.size());
-		g_director->markArchiveStale(getPathName());
+		invalidateAfterSave(filename);
 		return true;
 	}
 	if (mode == kSaveForSession) {
 		saved->addSessionFile(saveFileName, out.getData(), out.size());
 		debugC(3, kDebugSaving, "RIFXArchive::writeToFile: Kept the movie as %s for this session (%d bytes)", saveFileName.c_str(), (int)out.size());
-		g_director->markArchiveStale(getPathName());
-		if (!filename.empty())
-			g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
+		invalidateAfterSave(filename);
 		return true;
 	}
 
@@ -287,16 +278,20 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mo
 
 	// Add to search index
 	saved->addWrittenFile(saveFileName);
+	invalidateAfterSave(filename);
 
-	// The cached archives for the saved file are out of date now. Have
-	// them read back from disk the next time the file is opened, or
-	// reopening the movie in the same session would show its contents
-	// from before the save (Opera Fatal's save slots).
+	return true;
+}
+
+// The cached archives for the saved file are out of date now. Have them
+// read back the next time the file is opened, or reopening the movie in
+// the same session would show its contents from before the save (Opera
+// Fatal's save slots). An empty filename means the movie was saved over
+// its own file.
+void RIFXArchive::invalidateAfterSave(const Common::String &filename) {
 	g_director->markArchiveStale(getPathName());
 	if (!filename.empty())
 		g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
-
-	return true;
 }
 
 bool RIFXArchive::writeOverlay(Common::WriteStream *out, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources) {
