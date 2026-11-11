@@ -1,0 +1,11 @@
+-- Results checked in Director 4.0.4 (Windows)
+set a to rect(10, 20, 30, 40)
+set b to offset(a, 5, 7)
+scummvmAssertEqual(string(b), "rect(15, 27, 35, 47)")
+scummvmAssertEqual(string(a), "rect(10, 20, 30, 40)")
+scummvmAssertEqual(string(offset(a, -3, -4)), "rect(7, 16, 27, 36)")
+
+scummvmAssertEqual(string(map(point(30, 40), rect(0, 0, 100, 100), rect(0, 0, 50, 200))), "point(15, 80)")
+scummvmAssertEqual(string(map(rect(10, 10, 20, 30), rect(0, 0, 100, 100), rect(0, 0, 50, 200))), "rect(5, 20, 10, 60)")
+scummvmAssertEqual(string(map(rect(10, 10, 20, 30), rect(0, 0, 100, 100), rect(5, 6, 305, 206))), "rect(35, 26, 65, 66)")
+scummvmAssertEqual(string(map(point(15, 25), rect(10, 20, 30, 40), rect(100, 100, 130, 110))), "point(107, 102)")

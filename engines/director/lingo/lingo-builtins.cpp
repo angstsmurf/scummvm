@@ -3913,67 +3913,73 @@ void LB::b_inside(int nargs) {
 	g_lingo->push(d);
 }
 
+static bool isRectDatum(const Datum &d) {
+	return d.type == RECT || (d.type == ARRAY && d.u.farr->arr.size() == 4);
+}
+
+// Checked in Director 4: map scales by the real ratio of the two rects,
+// truncating, and maps a rect corner by corner.
 void LB::b_map(int nargs) {
 	Datum toRect = g_lingo->pop();
 	Datum fromRect = g_lingo->pop();
-	Datum srcArr = g_lingo->pop();
+	Datum src = g_lingo->pop();
 
-	if (!(toRect.type == RECT || (toRect.type == ARRAY && toRect.u.farr->arr.size() == 4)) ||
-		!(fromRect.type == RECT || (fromRect.type == ARRAY && fromRect.u.farr->arr.size() == 4))) {
+	if (!isRectDatum(toRect) || !isRectDatum(fromRect)) {
 		warning("LB::b_map(): Invalid Datum Type of source and destination Rects");
+		g_lingo->push(src);
 		return;
 	}
-
-	int toWidth = toRect.u.farr->arr[2].u.i - toRect.u.farr->arr[0].u.i;
-	int toHeight = toRect.u.farr->arr[3].u.i - toRect.u.farr->arr[1].u.i;
-	int fromWidth = fromRect.u.farr->arr[2].u.i - fromRect.u.farr->arr[0].u.i;
-	int fromHeight = fromRect.u.farr->arr[3].u.i - fromRect.u.farr->arr[1].u.i;
-
-	if (!(srcArr.type == POINT ||
-		srcArr.type == RECT ||
-		(srcArr.type == ARRAY && (srcArr.u.farr->arr.size() == 2 || srcArr.u.farr->arr.size() == 4)))) {
+	bool srcIsRect = isRectDatum(src);
+	if (!srcIsRect && !(src.type == POINT || (src.type == ARRAY && src.u.farr->arr.size() == 2))) {
 		warning("LB::b_map(): Invalid Datum type of input Point / Rect");
+		g_lingo->push(src);
 		return;
 	}
+
+	LingoRect from(fromRect), to(toRect);
+	int fromWidth = from.right - from.left;
+	int fromHeight = from.bottom - from.top;
+	if (fromWidth == 0 || fromHeight == 0) {
+		warning("LB::b_map(): Empty source rect");
+		g_lingo->push(src);
+		return;
+	}
+	int toWidth = to.right - to.left;
+	int toHeight = to.bottom - to.top;
 
 	Datum d;
-	d.type = POINT;
+	d.type = srcIsRect ? RECT : POINT;
 	d.u.farr = new FArray();
-	d.u.farr->arr.push_back((srcArr.u.farr->arr[0].u.i - fromRect.u.farr->arr[0].u.i) * (toWidth / fromWidth) + toRect.u.farr->arr[0].u.i);
-	d.u.farr->arr.push_back((srcArr.u.farr->arr[1].u.i - fromRect.u.farr->arr[1].u.i) * (toHeight / fromHeight) + toRect.u.farr->arr[1].u.i);
-
-	if (srcArr.type == RECT ||
-		(srcArr.type == ARRAY && srcArr.u.farr->arr.size() == 4)) {
-		d.type = RECT;
-		d.u.farr->arr.push_back((srcArr.u.farr->arr[2].u.i - srcArr.u.farr->arr[0].u.i) * (toWidth / fromWidth) + d.u.farr->arr[0].u.i);
-		d.u.farr->arr.push_back((srcArr.u.farr->arr[3].u.i - srcArr.u.farr->arr[1].u.i) * (toWidth / fromWidth) + d.u.farr->arr[1].u.i);
+	for (uint i = 0; i < src.u.farr->arr.size(); i += 2) {
+		int x = src.u.farr->arr[i].asInt();
+		int y = src.u.farr->arr[i + 1].asInt();
+		d.u.farr->arr.push_back(Datum((int)((int64)(x - from.left) * toWidth / fromWidth) + to.left));
+		d.u.farr->arr.push_back(Datum((int)((int64)(y - from.top) * toHeight / fromHeight) + to.top));
 	}
-
 	g_lingo->push(d);
 }
 
+// Checked in Director 4: a positive vertical change moves the rect down,
+// and the rect passed in is left as it is.
 void LB::b_offsetRect(int nargs) {
 	Datum vert = g_lingo->pop();
 	Datum hori = g_lingo->pop();
 	Datum rect = g_lingo->pop();
 
-	if (vert.type != INT ||
-		hori.type != INT ||
-		!(rect.type == RECT || (rect.type == ARRAY && rect.u.farr->arr.size() >= 4))) {
-		warning(" LB::b_offsetRect(): Invalid DatumType of inputs");
+	if (vert.type != INT || hori.type != INT || !(rect.type == RECT || (rect.type == ARRAY && rect.u.farr->arr.size() >= 4))) {
+		warning("LB::b_offsetRect(): Invalid DatumType of inputs");
 		g_lingo->push(rect);
+		return;
 	}
 
-	//When vert is positive, rect moves higher
-	//When hori is positive, rect moves towards right
-
-	rect.u.farr->arr[0].u.i += hori.u.i;
-	rect.u.farr->arr[2].u.i += hori.u.i;
-	rect.u.farr->arr[1].u.i -= vert.u.i;
-	rect.u.farr->arr[3].u.i -= vert.u.i;
-
-
-	g_lingo->push(rect);
+	LingoRect r(rect);
+	r.left += hori.u.i;
+	r.right += hori.u.i;
+	r.top += vert.u.i;
+	r.bottom += vert.u.i;
+	Datum res = r.toDatum();
+	res.type = rect.type;
+	g_lingo->push(res);
 }
 
 void LB::b_union(int nargs) {
