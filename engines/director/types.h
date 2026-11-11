@@ -494,6 +494,8 @@ Common::String paletteType2str(PaletteType value);
 Common::String textAlignType2str(TextAlignType value);
 Common::String shapeType2str(ShapeType value);
 Common::String textType2str(TextType value);
+// Returns false if str isn't a boxType symbol
+bool str2textType(const Common::String &str, TextType &value);
 
 enum CollisionTest {
 	kCollisionNo = 0,

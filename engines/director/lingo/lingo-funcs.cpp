@@ -39,6 +39,17 @@
 
 namespace Director {
 
+void Lingo::freezeForGo(Window *stage) {
+	stage->_skipFrameAdvance = true;
+
+	// If there isn't already frozen Lingo (e.g. from a previous func_goto we haven't yet unfrozen),
+	// freeze this script context. We'll return to it after entering the next frame.
+
+	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
+	if (!_playDone)
+		_freezeState = true;
+}
+
 void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 	_vm->getCurrentWindow()->_playbackPaused = false;
 
@@ -56,14 +67,7 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 		return;
 	}
 
-	stage->_skipFrameAdvance = true;
-
-	// If there isn't already frozen Lingo (e.g. from a previous func_goto we haven't yet unfrozen),
-	// freeze this script context. We'll return to it after entering the next frame.
-
-	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
-	if (!_playDone)
-		_freezeState = true;
+	freezeForGo(stage);
 
 	if (movie.type != VOID) {
 		Common::String movieFilenameRaw = movie.asString();
@@ -127,11 +131,7 @@ void Lingo::func_gotoloop() {
 
 	score->gotoLoop();
 
-	stage->_skipFrameAdvance = true;
-
-	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
-	if (!_playDone)
-		_freezeState = true;
+	freezeForGo(stage);
 }
 
 void Lingo::func_gotonext() {
@@ -144,11 +144,7 @@ void Lingo::func_gotonext() {
 	score->gotoNext();
 	debugC(3, kDebugLingoExec, "Lingo::func_gotonext(): going to next frame %d", score->getNextFrame());
 
-	stage->_skipFrameAdvance = true;
-
-	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
-	if (!_playDone)
-		_freezeState = true;
+	freezeForGo(stage);
 }
 
 void Lingo::func_gotoprevious() {
@@ -161,11 +157,7 @@ void Lingo::func_gotoprevious() {
 	score->gotoPrevious();
 	debugC(3, kDebugLingoExec, "Lingo::func_gotoprevious(): going to previous frame %d", score->getNextFrame());
 
-	stage->_skipFrameAdvance = true;
-
-	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
-	if (!_playDone)
-		_freezeState = true;
+	freezeForGo(stage);
 }
 
 void Lingo::func_play(Datum &frame, Datum &movie) {

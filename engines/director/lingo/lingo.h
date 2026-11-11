@@ -473,6 +473,7 @@ public:
 	void func_gotoloop();
 	void func_gotonext();
 	void func_gotoprevious();
+	void freezeForGo(Window *stage);
 	void func_play(Datum &frame, Datum &movie);
 	void func_playdone();
 	void func_cursor(Datum cursorDatum);
