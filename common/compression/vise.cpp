@@ -810,6 +810,8 @@ int WinVISEArchive::listMembers(Common::ArchiveMemberList &list) const {
 }
 
 const Common::ArchiveMemberPtr WinVISEArchive::getMember(const Common::Path &path) const {
+	if (!hasFile(path))
+		return Common::ArchiveMemberPtr();
 	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
 }
 

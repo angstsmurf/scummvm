@@ -23,6 +23,7 @@
 #include "common/compression/dcl.h"
 
 #include "common/debug.h"
+#include "common/formats/winexe_ne.h"
 #include "common/hashmap.h"
 #include "common/memstream.h"
 #include "common/substream.h"
@@ -92,62 +93,12 @@ DCLInstallerArchive::~DCLInstallerArchive() {
 
 // The archive follows the last segment or resource of the NE executable
 bool DCLInstallerArchive::findFirstEntry(uint32 &offset) {
-	if (!_stream->seek(0) || _stream->readUint16BE() != MKTAG16('M', 'Z'))
+	NEResources exe;
+	if (!exe.loadFromEXE(_stream, DisposeAfterUse::NO))
 		return false;
-	if (!_stream->seek(0x3c))
-		return false;
-	uint32 neOffset = _stream->readUint32LE();
-	if (!_stream->seek(neOffset) || _stream->readUint16BE() != MKTAG16('N', 'E'))
-		return false;
+	uint32 end = exe.getImageEnd();
 
-	_stream->seek(neOffset + 0x1c);
-	uint16 segmentCount = _stream->readUint16LE();
-	_stream->seek(neOffset + 0x22);
-	uint16 segmentTable = _stream->readUint16LE();
-	uint16 resourceTable = _stream->readUint16LE();
-	_stream->seek(neOffset + 0x32);
-	uint16 segmentShift = _stream->readUint16LE();
-	if (segmentShift > 16 || _stream->err())
-		return false;
-
-	uint32 end = 0;
-	for (uint i = 0; i < segmentCount; i++) {
-		_stream->seek(neOffset + segmentTable + i * 8);
-		uint32 segmentOffset = (uint32)_stream->readUint16LE() << segmentShift;
-		uint32 segmentSize = _stream->readUint16LE();
-		uint16 segmentFlags = _stream->readUint16LE();
-		if (segmentOffset == 0)
-			continue;
-		if (segmentSize == 0)
-			segmentSize = 0x10000;
-		uint32 segmentEnd = segmentOffset + segmentSize;
-		// Relocations follow the segment data
-		if (segmentFlags & 0x100) {
-			_stream->seek(segmentEnd);
-			segmentEnd += 2 + _stream->readUint16LE() * 8;
-		}
-		end = MAX(end, segmentEnd);
-	}
-
-	_stream->seek(neOffset + resourceTable);
-	uint16 resourceShift = _stream->readUint16LE();
-	if (resourceShift > 16)
-		return false;
-	while (!_stream->eos() && !_stream->err()) {
-		uint16 typeId = _stream->readUint16LE();
-		if (typeId == 0)
-			break;
-		uint16 count = _stream->readUint16LE();
-		_stream->skip(4);
-		for (uint i = 0; i < count; i++) {
-			uint32 resourceOffset = (uint32)_stream->readUint16LE() << resourceShift;
-			uint32 resourceSize = (uint32)_stream->readUint16LE() << resourceShift;
-			_stream->skip(8);
-			end = MAX(end, resourceOffset + resourceSize);
-		}
-	}
-
-	if (_stream->err() || !_stream->seek(end))
+	if (end == NEResources::kInvalidAddress || !_stream->seek(end))
 		return false;
 
 	// Skip the version string

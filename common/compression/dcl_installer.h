@@ -36,7 +36,9 @@ namespace Common {
  * Loads the files appended to a 16-bit Windows (NE) installer executable
  * whose window class is "InstallWClass". It is driven by a text script
  * ("FILE: "Xtras\Fileio.x32", ...") stored in the same archive, and stores
- * the other files compressed with PKWARE DCL.
+ * the other files compressed with PKWARE DCL. This is the format of one
+ * installer (the one on the European Safecracker CDs), not a general DCL
+ * archive format.
  *
  * Members are named by the destination paths in the script, relative to
  * the install folder. Files the script doesn't name are listed by their
