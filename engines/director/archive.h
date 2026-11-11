@@ -203,6 +203,7 @@ private:
 	bool writeCast(Common::SeekableWriteStream *writeStream, uint32 offset, uint32 castLib);	// Parallel to readCast
 	// Write the movie image as changes over the game file it was made from
 	bool writeOverlay(Common::WriteStream *out, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources);
+	void invalidateAfterSave(const Common::String &filename);
 
 	uint32 getArchiveSize(Common::Array<Resource *> resources);
 	uint32 getMmapSize();
