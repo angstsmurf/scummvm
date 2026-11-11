@@ -107,7 +107,8 @@ TextCastMember::TextCastMember(Cast *cast, uint16 castId, Common::SeekableReadSt
 			_initialRect = Movie::readRect(stream);
 			// The D3 projector takes the height of a fixed or scrolling
 			// field from this word, as D4 does from the one after its rect.
-			_maxHeight = pad3 = stream.readUint16();
+			_maxHeight = stream.readUint16();
+			pad3 = _maxHeight;
 			_textFlags = stream.readUint16(); // 1: editable, 2: auto tab, 4: don't wrap
 			_editable = _textFlags & 0x1;
 			totalTextHeight = stream.readUint16();
@@ -324,6 +325,49 @@ Graphics::MacWidget *TextCastMember::createWindowOrWidget(Common::Rect &bbox, Co
 	return widget;
 }
 
+// The box of a field's text, before the border, gutter and shadow go
+// around it
+Common::Rect TextCastMember::computeFieldDims(const Common::Rect &bbox) {
+	Common::Rect dims(bbox);
+
+	// TODO: The Mac projectors (D2-D6) inset the text rect by
+	// gutter / 2 at the top and bottom, i.e. 2 * (gutter / 2) in total,
+	// while MacWidget adds gutter. The two differ for odd gutter sizes.
+	// The Windows D3.1 projector insets the top by gutter / 2 and the
+	// bottom by gutter - gutter / 2, so there the total is gutter.
+
+	// for mactext, we can expand now, but we can't shrink. so we may pass the small size when we have adjustToFit text style
+	if (_textType == kTextTypeAdjustToFit) {
+		dims.right = MIN<int>(dims.right, dims.left + _initialRect.width());
+		dims.bottom = MIN<int>(dims.bottom, dims.top + _initialRect.height());
+	} else {
+		// Fixed, scrolling and limit fields. The projectors only check
+		// for adjust to fit, so a limit field gets the same box as a
+		// fixed one.
+		// use initialRect to create widget for fixed style text, this maybe related to version.
+		if (g_director->getVersion() < 300) {
+			// The D2 projector ignores the size of the sprite in the
+			// score and takes the box from the member rect. It has no
+			// maximum height and no scroll bar.
+			dims.right = dims.left + _initialRect.width();
+			dims.bottom = dims.top + _initialRect.height();
+		} else {
+			// The D3 to D6 projectors ignore the size of the sprite in
+			// the score and take the box from the member. The content
+			// is the member rect's width, plus the scroll bar of a
+			// scrolling field, by _maxHeight; the border, gutter and
+			// shadow go around that.
+			// The Daedalus Encounter has a 193 pixel wide sprite for
+			// its 147 pixel translation field, which would cover the
+			// SAVE button.
+			dims.right = dims.left + _initialRect.width() + (_textType == kTextTypeScrolling ? kFieldScrollBarWidth : 0);
+			dims.bottom = dims.top + _maxHeight;
+		}
+	}
+
+	return dims;
+}
+
 Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
 	Graphics::MacFont *macFont = new Graphics::MacFont(_fontId, _fontSize, _textSlant);
 	Graphics::MacWidget *widget = nullptr;
@@ -341,40 +385,7 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 
 	switch (type) {
 	case kCastText:
-		// TODO: The Mac projectors (D2-D6) inset the text rect by
-		// gutter / 2 at the top and bottom, i.e. 2 * (gutter / 2) in total,
-		// while MacWidget adds gutter. The two differ for odd gutter sizes.
-		// The Windows D3.1 projector insets the top by gutter / 2 and the
-		// bottom by gutter - gutter / 2, so there the total is gutter.
-
-		// for mactext, we can expand now, but we can't shrink. so we may pass the small size when we have adjustToFit text style
-		if (_textType == kTextTypeAdjustToFit) {
-			dims.right = MIN<int>(dims.right, dims.left + _initialRect.width());
-			dims.bottom = MIN<int>(dims.bottom, dims.top + _initialRect.height());
-		} else {
-			// Fixed, scrolling and limit fields. The projectors only check
-			// for adjust to fit, so a limit field gets the same box as a
-			// fixed one.
-			// use initialRect to create widget for fixed style text, this maybe related to version.
-			if (g_director->getVersion() < 300) {
-				// The D2 projector ignores the size of the sprite in the
-				// score and takes the box from the member rect. It has no
-				// maximum height and no scroll bar.
-				dims.right = dims.left + _initialRect.width();
-				dims.bottom = dims.top + _initialRect.height();
-			} else {
-				// The D3 to D6 projectors ignore the size of the sprite in
-				// the score and take the box from the member. The content
-				// is the member rect's width, plus 16 pixels for the scroll
-				// bar of a scrolling field, by _maxHeight; the border,
-				// gutter and shadow go around that.
-				// The Daedalus Encounter has a 193 pixel wide sprite for
-				// its 147 pixel translation field, which would cover the
-				// SAVE button.
-				dims.right = dims.left + _initialRect.width() + (_textType == kTextTypeScrolling ? 16 : 0);
-				dims.bottom = dims.top + _maxHeight;
-			}
-		}
+		dims = computeFieldDims(bbox);
 		widget = createWindowOrWidget(bbox, dims, macFont);
 		if (_textType != kTextTypeScrolling) {
 			((Graphics::MacText *)widget)->setEditable(channel->_sprite->_editable || _editable);
