@@ -162,76 +162,36 @@ static Window *findWindow(const Common::String &name) {
 	return g_director->findWindow(name);
 }
 
-void QTCatMoviePlayerXObj::m_play(int nargs) {
-	Common::String windowName = g_lingo->pop().asString();
-	bool playEveryFrame = g_lingo->pop().asInt() != 0;
-	bool hideCursor = g_lingo->pop().asInt() != 0;
-	int v = g_lingo->pop().asInt();
-	int h = g_lingo->pop().asInt();
-	bool interruptable = g_lingo->pop().asInt() != 0;
-	int duration = g_lingo->pop().asInt();
-	int startTime = g_lingo->pop().asInt();
-	uint32 offset = (uint32)g_lingo->pop().asInt();
-
-	QTCatMoviePlayerXObject *me = getMe();
-
-	debugC(5, kDebugXObj, "QTCatMoviePlayerXObj::m_play(%u, %d, %d, %d, %d, %d, %d, %d, \"%s\") on '%s'",
-		offset, startTime, duration, interruptable, h, v, hideCursor, playEveryFrame, windowName.c_str(),
-		me->_path.toString().c_str());
-
+// Opens the movie at offset in a catalogue file
+static Video::QuickTimeDecoder *openCatMovie(const Common::Path &path, uint32 offset) {
 	Common::File *file = new Common::File();
-	if (me->_path.empty() || !file->open(me->_path)) {
-		warning("QTCatMoviePlayerXObj::m_play: Could not open '%s'", me->_path.toString().c_str());
+	if (path.empty() || !file->open(path)) {
+		warning("QTCatMoviePlayerXObj::m_play: Could not open '%s'", path.toString().c_str());
 		delete file;
-		g_lingo->push(Datum(0));
-		return;
+		return nullptr;
 	}
 
 	uint32 end = findMovieEnd(file, offset);
 	if (!end) {
-		warning("QTCatMoviePlayerXObj::m_play: No movie at offset %u in '%s'", offset, me->_path.toString().c_str());
+		warning("QTCatMoviePlayerXObj::m_play: No movie at offset %u in '%s'", offset, path.toString().c_str());
 		delete file;
-		g_lingo->push(Datum(0));
-		return;
+		return nullptr;
 	}
 
 	Video::QuickTimeDecoder *video = new Video::QuickTimeDecoder();
 	video->setChunkBeginOffset(offset);
 	if (!video->loadStream(new Common::SeekableSubReadStream(file, offset, end, DisposeAfterUse::YES))) {
-		warning("QTCatMoviePlayerXObj::m_play: Could not load movie at offset %u in '%s'", offset, me->_path.toString().c_str());
+		warning("QTCatMoviePlayerXObj::m_play: Could not load movie at offset %u in '%s'", offset, path.toString().c_str());
 		delete video;
-		g_lingo->push(Datum(0));
-		return;
+		return nullptr;
 	}
+	return video;
+}
 
-	if (g_director->_pixelformat.bytesPerPixel == 1)
-		video->setDitheringPalette(g_director->getPalette());
-
-	// startTime and duration are in the movie's time scale; duration -1
-	// plays to the end.
-	uint32 timeScale = video->getTimeScale();
-	if (startTime > 0 && timeScale)
-		video->seek(Audio::Timestamp(0, startTime, timeScale));
-	if (duration >= 0 && timeScale)
-		video->setEndTime(Audio::Timestamp(0, startTime + duration, timeScale));
-
-	Common::Point origin(h, v);
-	Window *window = findWindow(windowName);
-	if (!window) {
-		warning("QTCatMoviePlayerXObj::m_play: No window named '%s', using the stage", windowName.c_str());
-		window = g_director->getStage();
-	}
-	const Common::Rect &inner = window->getMacWindow()->getInnerDimensions();
-	origin.x += inner.left;
-	origin.y += inner.top;
-
-	if (hideCursor)
-		CursorMan.showMouse(false);
-
-	video->start();
-
+// Plays the movie straight to the screen at origin until it ends, a click
+// or key interrupts it, or ScummVM quits. lastFrame gets the last frame shown.
+static void playLoop(Video::QuickTimeDecoder *video, const Common::Point &origin, bool interruptable, Graphics::Surface &lastFrame) {
 	Graphics::Surface *converted = nullptr;
-	Graphics::Surface lastFrame;
 	const Common::Rect screen(g_system->getWidth(), g_system->getHeight());
 	Common::Event event;
 	bool keepPlaying = true;
@@ -282,23 +242,79 @@ void QTCatMoviePlayerXObj::m_play(int nargs) {
 		converted->free();
 		delete converted;
 	}
+}
+
+// QuickTime leaves the last frame on screen until Director paints over
+// it. Keep it in the window, so that a redraw before the game updates
+// the stage doesn't flash the window's old (often black) contents.
+static void leaveLastFrame(Window *window, const Graphics::Surface &lastFrame, int h, int v) {
+	Graphics::ManagedSurface *surface = window->getSurface();
+	Common::Rect dst(h, v, h + lastFrame.w, v + lastFrame.h);
+	dst.clip(Common::Rect(surface->w, surface->h));
+	if (!dst.isEmpty())
+		surface->copyRectToSurface(lastFrame, dst.left, dst.top,
+			Common::Rect(dst.left - h, dst.top - v, dst.right - h, dst.bottom - v));
+	window->getMacWindow()->setContentDirty(true);
+}
+
+void QTCatMoviePlayerXObj::m_play(int nargs) {
+	Common::String windowName = g_lingo->pop().asString();
+	bool playEveryFrame = g_lingo->pop().asInt() != 0;
+	bool hideCursor = g_lingo->pop().asInt() != 0;
+	int v = g_lingo->pop().asInt();
+	int h = g_lingo->pop().asInt();
+	bool interruptable = g_lingo->pop().asInt() != 0;
+	int duration = g_lingo->pop().asInt();
+	int startTime = g_lingo->pop().asInt();
+	uint32 offset = (uint32)g_lingo->pop().asInt();
+
+	QTCatMoviePlayerXObject *me = getMe();
+
+	debugC(5, kDebugXObj, "QTCatMoviePlayerXObj::m_play(%u, %d, %d, %d, %d, %d, %d, %d, \"%s\") on '%s'",
+		offset, startTime, duration, interruptable, h, v, hideCursor, playEveryFrame, windowName.c_str(),
+		me->_path.toString().c_str());
+
+	Video::QuickTimeDecoder *video = openCatMovie(me->_path, offset);
+	if (!video) {
+		g_lingo->push(Datum(0));
+		return;
+	}
+
+	if (g_director->_pixelformat.bytesPerPixel == 1)
+		video->setDitheringPalette(g_director->getPalette());
+
+	// startTime and duration are in the movie's time scale; duration -1
+	// plays to the end.
+	uint32 timeScale = video->getTimeScale();
+	if (startTime > 0 && timeScale)
+		video->seek(Audio::Timestamp(0, startTime, timeScale));
+	if (duration >= 0 && timeScale)
+		video->setEndTime(Audio::Timestamp(0, startTime + duration, timeScale));
+
+	Common::Point origin(h, v);
+	Window *window = findWindow(windowName);
+	if (!window) {
+		warning("QTCatMoviePlayerXObj::m_play: No window named '%s', using the stage", windowName.c_str());
+		window = g_director->getStage();
+	}
+	const Common::Rect &inner = window->getMacWindow()->getInnerDimensions();
+	origin.x += inner.left;
+	origin.y += inner.top;
+
+	if (hideCursor)
+		CursorMan.showMouse(false);
+
+	video->start();
+	Graphics::Surface lastFrame;
+	playLoop(video, origin, interruptable, lastFrame);
 	video->close();
 	delete video;
 
 	if (hideCursor)
 		CursorMan.showMouse(true);
 
-	// QuickTime leaves the last frame on screen until Director paints over
-	// it. Keep it in the window, so that a redraw before the game updates
-	// the stage doesn't flash the window's old (often black) contents.
 	if (lastFrame.getPixels()) {
-		Graphics::ManagedSurface *surface = window->getSurface();
-		Common::Rect dst(h, v, h + lastFrame.w, v + lastFrame.h);
-		dst.clip(Common::Rect(surface->w, surface->h));
-		if (!dst.isEmpty())
-			surface->copyRectToSurface(lastFrame, dst.left, dst.top,
-				Common::Rect(dst.left - h, dst.top - v, dst.right - h, dst.bottom - v));
-		window->getMacWindow()->setContentDirty(true);
+		leaveLastFrame(window, lastFrame, h, v);
 		lastFrame.free();
 	}
 
