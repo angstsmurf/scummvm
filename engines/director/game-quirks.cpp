@@ -30,6 +30,7 @@
 #include "common/tokenizer.h"
 #include "director/director.h"
 #include "director/movie.h"
+#include "director/util.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xtras/s/smacker.h"
 
@@ -339,65 +340,6 @@ static void quirkSafecrackerWin() {
 	g_director->_exeNameOverride = Common::String::format("sc_%s.exe", safecrackerLangCode(g_director->getLanguage()));
 }
 
-// Mac archives such as Installer VISE store their names in Mac Roman, but
-// Director looks files up by their punycode-encoded Unicode names, the way
-// they are named on disk. This exposes the members under those names.
-class MacRomanPathArchive : public Common::Archive {
-public:
-	MacRomanPathArchive(Common::Archive *archive, Common::SeekableReadStream *stream) : _archive(archive), _stream(stream) {
-		Common::ArchiveMemberList list;
-		_archive->listMembers(list);
-		for (auto &member : list) {
-			Common::Path rawPath = member->getPathInArchive();
-			Common::StringArray components = rawPath.splitComponents();
-			for (auto &component : components)
-				component = Common::U32String(component, Common::kMacRoman).encode();
-			_paths[Common::Path::joinComponents(components).punycodeEncode()] = rawPath;
-		}
-	}
-
-	~MacRomanPathArchive() override {
-		delete _archive;
-		delete _stream;
-	}
-
-	bool hasFile(const Common::Path &path) const override {
-		return _paths.contains(path);
-	}
-
-	int listMembers(Common::ArchiveMemberList &list) const override {
-		int count = 0;
-		for (auto &it : _paths) {
-			list.push_back(Common::ArchiveMemberPtr(new Common::GenericArchiveMember(it._key, *this)));
-			count++;
-		}
-		return count;
-	}
-
-	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override {
-		if (!hasFile(path))
-			return Common::ArchiveMemberPtr();
-		return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
-	}
-
-	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override {
-		if (!hasFile(path))
-			return nullptr;
-		return _archive->createReadStreamForMember(_paths[path]);
-	}
-
-	Common::SeekableReadStream *createReadStreamForMemberAltStream(const Common::Path &path, Common::AltStreamType altStreamType) const override {
-		if (!hasFile(path))
-			return nullptr;
-		return _archive->createReadStreamForMemberAltStream(_paths[path], altStreamType);
-	}
-
-private:
-	Common::Archive *_archive;
-	Common::SeekableReadStream *_stream;
-	Common::HashMap<Common::Path, Common::Path, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> _paths;
-};
-
 // The European Mac release has the projectors for all languages in one
 // Installer VISE archive on the CD, each in a "SafeCracker (XXX)" folder
 static void quirkSafecrackerMac() {
@@ -422,7 +364,7 @@ static void quirkSafecrackerMac() {
 	Common::String lang = safecrackerLangCode(g_director->getLanguage());
 	lang.toUppercase();
 
-	SearchMan.add(installerName, new MacRomanPathArchive(archive, installer), 5);
+	SearchMan.add(installerName, createMacRomanPathArchive(archive, installer), 5);
 	g_director->_exeNameOverride = Common::String::format("SafeCracker\xe2\x84\xa2 (%s):SafeCracker\xe2\x84\xa2 PPC (%s)", lang.c_str(), lang.c_str());
 }
 
