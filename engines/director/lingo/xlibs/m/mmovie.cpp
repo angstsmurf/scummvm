@@ -230,7 +230,7 @@ int MMovieXObject::updateScreen() {
 				}
 			}
 			if (!_bounds.isEmpty())
-				g_system->copyRectToScreen(_lastFrame.getPixels(), _lastFrame.pitch, _bounds.left, _bounds.top, _bounds.width(), _bounds.height());
+				g_director->_wm->copyRectToScreen(_lastFrame.getPixels(), _lastFrame.pitch, _bounds.left, _bounds.top, _bounds.width(), _bounds.height());
 			// do a time check
 			uint32 endTime = Audio::Timestamp(0, seg._length + seg._start, movie._video->getTimeScale()).msecs();
 			debugC(8, kDebugXObj, "MMovieXObject::updateScreen(): time: %d, endTime: %d, ticks: %d, endTicks: %d", movie._video->getTime(), endTime, getTicks(), seg._length + seg._start);

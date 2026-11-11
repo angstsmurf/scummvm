@@ -102,7 +102,7 @@ void XPlayAnim::b_xplayanim(int nargs) {
 			break;
 		if (video->needsUpdate()) {
 			frame = video->decodeNextFrame();
-			g_system->copyRectToScreen(frame->getPixels(), frame->pitch, x, y, frame->w, frame->h);
+			g_director->_wm->copyRectToScreen(frame->getPixels(), frame->pitch, x, y, frame->w, frame->h);
 		}
 		if (video->hasDirtyPalette()) {
 			byte *palette = const_cast<byte *>(video->getPalette());

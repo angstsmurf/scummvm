@@ -142,7 +142,7 @@ void MoovXObj::m_fondler(int nargs) {
 	if (me->_video && me->_video->needsUpdate()) {
 		frame = me->_video->decodeNextFrame();
 		if (frame) {
-			g_system->copyRectToScreen(frame->getPixels(), frame->pitch, me->_x, me->_y, frame->w, frame->h);
+			g_director->_wm->copyRectToScreen(frame->getPixels(), frame->pitch, me->_x, me->_y, frame->w, frame->h);
 			g_system->updateScreen();
 		}
 	}

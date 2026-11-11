@@ -225,7 +225,7 @@ void BatQT::m_getTime(int nargs) {
 			const Graphics::Surface *frame = me->_video->decodeNextFrame();
 			if (frame) {
 				Graphics::Surface *temp = frame->scale(me->_movieBox.width(), me->_movieBox.height(), false);
-				g_system->copyRectToScreen(temp->getPixels(), temp->pitch, me->_movieBox.left, me->_movieBox.top, temp->w, temp->h);
+				g_director->_wm->copyRectToScreen(temp->getPixels(), temp->pitch, me->_movieBox.left, me->_movieBox.top, temp->w, temp->h);
 				g_system->updateScreen();
 				delete temp;
 			}

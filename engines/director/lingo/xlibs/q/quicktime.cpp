@@ -110,7 +110,7 @@ void Quicktime::m_playStage(int nargs) {
 		if (video->needsUpdate()) {
 			frame = video->decodeNextFrame();
 			if (frame != nullptr)
-				g_system->copyRectToScreen(frame->getPixels(), frame->pitch, left, top, frame->w, frame->h);
+				g_director->_wm->copyRectToScreen(frame->getPixels(), frame->pitch, left, top, frame->w, frame->h);
 		}
 		g_system->updateScreen();
 		g_director->delayMillis(10);

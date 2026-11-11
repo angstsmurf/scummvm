@@ -159,7 +159,7 @@ void callPacoPlay(const Common::String &cmd) {
 				Graphics::Surface *dither = frame->convertTo(g_director->_wm->_pixelformat, videoPalette, 256, origPalette, origCount, Graphics::kDitherNaive);
 				int width = MIN(dither->w + posX, (int)g_system->getWidth()) - posX;
 				int height = MIN(dither->h + posY, (int)g_system->getHeight()) - posY;
-				g_system->copyRectToScreen(dither->getPixels(), dither->pitch, posX, posY, width, height);
+				g_director->_wm->copyRectToScreen(dither->getPixels(), dither->pitch, posX, posY, width, height);
 				dither->free();
 				delete dither;
 			}
