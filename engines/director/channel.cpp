@@ -126,6 +126,14 @@ Channel::~Channel() {
 		delete _sprite;
 }
 
+// Rich text drawn with Background Transparent ink has no background
+// colour to key out: its anti-aliased text carries per-pixel alpha.
+bool Channel::needsSrcAlpha(const Graphics::ManagedSurface *srf) const {
+	return srf && _sprite->_cast && _sprite->_cast->_type == kCastRichText &&
+		_sprite->_ink == kInkTypeBackgndTrans && srf->format.bytesPerPixel == 4 &&
+		srf->format.aBits() > 0;
+}
+
 DirectorPlotData Channel::getPlotData() {
 	int blend = (_sprite->_thickness & kTHasBlend) || _sprite->_ink == kInkTypeBlend ? _sprite->_blendAmount : 0;
 	DirectorPlotData pd(g_director, _sprite->_spriteType, _sprite->_ink, blend, _sprite->getBackColor(), _sprite->getForeColor());
@@ -156,13 +164,8 @@ DirectorPlotData Channel::getPlotData() {
 		pd.setApplyColor();
 	}
 
-	// Rich text drawn with Background Transparent ink has no background
-	// colour to key out: its anti-aliased text carries per-pixel alpha.
-	if (pd.srf && _sprite->_cast && _sprite->_cast->_type == kCastRichText &&
-			_sprite->_ink == kInkTypeBackgndTrans && pd.srf->format.bytesPerPixel == 4 &&
-			pd.srf->format.aBits() > 0) {
+	if (needsSrcAlpha(pd.srf))
 		pd.srcAlpha = true;
-	}
 
 	pd.srfMask = nullptr;
 	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {

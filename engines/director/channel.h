@@ -88,6 +88,7 @@ public:
 	void replaceWidget(CastMemberID previousCastId = CastMemberID(0, 0), bool force = false);
 	bool updateWidget();
 	void sizeSpriteFromWidget();
+	bool needsSrcAlpha(const Graphics::ManagedSurface *srf) const;
 	void updateTextCast();
 
 	bool isTrail();
