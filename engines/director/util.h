@@ -23,6 +23,8 @@
 #define DIRECTOR_UTIL_H
 
 namespace Common {
+class Archive;
+class SeekableReadStream;
 class String;
 class FSNode;
 class Path;
@@ -73,6 +75,11 @@ Common::Path dumpFactoryName(const char *prefix, const char *name, const char *e
 bool isButtonSprite(SpriteType spriteType);
 
 uint32 macTimeSeed();
+
+// Wraps an archive whose member names are in Mac Roman (e.g. Installer
+// VISE) so that its members are found under their punycode-encoded Unicode
+// names, as on disk. Takes ownership of the archive and its stream.
+Common::Archive *createMacRomanPathArchive(Common::Archive *archive, Common::SeekableReadStream *stream);
 
 class RandomState {
 public:

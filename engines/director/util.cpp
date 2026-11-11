@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/archive.h"
 #include "common/file.h"
 #include "common/keyboard.h"
 #include "common/macresman.h"
@@ -1934,6 +1935,73 @@ void DirectorEngine::delayMillis(uint32 delay) {
 		return;
 
 	_system->delayMillis(delay);
+}
+
+// Mac archives such as Installer VISE store their names in Mac Roman, but
+// Director looks files up by their punycode-encoded Unicode names, the way
+// they are named on disk. This exposes the members under those names.
+namespace {
+
+class MacRomanPathArchive : public Common::Archive {
+public:
+	MacRomanPathArchive(Common::Archive *archive, Common::SeekableReadStream *stream) : _archive(archive), _stream(stream) {
+		Common::ArchiveMemberList list;
+		_archive->listMembers(list);
+		for (auto &member : list) {
+			Common::Path rawPath = member->getPathInArchive();
+			Common::StringArray components = rawPath.splitComponents();
+			for (auto &component : components)
+				component = Common::U32String(component, Common::kMacRoman).encode();
+			_paths[Common::Path::joinComponents(components).punycodeEncode()] = rawPath;
+		}
+	}
+
+	~MacRomanPathArchive() override {
+		delete _archive;
+		delete _stream;
+	}
+
+	bool hasFile(const Common::Path &path) const override {
+		return _paths.contains(path);
+	}
+
+	int listMembers(Common::ArchiveMemberList &list) const override {
+		int count = 0;
+		for (auto &it : _paths) {
+			list.push_back(Common::ArchiveMemberPtr(new Common::GenericArchiveMember(it._key, *this)));
+			count++;
+		}
+		return count;
+	}
+
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override {
+		if (!hasFile(path))
+			return Common::ArchiveMemberPtr();
+		return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(path, *this));
+	}
+
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override {
+		if (!hasFile(path))
+			return nullptr;
+		return _archive->createReadStreamForMember(_paths[path]);
+	}
+
+	Common::SeekableReadStream *createReadStreamForMemberAltStream(const Common::Path &path, Common::AltStreamType altStreamType) const override {
+		if (!hasFile(path))
+			return nullptr;
+		return _archive->createReadStreamForMemberAltStream(_paths[path], altStreamType);
+	}
+
+private:
+	Common::Archive *_archive;
+	Common::SeekableReadStream *_stream;
+	Common::HashMap<Common::Path, Common::Path, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> _paths;
+};
+
+} // End of anonymous namespace
+
+Common::Archive *createMacRomanPathArchive(Common::Archive *archive, Common::SeekableReadStream *stream) {
+	return new MacRomanPathArchive(archive, stream);
 }
 
 } // End of namespace Director
