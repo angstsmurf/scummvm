@@ -79,6 +79,8 @@ public:
 	virtual void setForeColor(uint32 fgCol) { return; }
 	virtual uint32 getBackColor() { return 0; }
 	virtual void setBackColor(uint32 bgCol) { return; }
+	// The colors come from the sprite; Lingo reads the member's as 0 and 255
+	virtual bool colorsLiveOnSprite() { return false; }
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;

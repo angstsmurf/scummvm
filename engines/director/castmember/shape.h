@@ -39,6 +39,7 @@ public:
 	void setForeColor(uint32 fgCol) override;
 
 	bool hasField(int field) override;
+	bool colorsLiveOnSprite() override { return true; }
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;
 
