@@ -473,7 +473,9 @@ bool Score::isWaitingForNextFrame() {
 	// handler that loops on "go" (e.g. "repeat while the mouseDown") runs as
 	// fast as frames can be drawn. The Daedalus Encounter's planets puzzle
 	// relies on this: dragging the sun moves the planet 1 degree per loop
-	// pass, on frames with a tempo of 4 fps.
+	// pass, on frames with a tempo of 4 fps. Not gated: every version this
+	// was checked in (D2 Warlock, D3 Mac and Windows, D4 to D6, D7 DIRAPI)
+	// behaves the same.
 	bool goFromFrozenHandler = _nextFrame &&
 		_window->frozenLingoStateCount() > 0 &&
 		!_window->hasPendingMovieSwitch();
