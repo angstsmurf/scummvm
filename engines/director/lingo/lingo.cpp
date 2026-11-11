@@ -2043,6 +2043,17 @@ CastMemberID Lingo::resolveCastMember(const Datum &memberID, const Datum &castLi
 	return CastMemberID(-1, castLib.asInt());
 }
 
+CastMemberID Lingo::resolveFieldMember(const Datum &member, const Datum &castLib) {
+	// A script and a field may share a name, so prefer fields, but fall back
+	// to any member by that name. Checked in D4 for Windows.
+	if (g_director->getVersion() < 500 && member.type == STRING) {
+		CastMemberID memberID = member.asMemberID(kCastText);
+		if (memberID.member != -1)
+			return memberID;
+	}
+	return toCastMemberID(member, castLib);
+}
+
 CastMemberID Lingo::toCastMemberID(const Datum &member, const Datum &castLib) {
 	// Used specifically for unpacking CastMemberIDs when provided by the bytecode
 	// as two Datums. Multiplex IDs are supported, but auto-truncated.

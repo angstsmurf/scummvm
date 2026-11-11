@@ -1661,7 +1661,7 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 
 	switch (field) {
 	case kTheBackColor:
-		d = (int)g_director->reverseTransformColor(sprite->_backColor);
+		d = (int)sprite->_backColorIndex;
 		break;
 	case kTheBlend:
 		d = (255 - sprite->_blendAmount) * 100 / 255;
@@ -1703,7 +1703,7 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = (sprite->_thickness & kTFlipV) ? 1 : 0;
 		break;
 	case kTheForeColor:
-		d = (int)g_director->reverseTransformColor(sprite->_foreColor);
+		d = (int)sprite->_foreColorIndex;
 		break;
 	case kTheHeight:
 		d = channel->getHeight();
@@ -2366,7 +2366,9 @@ Datum Lingo::getTheField(Datum &id1, int field) {
 		return d;
 	}
 
-	// A script and a field may share a name, so only look for fields
+	// A script and a field may share a name, so only look for fields. Unlike
+	// a field reference (resolveFieldMember()), this doesn't fall back to
+	// other members; not checked against the original.
 	CastMemberID id = id1.asMemberID(kCastText);
 
 	CastMember *member = movie->getCastMember(id);
@@ -2400,7 +2402,9 @@ void Lingo::setTheField(Datum &id1, int field, Datum &d) {
 		return;
 	}
 
-	// A script and a field may share a name, so only look for fields
+	// A script and a field may share a name, so only look for fields. Unlike
+	// a field reference (resolveFieldMember()), this doesn't fall back to
+	// other members; not checked against the original.
 	CastMemberID id = id1.asMemberID(kCastText);
 
 	CastMember *member = movie->getCastMember(id);

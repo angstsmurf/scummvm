@@ -439,6 +439,8 @@ public:
 	Datum findVarV4(int varType, const Datum &id);
 	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib, CastType type);
 	CastMemberID toCastMemberID(const Datum &member, const Datum &castLib);
+	// The member a field reference ("field x") names. castLib is VOID before D5.
+	CastMemberID resolveFieldMember(const Datum &member, const Datum &castLib);
 	void exposeXObject(const char *name, Datum obj);
 
 	int getAlignedType(const Datum &d1, const Datum &d2, bool equality);
