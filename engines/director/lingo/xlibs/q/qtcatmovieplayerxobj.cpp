@@ -241,12 +241,9 @@ void QTCatMoviePlayerXObj::m_play(int nargs) {
 	Common::Event event;
 	bool keepPlaying = true;
 	while (keepPlaying && !video->endOfVideo()) {
-		while (g_director->pollEvent(event)) {
+		bool quit = false;
+		while (g_director->pollModalEvent(event, quit)) {
 			switch (event.type) {
-			case Common::EVENT_QUIT:
-				g_director->processEventQUIT();
-				keepPlaying = false;
-				break;
 			case Common::EVENT_LBUTTONDOWN:
 			case Common::EVENT_RBUTTONDOWN:
 			case Common::EVENT_KEYDOWN:
@@ -257,7 +254,7 @@ void QTCatMoviePlayerXObj::m_play(int nargs) {
 				break;
 			}
 		}
-		if (!keepPlaying)
+		if (quit || !keepPlaying)
 			break;
 
 		if (video->needsUpdate()) {

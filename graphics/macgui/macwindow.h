@@ -37,6 +37,14 @@ class MacWindowManager;
 class MacWindowBorder;
 class MacWidget;
 
+/**
+ * Copy the pixels of src that differ from dst, with src's top left corner at
+ * destPos, and mark the area they span dirty. Both have to be in the same
+ * pixel format. Returns the changed area of dst, which is empty if nothing
+ * changed.
+ */
+Common::Rect blitChangedPixels(ManagedSurface *dst, const Surface &src, const Common::Point &destPos);
+
 namespace MacWindowConstants {
 enum WindowType {
 	kWindowUnknown,

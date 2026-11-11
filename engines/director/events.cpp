@@ -151,6 +151,16 @@ void DirectorEngine::processEventQUIT() {
 	}
 }
 
+bool DirectorEngine::pollModalEvent(Common::Event &event, bool &quit) {
+	if (!pollEvent(event))
+		return false;
+	if (event.type != Common::EVENT_QUIT)
+		return true;
+	processEventQUIT();
+	quit = true;
+	return false;
+}
+
 bool Window::processSysEvent(Common::Event &event) {
 	bool flag = false;
 
