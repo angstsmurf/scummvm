@@ -197,7 +197,7 @@ bool Score::processFrozenScripts(bool recursion, int count) {
 		// Director 4 and later send stepMovie and enterFrame from one routine,
 		// and a go inside stepMovie returns to it. Once that stepMovie is done,
 		// it sends enterFrame to whatever frame is current by then.
-		if (_version >= kFileVer400 && currentScript.name &&
+		if (enterFrameFollowsStepMovie() && currentScript.name &&
 				currentScript.name->equalsIgnoreCase("stepMovie") &&
 				!_nextFrame && _window->_nextMovie.movie.empty() &&
 				_playState != kPlayStopped && !_window->_playbackPaused) {
@@ -389,11 +389,11 @@ void Score::step() {
 			_idleWentToFrame = false;
 			// In D7, the frame step returns at once while a "delay" runs, before
 			// it sends idle (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
-			bool delayed = _version >= kFileVer700 && _nextFrameDelay &&
+			bool delayed = delayBlocksIdle() && _nextFrameDelay &&
 				g_system->getMillis() < _nextFrameDelay;
 			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst && !delayed) {
 				_movie->processEvent(kEventIdle);
-				_idleWentToFrame = _version >= kFileVer400 && _nextFrame != 0 && _window->_nextMovie.movie.empty();
+				_idleWentToFrame = goFromIdleRestartsTimer() && _nextFrame != 0 && _window->_nextMovie.movie.empty();
 			}
 
 			if (_version >= kFileVer600) {
@@ -570,7 +570,7 @@ void Score::updateCurrentFrame() {
 	// jump to the current frame (e.g. "go to the frame"). D5 skips a jump to
 	// the current frame while score recording is on.
 	bool reloadFrame = _curFrameNumber != nextFrameNumberToLoad ||
-		(jumping && _version < kFileVer600 && !_window->_playbackPaused && !_recording);
+		(jumping && jumpRebuildsFrame() && !_window->_playbackPaused && !_recording);
 
 	if (reloadFrame) {
 		// Cache the previous bounding box for the purposes of rollOver.
@@ -599,7 +599,7 @@ void Score::updateCurrentFrame() {
 		//
 		// D6 keeps the fields Lingo set (auto-puppet) until the sprite span
 		// ends, so it doesn't take this path.
-		if (jumping && _version < kFileVer600) {
+		if (jumping && jumpRebuildsFrame()) {
 			for (auto &it : _currentFrame->_sprites)
 				it->_copyBackMask = static_cast<uint32>(-1);
 		}
@@ -653,7 +653,7 @@ void Score::updateNextFrameTime() {
 				_nextFrameTime = g_system->getMillis() + 1000.0 / (float)_currentFrameRate;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): setting _nextFrameTime to %d based on a framerate of %d", _nextFrameTime, _currentFrameRate);
 			} else {
-				if (tempo == 128 && _version >= kFileVer400 && _version < kFileVer500 && _movie->hasQueuedClick()) {
+				if (tempo == 128 && queuedClickEndsClickWait() && _movie->hasQueuedClick()) {
 					// In D4, a click that Lingo has not handled yet ends the
 					// wait at once. It is still sent as mouseDown and mouseUp
 					// afterwards. This happens when a handler clicks (e.g.
@@ -779,7 +779,7 @@ void Score::update() {
 		// exitFrame, so the pass that ends the delay sends exitFrame too.
 		// D7 checks the delay first and sends nothing until it is over
 		// (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
-		bool exitFrameAgain = _version >= kFileVer400 && _version < kFileVer700 &&
+		bool exitFrameAgain = exitFrameRepeatsDuringDelay() &&
 			_nextFrameDelay && !_window->frozenLingoStateCount();
 		if (_haveInteractivity && !_window->_skipFrameAdvance && (!_exitFrameCalled || exitFrameAgain)) {
 			// Exit the current frame. This can include scopeless ScoreScripts.
@@ -861,7 +861,7 @@ void Score::update() {
 		}
 
 		// Check to see if we've hit the recursion limit
-		if (_version >= kFileVer400 && _window->frozenLingoRecursionCount() >= 2) {
+		if (hasGoNestingLimit() && _window->frozenLingoRecursionCount() >= 2) {
 			debugC(1, kDebugEvents, "Score::update(): hitting D4 recursion depth limit, defrosting");
 			processFrozenScripts(true);
 			return;
@@ -936,7 +936,7 @@ void Score::update() {
 		return;
 
 	// If we've hit the recursion limit, don't enterFrame
-	if (_version >= kFileVer400 && _window->frozenLingoRecursionCount() >= 2) {
+	if (hasGoNestingLimit() && _window->frozenLingoRecursionCount() >= 2) {
 		debugC(1, kDebugEvents, "Score::update: exiting early due to recursion depth limit");
 		return;
 	}
