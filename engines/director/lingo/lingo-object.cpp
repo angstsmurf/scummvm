@@ -131,6 +131,7 @@
 #include "director/lingo/xlibs/q/quicktime.h"
 #include "director/lingo/xlibs/r/registercomponent.h"
 #include "director/lingo/xlibs/r/remixxcmd.h"
+#include "director/lingo/xlibs/r/runninginforeground.h"
 #include "director/lingo/xlibs/s/serialportxobj.h"
 #include "director/lingo/xlibs/s/smallutil.h"
 #include "director/lingo/xlibs/s/soundjam.h"

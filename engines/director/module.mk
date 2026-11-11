@@ -164,6 +164,7 @@ MODULE_OBJS = \
 	lingo/xlibs/q/quicktime.o \
 	lingo/xlibs/r/registercomponent.o \
 	lingo/xlibs/r/remixxcmd.o \
+	lingo/xlibs/r/runninginforeground.o \
 	lingo/xlibs/s/savenrestorexobj.o \
 	lingo/xlibs/s/serialportxobj.o \
 	lingo/xlibs/s/smallutil.o \

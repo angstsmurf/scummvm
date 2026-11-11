@@ -78,12 +78,6 @@ const XlibFileDesc NavMovieXCMD::fileNames[] = {
 	{ nullptr,		nullptr },
 };
 
-const char *const RunningInForegroundXFCN::xlibName = "RunningInForeground";
-const XlibFileDesc RunningInForegroundXFCN::fileNames[] = {
-	{ "RunningInForeground",	nullptr },
-	{ nullptr,					nullptr },
-};
-
 // XCMDs can be used both as commands and as functions. Register separate
 // entries so the command form sets the result without returning a value.
 static const BuiltinProto panoBuiltins[] = {
@@ -95,11 +89,6 @@ static const BuiltinProto panoBuiltins[] = {
 static const BuiltinProto navBuiltins[] = {
 	{ "NavMovie", NavMovieXCMD::m_navMovie,			-1, 0, 400, FBLTIN },
 	{ "NavMovie", NavMovieXCMD::m_navMovieCmd,		-1, 0, 400, CBLTIN },
-	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
-};
-
-static const BuiltinProto foregroundBuiltins[] = {
-	{ "RunningInForeground", RunningInForegroundXFCN::m_runningInForeground, 0, 0, 400, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
@@ -137,11 +126,20 @@ static Datum errorDatum(const char *fmt, ...) {
 	return Datum("error: " + msg);
 }
 
+// Parses "n,n,..." from Lingo. Returns an empty array if any item is not a
+// number, so that callers report the whole argument as bad.
 static Common::Array<int> parseNumbers(const Common::String &str) {
 	Common::Array<int> res;
 	Common::StringTokenizer tok(str, ",");
-	while (!tok.empty())
-		res.push_back(atoi(tok.nextToken().c_str()));
+	while (!tok.empty()) {
+		Common::String item = tok.nextToken();
+		item.trim();
+		char *end;
+		long n = strtol(item.c_str(), &end, 10);
+		if (item.empty() || *end)
+			return Common::Array<int>();
+		res.push_back((int)n);
+	}
 	return res;
 }
 
@@ -555,18 +553,6 @@ void NavMovieXCMD::m_navMovie(int nargs) {
 
 void NavMovieXCMD::m_navMovieCmd(int nargs) {
 	runXCMD("NavMovie", s_navMovies, nargs);
-}
-
-void RunningInForegroundXFCN::open(ObjectType type, const Common::Path &path) {
-	g_lingo->initBuiltIns(foregroundBuiltins);
-}
-
-void RunningInForegroundXFCN::close(ObjectType type) {
-	g_lingo->cleanupBuiltIns(foregroundBuiltins);
-}
-
-void RunningInForegroundXFCN::m_runningInForeground(int nargs) {
-	g_lingo->push(Datum("true"));
 }
 
 ///////////////
