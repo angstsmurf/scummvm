@@ -208,10 +208,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 }
 
 DigitalVideoCastMember::~DigitalVideoCastMember() {
-	if (_lastFrame) {
-		_lastFrame->free();
-		delete _lastFrame;
-	}
+	freeLastFrame();
 
 	if (_video)
 		delete _video;
@@ -552,11 +549,7 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 	debugC(1, kDebugImages, "Video time: %d  rate: %f frame: %p dims: %d x %d", _channel->_movieTime, _channel->_movieRate, (const void *)frame, bbox.width(), bbox.height());
 
 	if (frame) {
-		if (_lastFrame) {
-			_lastFrame->free();
-			delete _lastFrame;
-			_lastFrame = nullptr;
-		}
+		freeLastFrame();
 
 		if (frame->getPixels()) {
 			// Video should have the dithering palette set, decode using whatever palette we have now
@@ -601,9 +594,7 @@ uint DigitalVideoCastMember::getTimeScale() {
 uint DigitalVideoCastMember::getMovieCurrentTime() {
 	if (!_video)
 		return 0;
-	// Round up to ticks. getTime() is unsigned, so "1 + (ms * scale - 1) / 1000"
-	// would underflow to the end of the movie when the time is 0.
-	int ticks = (_video->getTime() * getTimeScale() + 999) / 1000;
+	int ticks = msToTicksCeil(_video->getTime());
 	int stamp = MIN<int>(ticks, getMovieTotalTime());
 
 	return stamp;
@@ -623,7 +614,7 @@ uint DigitalVideoCastMember::getMovieTotalTime() {
 	if (!_video)
 		return 0;
 
-	int ticks = (_video->getDuration().msecs() * getTimeScale() + 999) / 1000;
+	int ticks = msToTicksCeil(_video->getDuration().msecs());
 	return ticks;
 }
 
@@ -633,6 +624,69 @@ uint DigitalVideoCastMember::getMovieTotalTimeMillis() {
 
 	int ticks = _video->getDuration().msecs();
 	return ticks;
+}
+
+// Build the time from units rather than whole milliseconds. Rounding
+// down to milliseconds lands just before the frame at that unit, so the
+// previous frame shows. The Door F frescos in The Daedalus Encounter are
+// single frames reached this way.
+Audio::Timestamp DigitalVideoCastMember::timestampFor(int units) {
+	return Audio::Timestamp(0, units, getTimeScale()).convertToFramerate(_video->getDuration().framerate());
+}
+
+// Round up to time scale units. The time is unsigned, so
+// "1 + (ms * scale - 1) / 1000" would underflow to the end of the movie
+// when the time is 0.
+uint DigitalVideoCastMember::msToTicksCeil(uint32 ms) {
+	return (ms * getTimeScale() + 999) / 1000;
+}
+
+// After a seek, the frame at the new position has to be shown
+void DigitalVideoCastMember::afterSeek() {
+	if (_channel->_movieRate == 0.0) {
+		_getFirstFrame = true;
+	} else {
+		// If playback gets paused before the next frame has been
+		// rendered, setMovieRate() needs to show the frame at the
+		// new position
+		_frameStale = true;
+	}
+
+	_dirty = true;
+}
+
+// Whether starting playback rewinds the movie. Only restarting
+// playback rewinds a movie that has ended.
+// The D3 to D6 projectors set the rate with mcActionPlay or
+// SetMovieRate, and in QuickTime 2.0 and 3.0 neither seeks
+// at rate 0.
+// Pausing keeps the position: The Daedalus Encounter seeks
+// DE_FAVA.MOV past its end, sets movieRate to 0 and expects
+// the floodlight button to see the movieTime at the end.
+//
+// The D4 to D6 projectors create a QuickTime movie controller
+// only for direct-to-stage members, and set their rate with
+// mcActionPlay. In QuickTime 2.0 and 3.0 that action, at a
+// positive rate, goes to the start of a movie that has ended.
+// Other members get a plain SetMovieRate, which never seeks,
+// so they stay at the end. D3 always uses SetMovieRate, so it
+// never rewinds here.
+bool DigitalVideoCastMember::shouldRewindOnPlay() {
+	return g_director->getVersion() >= 400 && _directToStage && endOfVideo();
+}
+
+void DigitalVideoCastMember::sizeChannelToMember() {
+	Common::Rect rect = getInitialRect();
+	_channel->setWidth(rect.width());
+	_channel->setHeight(rect.height());
+}
+
+void DigitalVideoCastMember::freeLastFrame() {
+	if (_lastFrame) {
+		_lastFrame->free();
+		delete _lastFrame;
+		_lastFrame = nullptr;
+	}
 }
 
 void DigitalVideoCastMember::seekMovie(int stamp) {
@@ -646,24 +700,8 @@ void DigitalVideoCastMember::seekMovie(int stamp) {
 
 	_channel->_startTime = stamp;
 
-	// Build the time from ticks rather than whole milliseconds. Rounding
-	// down to milliseconds lands just before the frame at that tick, so
-	// the previous frame shows. The Door F frescos in The Daedalus
-	// Encounter are single frames reached this way.
-	Audio::Timestamp dur = _video->getDuration();
-
-	_video->seek(Audio::Timestamp(0, _channel->_startTime, getTimeScale()).convertToFramerate(dur.framerate()));
-
-	if (_channel->_movieRate == 0.0) {
-		_getFirstFrame = true;
-	} else {
-		// If playback gets paused before the next frame has been
-		// rendered, setMovieRate() needs to show the frame at the
-		// new position
-		_frameStale = true;
-	}
-
-	_dirty = true;
+	_video->seek(timestampFor(_channel->_startTime));
+	afterSeek();
 }
 
 void DigitalVideoCastMember::setStartTime(int stamp) {
@@ -685,9 +723,7 @@ void DigitalVideoCastMember::setStopTime(int stamp) {
 
 	_channel->_stopTime = stamp;
 
-	Audio::Timestamp dur = _video->getDuration();
-
-	_video->setEndTime(Audio::Timestamp(0, _channel->_stopTime, getTimeScale()).convertToFramerate(dur.framerate()));
+	_video->setEndTime(timestampFor(_channel->_stopTime));
 }
 
 void DigitalVideoCastMember::setMovieTime(int units) {
@@ -696,22 +732,8 @@ void DigitalVideoCastMember::setMovieTime(int units) {
 
 	// startTime and stopTime are always in ticks (1/60)
 	// movieTime and duration are always in scaling units (1/digitalVideoTimeScale)
-
-	// Build the time from units rather than whole milliseconds, as in
-	// seekMovie().
-	Audio::Timestamp dur = _video->getDuration();
-	_video->seek(Audio::Timestamp(0, units, getTimeScale()).convertToFramerate(dur.framerate()));
-
-	if (_channel->_movieRate == 0.0) {
-		_getFirstFrame = true;
-	} else {
-		// If playback gets paused before the next frame has been
-		// rendered, setMovieRate() needs to show the frame at the
-		// new position
-		_frameStale = true;
-	}
-
-	_dirty = true;
+	_video->seek(timestampFor(units));
+	afterSeek();
 }
 
 void DigitalVideoCastMember::setMovieRate(double rate) {
@@ -748,22 +770,7 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 		if (!_video->isPlaying())
 			_video->start();
 
-		// Only restarting playback rewinds a movie that has ended.
-		// The D3 to D6 projectors set the rate with mcActionPlay or
-		// SetMovieRate, and in QuickTime 2.0 and 3.0 neither seeks
-		// at rate 0.
-		// Pausing keeps the position: The Daedalus Encounter seeks
-		// DE_FAVA.MOV past its end, sets movieRate to 0 and expects
-		// the floodlight button to see the movieTime at the end.
-		//
-		// The D4 to D6 projectors create a QuickTime movie controller
-		// only for direct-to-stage members, and set their rate with
-		// mcActionPlay. In QuickTime 2.0 and 3.0 that action, at a
-		// positive rate, goes to the start of a movie that has ended.
-		// Other members get a plain SetMovieRate, which never seeks,
-		// so they stay at the end. D3 always uses SetMovieRate, so it
-		// never rewinds here.
-		if (g_director->getVersion() >= 400 && _directToStage && endOfVideo())
+		if (shouldRewindOnPlay())
 			rewindVideo();
 	}
 
@@ -947,11 +954,8 @@ void DigitalVideoCastMember::setField(int field, const Datum &d) {
 			_needsReload = false;
 			_useLinkedPath = true;
 			reloadVideo();
-			if (_channel && !_channel->_sprite->_stretch) {
-				Common::Rect rect = getInitialRect();
-				_channel->setWidth(rect.width());
-				_channel->setHeight(rect.height());
-			}
+			if (_channel && !_channel->_sprite->_stretch)
+				sizeChannelToMember();
 		}
 		return;
 	case kTheFrameRate:
@@ -974,11 +978,8 @@ void DigitalVideoCastMember::setField(int field, const Datum &d) {
 		if ((d.type == ARRAY || d.type == POINT) && d.u.farr->arr.size() >= 2) {
 			_scaleX = d.u.farr->arr[0].asInt();
 			_scaleY = d.u.farr->arr[1].asInt();
-			if (_channel) {
-				Common::Rect rect = getInitialRect();
-				_channel->setWidth(rect.width());
-				_channel->setHeight(rect.height());
-			}
+			if (_channel)
+				sizeChannelToMember();
 		} else {
 			warning("DigitalVideoCastMember::setField(): scale expects an [x, y] percentage list, got %s", d.type2str());
 		}
@@ -1012,11 +1013,7 @@ void DigitalVideoCastMember::reloadVideo() {
 	debugC(2, kDebugLoading, "DigitalVideoCastMember::reloadVideo(): cast %d now uses %s", _castId, _filename.c_str());
 
 	// The last frame belongs to the previous file
-	if (_lastFrame) {
-		_lastFrame->free();
-		delete _lastFrame;
-		_lastFrame = nullptr;
-	}
+	freeLastFrame();
 	_frameStale = true;
 
 	if (_channel) {

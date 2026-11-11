@@ -24,6 +24,10 @@
 
 #include "director/castmember/castmember.h"
 
+namespace Audio {
+class Timestamp;
+}
+
 namespace Video {
 class VideoDecoder;
 }
@@ -120,6 +124,14 @@ public:
 	Graphics::Surface *_lastFrame;
 
 	Channel *_channel;
+
+private:
+	Audio::Timestamp timestampFor(int units);
+	uint msToTicksCeil(uint32 ms);
+	void afterSeek();
+	bool shouldRewindOnPlay();
+	void sizeChannelToMember();
+	void freeLastFrame();
 };
 
 } // End of namespace Director
