@@ -83,18 +83,6 @@ void m_navMovieCmd(int nargs);
 
 } // End of namespace NavMovieXCMD
 
-namespace RunningInForegroundXFCN {
-
-extern const char *const xlibName;
-extern const XlibFileDesc fileNames[];
-
-void open(ObjectType type, const Common::Path &path);
-void close(ObjectType type);
-
-void m_runningInForeground(int nargs);
-
-} // End of namespace RunningInForegroundXFCN
-
 } // End of namespace Director
 
 #endif

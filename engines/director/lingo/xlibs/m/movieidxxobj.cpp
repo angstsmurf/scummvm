@@ -67,22 +67,18 @@ static const MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-struct MovieIdxEntry {
-	int cmvIndex;
-	Common::String name;
-	uint32 offset;
-	uint32 length;
-	int sound;
-	int playEveryFrame;
-};
+typedef MovieIdxXObject::Entry MovieIdxEntry;
 
-static Common::Array<MovieIdxEntry> *movieIndex = nullptr;
-
-static bool isEndName(const Common::String &name) {
-	return name == "END";
+// Both tables end with a record named "END". Adds e to the entries, or
+// returns true if it is that record.
+static bool addUntilEnd(Common::Array<MovieIdxEntry> &entries, const MovieIdxEntry &e) {
+	if (e.name == "END")
+		return true;
+	entries.push_back(e);
+	return false;
 }
 
-static bool parseMacTable(const byte *data, uint32 size) {
+static bool parseMacTable(const byte *data, uint32 size, Common::Array<MovieIdxEntry> &result) {
 	const uint32 recSize = 22;
 	// Find the first offset where a run of well-formed records leads up to
 	// the END record.
@@ -114,21 +110,20 @@ static bool parseMacTable(const byte *data, uint32 size) {
 			e.sound = r[20];
 			e.playEveryFrame = r[21];
 			pos += recSize;
-			if (isEndName(e.name)) {
+			if (addUntilEnd(entries, e)) {
 				ok = true;
 				break;
 			}
-			entries.push_back(e);
 		}
 		if (ok && entries.size() >= 2) {
-			*movieIndex = entries;
+			result = entries;
 			return true;
 		}
 	}
 	return false;
 }
 
-static bool parseWinTable(const byte *data, uint32 size) {
+static bool parseWinTable(const byte *data, uint32 size, Common::Array<MovieIdxEntry> &result) {
 	const uint32 recSize = 18;
 	for (uint32 start = 0; start + 3 * recSize <= size; start++) {
 		if (READ_LE_UINT32(data + start + 2) != 0xffff ||
@@ -162,23 +157,27 @@ static bool parseWinTable(const byte *data, uint32 size) {
 			e.sound = READ_LE_UINT16(r + 14);
 			e.playEveryFrame = READ_LE_UINT16(r + 16);
 			names = end + 1;
-			if (isEndName(e.name)) {
-				*movieIndex = entries;
+			if (addUntilEnd(entries, e)) {
+				result = entries;
 				return true;
 			}
-			entries.push_back(e);
 		}
 		return false;
 	}
 	return false;
 }
 
-static void loadMovieIndex(const Common::Path &path) {
-	if (!movieIndex)
-		movieIndex = new Common::Array<MovieIdxEntry>();
-	movieIndex->clear();
+static Common::Array<byte> readAll(Common::SeekableReadStream &stream) {
+	Common::Array<byte> data(stream.size());
+	if (!data.empty())
+		stream.read(data.data(), data.size());
+	return data;
+}
+
+static Common::Array<MovieIdxEntry> loadMovieIndex(const Common::Path &path) {
+	Common::Array<MovieIdxEntry> index;
 	if (path.empty())
-		return;
+		return index;
 
 	Common::MacResManager resMan;
 	if (resMan.open(path) && resMan.hasResFork()) {
@@ -187,30 +186,24 @@ static void loadMovieIndex(const Common::Path &path) {
 			Common::SeekableReadStream *res = resMan.getResource(MKTAG('X', 'C', 'O', 'D'), ids[i]);
 			if (!res)
 				continue;
-			uint32 size = res->size();
-			byte *data = (byte *)malloc(size);
-			res->read(data, size);
+			Common::Array<byte> data = readAll(*res);
 			delete res;
-			bool found = parseMacTable(data, size);
-			free(data);
-			if (found)
+			if (parseMacTable(data.data(), data.size(), index))
 				break;
 		}
 	} else {
 		Common::File f;
 		if (f.open(path)) {
-			uint32 size = f.size();
-			byte *data = (byte *)malloc(size);
-			f.read(data, size);
-			parseWinTable(data, size);
-			free(data);
+			Common::Array<byte> data = readAll(f);
+			parseWinTable(data.data(), data.size(), index);
 		}
 	}
 
-	if (movieIndex->empty())
+	if (index.empty())
 		warning("MovieIdxXObj: No movie index found in '%s'", path.toString().c_str());
 	else
-		debugC(5, kDebugXObj, "MovieIdxXObj: Read %d movie index entries from '%s'", movieIndex->size(), path.toString().c_str());
+		debugC(5, kDebugXObj, "MovieIdxXObj: Read %d movie index entries from '%s'", index.size(), path.toString().c_str());
+	return index;
 }
 
 MovieIdxXObject::MovieIdxXObject(ObjectType ObjectType) :Object<MovieIdxXObject>("MovieIdx") {
@@ -219,9 +212,10 @@ MovieIdxXObject::MovieIdxXObject(ObjectType ObjectType) :Object<MovieIdxXObject>
 
 void MovieIdxXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
-		loadMovieIndex(path);
 		MovieIdxXObject::initMethods(xlibMethods);
 		MovieIdxXObject *xobj = new MovieIdxXObject(kXObj);
+		// Instances made by mNew are copies of this one, index included
+		xobj->_index = loadMovieIndex(path);
 		g_lingo->exposeXObject(xlibName, xobj);
 	}
 }
@@ -229,8 +223,6 @@ void MovieIdxXObj::open(ObjectType type, const Common::Path &path) {
 void MovieIdxXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		MovieIdxXObject::cleanupMethods();
-		delete movieIndex;
-		movieIndex = nullptr;
 		g_lingo->_globalvars[xlibName] = Datum();
 	}
 }
@@ -246,13 +238,9 @@ void MovieIdxXObj::m_dispose(int nargs) {
 
 void MovieIdxXObj::m_movieInfo(int nargs) {
 	Common::String name = g_lingo->pop().asString();
+	MovieIdxXObject *me = static_cast<MovieIdxXObject *>(g_lingo->_state->me.u.obj);
 
-	if (!movieIndex) {
-		g_lingo->push(Datum(""));
-		return;
-	}
-
-	for (auto &e : *movieIndex) {
+	for (const auto &e : me->_index) {
 		if (e.name.equalsIgnoreCase(name)) {
 			Common::String info = Common::String::format("%d,%u,%u,%d,%d",
 				e.cmvIndex, e.offset, e.length, e.sound, e.playEveryFrame);

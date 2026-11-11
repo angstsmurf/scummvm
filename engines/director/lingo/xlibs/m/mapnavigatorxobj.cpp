@@ -303,18 +303,33 @@ MapNavigatorXObject::Instruction *MapNavigatorXObject::getInstruction(int node, 
 	return &c->instructions[index - 1];
 }
 
-// Compare like the original: unsigned bytes, then lengths
-static int compareNames(const Common::String &a, const Common::String &b) {
-	uint len = MIN(a.size(), b.size());
-	for (uint i = 0; i < len; i++) {
-		if (a[i] != b[i])
-			return (byte)a[i] - (byte)b[i];
-	}
-	return (int)a.size() - (int)b.size();
-}
-
 static MapNavigatorXObject *getMe() {
 	return static_cast<MapNavigatorXObject *>(g_lingo->_state->me.u.obj);
+}
+
+// The methods below take node, hot spot, condition and instruction
+// arguments in that order, after which any others follow
+
+static MapNavigatorXObject::HotSpot *popHotSpot(bool hidden = false) {
+	int hotSpot = g_lingo->pop().asInt();
+	int node = g_lingo->pop().asInt();
+	MapNavigatorXObject *me = getMe();
+	return hidden ? me->getHiddenHotSpot(node, hotSpot) : me->getHotSpot(node, hotSpot);
+}
+
+static MapNavigatorXObject::Condition *popCondition() {
+	int condition = g_lingo->pop().asInt();
+	int hotSpot = g_lingo->pop().asInt();
+	int node = g_lingo->pop().asInt();
+	return getMe()->getCondition(node, hotSpot, condition);
+}
+
+static MapNavigatorXObject::Instruction *popInstruction() {
+	int index = g_lingo->pop().asInt();
+	int condition = g_lingo->pop().asInt();
+	int hotSpot = g_lingo->pop().asInt();
+	int node = g_lingo->pop().asInt();
+	return getMe()->getInstruction(node, hotSpot, condition, index);
 }
 
 void MapNavigatorXObj::m_new(int nargs) {
@@ -360,11 +375,12 @@ void MapNavigatorXObj::m_getNodeIndex(int nargs) {
 	MapNavigatorXObject *me = getMe();
 
 	// The original does a case-sensitive binary search, relying on the
-	// nodes being sorted by name
+	// nodes being sorted by name. It compares unsigned bytes and then
+	// lengths, like compareTo.
 	int lo = 0, hi = (int)me->_nodes.size() - 1;
 	while (lo <= hi) {
 		int mid = (lo + hi) / 2;
-		int cmp = compareNames(name, me->_nodes[mid].name);
+		int cmp = name.compareTo(me->_nodes[mid].name);
 		if (cmp == 0) {
 			g_lingo->push(Datum(mid + 1));
 			return;
@@ -392,33 +408,25 @@ void MapNavigatorXObj::m_getHotSpotCount(int nargs) {
 
 void MapNavigatorXObj::m_setHidden(int nargs) {
 	int flag = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *h = getMe()->getHiddenHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *h = popHotSpot(true);
 	if (h)
 		h->hidden = flag != 0;
 }
 
 void MapNavigatorXObj::m_getHidden(int nargs) {
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *h = getMe()->getHiddenHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *h = popHotSpot(true);
 	g_lingo->push(Datum(h && h->hidden ? 1 : 0));
 }
 
 void MapNavigatorXObj::m_pointInside(int nargs) {
 	int v = g_lingo->pop().asInt();
 	int h = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *hs = getMe()->getHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *hs = popHotSpot();
 	g_lingo->push(Datum(hs && hs->rect.contains(h, v) ? 1 : 0));
 }
 
 void MapNavigatorXObj::m_getHotSpotRect(int nargs) {
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *h = getMe()->getHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *h = popHotSpot();
 	if (!h) {
 		g_lingo->push(Datum(Common::String()));
 		return;
@@ -428,50 +436,32 @@ void MapNavigatorXObj::m_getHotSpotRect(int nargs) {
 }
 
 void MapNavigatorXObj::m_getHotSpotCursor(int nargs) {
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *h = getMe()->getHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *h = popHotSpot();
 	g_lingo->push(Datum(h ? h->cursor : 0));
 }
 
 void MapNavigatorXObj::m_getEvaluationFcn(int nargs) {
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::HotSpot *h = getMe()->getHotSpot(node, hotSpot);
+	MapNavigatorXObject::HotSpot *h = popHotSpot();
 	g_lingo->push(Datum(h ? h->evaluationFcn : Common::String()));
 }
 
 void MapNavigatorXObj::m_getDestinationNode(int nargs) {
-	int condition = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::Condition *c = getMe()->getCondition(node, hotSpot, condition);
+	MapNavigatorXObject::Condition *c = popCondition();
 	g_lingo->push(Datum(c ? c->destinationNode + 1 : 0));
 }
 
 void MapNavigatorXObj::m_getInstructionCount(int nargs) {
-	int condition = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::Condition *c = getMe()->getCondition(node, hotSpot, condition);
+	MapNavigatorXObject::Condition *c = popCondition();
 	g_lingo->push(Datum(c ? (int)c->instructions.size() : 0));
 }
 
 void MapNavigatorXObj::m_getInstructionType(int nargs) {
-	int index = g_lingo->pop().asInt();
-	int condition = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::Instruction *i = getMe()->getInstruction(node, hotSpot, condition, index);
+	MapNavigatorXObject::Instruction *i = popInstruction();
 	g_lingo->push(Datum(i ? (int)(byte)i->type : 0));
 }
 
 void MapNavigatorXObj::m_getInstruction(int nargs) {
-	int index = g_lingo->pop().asInt();
-	int condition = g_lingo->pop().asInt();
-	int hotSpot = g_lingo->pop().asInt();
-	int node = g_lingo->pop().asInt();
-	MapNavigatorXObject::Instruction *i = getMe()->getInstruction(node, hotSpot, condition, index);
+	MapNavigatorXObject::Instruction *i = popInstruction();
 	g_lingo->push(Datum(i ? i->text : Common::String()));
 }
 

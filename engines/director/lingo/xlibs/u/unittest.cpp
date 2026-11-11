@@ -183,40 +183,31 @@ void UnitTestXObj::m_moveMouse(int nargs) {
 	g_lingo->push(0);
 }
 
-void UnitTestXObj::m_leftMouseDown(int nargs) {
+// The Windows XObject sends the click with SendMessage, so the stage
+// handles it before the call returns. Lingo still runs, so its mouseDown
+// and mouseUp handlers are queued for later.
+static void sendMouseEvent(const char *method, Common::EventType type, int nargs) {
 	if (nargs != 0) {
-		warning("UnitTestXObj::m_leftMouseDown: expected 0 arguments");
+		warning("UnitTestXObj::%s: expected 0 arguments", method);
 		g_lingo->dropStack(nargs);
 		g_lingo->push(0);
 		return;
 	}
 	UnitTestXObject *me = static_cast<UnitTestXObject *>(g_lingo->_state->me.u.obj);
 	Common::Event ev;
-	ev.type = Common::EVENT_LBUTTONDOWN;
+	ev.type = type;
 	ev.mouse = me->_mousePos;
 	g_director->_injectedEvents.push_back(ev);
-	// The Windows XObject sends the click with SendMessage, so the stage
-	// handles it before the call returns. Lingo still runs, so its
-	// mouseDown and mouseUp handlers are queued for later.
 	g_director->processSysEvents();
 	g_lingo->push(0);
 }
 
+void UnitTestXObj::m_leftMouseDown(int nargs) {
+	sendMouseEvent("m_leftMouseDown", Common::EVENT_LBUTTONDOWN, nargs);
+}
+
 void UnitTestXObj::m_leftMouseUp(int nargs) {
-	if (nargs != 0) {
-		warning("UnitTestXObj::m_leftMouseDown: expected 0 arguments");
-		g_lingo->dropStack(nargs);
-		g_lingo->push(0);
-		return;
-	}
-	UnitTestXObject *me = static_cast<UnitTestXObject *>(g_lingo->_state->me.u.obj);
-	Common::Event ev;
-	ev.type = Common::EVENT_LBUTTONUP;
-	ev.mouse = me->_mousePos;
-	g_director->_injectedEvents.push_back(ev);
-	// Handled at once, as in m_leftMouseDown().
-	g_director->processSysEvents();
-	g_lingo->push(0);
+	sendMouseEvent("m_leftMouseUp", Common::EVENT_LBUTTONUP, nargs);
 }
 
 void UnitTestXObj::m_keyPress(int nargs) {
@@ -235,7 +226,7 @@ void UnitTestXObj::m_keyPress(int nargs) {
 	g_director->_injectedEvents.push_back(ev);
 	ev.type = Common::EVENT_KEYUP;
 	g_director->_injectedEvents.push_back(ev);
-	// Handled at once, as in m_leftMouseDown(). The message never sits in
+	// Handled at once, as in sendMouseEvent(). The message never sits in
 	// the queue, so a transition after it must not see a pending key.
 	bool keyHeld = g_director->_keyHeldByLingo;
 	g_director->processSysEvents();

@@ -27,6 +27,17 @@ namespace Director {
 class MovieIdxXObject : public Object<MovieIdxXObject> {
 public:
 	MovieIdxXObject(ObjectType objType);
+
+	struct Entry {
+		int cmvIndex;
+		Common::String name;
+		uint32 offset;
+		uint32 length;
+		int sound;
+		int playEveryFrame;
+	};
+
+	Common::Array<Entry> _index;
 };
 
 namespace MovieIdxXObj {
