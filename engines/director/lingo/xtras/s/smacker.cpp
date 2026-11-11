@@ -232,14 +232,14 @@ void SmackerXtra::playSmacker(const Common::String &videoPath, const Common::Rec
 				dest->getBounds(),
 				videoPalette
 			);
-			g_system->copyRectToScreen(dest->getPixels(), dest->pitch, bbox.left, bbox.top, bbox.width(), bbox.height());
+			g_director->_wm->copyRectToScreen(dest->getPixels(), dest->pitch, bbox.left, bbox.top, bbox.width(), bbox.height());
 
 			// Video palette order is going to be different to the screen, we need to untangle it
 			/*Graphics::Surface *dither = frame->convertTo(g_director->_wm->_pixelformat, videoPalette, 256,
 					usePalette ? videoPalette : origPalette, usePalette ? 256 : origCount, Graphics::kDitherNaive);
 			int width = MIN(dither->w + posX, (int)g_system->getWidth()) - bbox.left;
 			int height = MIN(dither->h + posY, (int)g_system->getHeight()) - bbox.top;
-			g_system->copyRectToScreen(dither->getPixels(), dither->pitch, bbox.left, bbox.top, width, height);
+			g_director->_wm->copyRectToScreen(dither->getPixels(), dither->pitch, bbox.left, bbox.top, width, height);
 			dither->free();
 			delete dither;*/
 		}

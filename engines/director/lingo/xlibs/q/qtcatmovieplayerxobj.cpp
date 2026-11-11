@@ -273,7 +273,7 @@ void QTCatMoviePlayerXObj::m_play(int nargs) {
 				Common::Rect dst(origin.x, origin.y, origin.x + frame->w, origin.y + frame->h);
 				dst.clip(screen);
 				if (!dst.isEmpty()) {
-					g_system->copyRectToScreen(
+					g_director->_wm->copyRectToScreen(
 						frame->getBasePtr(dst.left - origin.x, dst.top - origin.y), frame->pitch,
 						dst.left, dst.top, dst.width(), dst.height());
 				}
