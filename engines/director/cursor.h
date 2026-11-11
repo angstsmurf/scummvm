@@ -48,6 +48,7 @@ class Cursor : public Graphics::MacCursor {
 	void readFromResource(Datum resourceId);
 	void readBuiltinType(Datum resourceId);
 	bool readFromArchive(Archive *archive, uint16 resourceId);
+	bool readFromOpenResFiles(uint16 resourceId);
 
 	bool isEmpty() {return _cursorResId.type != ARRAY && Datum(0).equalTo(_cursorResId);}
 	bool operator==(const Cursor &c);

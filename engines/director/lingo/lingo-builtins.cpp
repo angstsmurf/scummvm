@@ -1775,8 +1775,7 @@ void LB::b_openResFile(int nargs) {
 		Common::SharedPtr<Archive> arch(new MacArchive());
 		if (arch->openFile(findPath(resPath))) {
 			g_director->_openResFiles.setVal(resPath, arch);
-			g_director->_allSeenResFiles.setVal(resPath, arch);
-			g_director->addArchiveToOpenList(resPath);
+			g_director->registerResFile(resPath, arch);
 		}
 	}
 }
@@ -1818,11 +1817,11 @@ void LB::b_openXlib(int nargs) {
 			// other resources (e.g. cursors) can be found.
 			if (!g_director->_allSeenResFiles.contains(xlibPath)) {
 				resFile->setPathName(xlibPath);
-				g_director->_allSeenResFiles.setVal(xlibPath, Common::SharedPtr<Archive>(resFile));
+				g_director->registerResFile(xlibPath, Common::SharedPtr<Archive>(resFile));
 			} else {
 				delete resFile;
+				g_director->addArchiveToOpenList(xlibPath);
 			}
-			g_director->addArchiveToOpenList(xlibPath);
 			return;
 		}
 		delete resFile;

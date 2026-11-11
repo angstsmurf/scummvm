@@ -245,11 +245,7 @@ void Cursor::readFromResource(Datum resourceId) {
 			}
 		}
 
-		for (auto &it : g_director->_allOpenResFiles) {
-			readSuccessful = readFromArchive(g_director->_allSeenResFiles[it].get(), resourceId.asInt());
-			if (readSuccessful)
-				break;
-		}
+		readSuccessful = readFromOpenResFiles(resourceId.asInt());
 
 		// Cursors can be located in the main archive, which may not
 		// be in _allOpenResFiles
@@ -285,6 +281,15 @@ void Cursor::readFromResource(Datum resourceId) {
 			resetCursor(Graphics::kMacCursorArrow, true, resourceId);
 		}
 	}
+}
+
+// Search the open resource files, most recently opened first
+bool Cursor::readFromOpenResFiles(uint16 resourceId) {
+	for (auto &it : g_director->_allOpenResFiles) {
+		if (readFromArchive(g_director->_allSeenResFiles[it].get(), resourceId))
+			return true;
+	}
+	return false;
 }
 
 bool Cursor::readFromArchive(Archive *archive, uint16 resourceId) {

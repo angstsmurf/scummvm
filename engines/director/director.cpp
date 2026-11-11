@@ -216,12 +216,19 @@ Common::String DirectorEngine::getCurrentAbsolutePath() {
 
 static bool buildbotErrorHandler(const char *msg) { return true; }
 
-Window *DirectorEngine::getOrCreateWindow(Common::String &name) {
+// A window opened by Lingo, by name; the stage isn't one of them
+Window *DirectorEngine::findWindow(const Common::String &name) const {
 	for (auto &it : _windowList) {
-		if (it->getName().equalsIgnoreCase(name)) {
+		if (it->getName().equalsIgnoreCase(name))
 			return it;
-		}
 	}
+	return nullptr;
+}
+
+Window *DirectorEngine::getOrCreateWindow(Common::String &name) {
+	Window *existing = findWindow(name);
+	if (existing)
+		return existing;
 	Window *window = new Window(_wm->getNextId(), false, false, false, _wm, g_director, false);
 	window->setName(name);
 	window->setTitle(name);
