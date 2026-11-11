@@ -3837,27 +3837,47 @@ void LB::b_rect(int nargs) {
 	g_lingo->push(d);
 }
 
+// A rect as Lingo holds it. Games can build inverted rects (e.g. the
+// Daedalus combat hotspots), which Common::Rect asserts on. Like a
+// QuickDraw rect, an empty or inverted one contains no points.
+struct LingoRect {
+	int left, top, right, bottom;
+
+	explicit LingoRect(const Datum &d) :
+		left(d.u.farr->arr[0].asInt()), top(d.u.farr->arr[1].asInt()),
+		right(d.u.farr->arr[2].asInt()), bottom(d.u.farr->arr[3].asInt()) {}
+	LingoRect(int l, int t, int r, int b) : left(l), top(t), right(r), bottom(b) {}
+
+	bool isEmpty() const { return right <= left || bottom <= top; }
+	bool contains(int x, int y) const { return x >= left && x < right && y >= top && y < bottom; }
+
+	Datum toDatum() const {
+		Datum d;
+		d.type = RECT;
+		d.u.farr = new FArray;
+		d.u.farr->arr.push_back(Datum(left));
+		d.u.farr->arr.push_back(Datum(top));
+		d.u.farr->arr.push_back(Datum(right));
+		d.u.farr->arr.push_back(Datum(bottom));
+		return d;
+	}
+};
 
 void LB::b_intersect(int nargs) {
-	Datum d;
 	Datum r2 = g_lingo->pop();
 	Datum r1 = g_lingo->pop();
 	TYPECHECK(r1, RECT);
 	TYPECHECK(r2, RECT);
-	Common::Rect rect1(r1.u.farr->arr[0].asInt(), r1.u.farr->arr[1].asInt(), r1.u.farr->arr[2].asInt(), r1.u.farr->arr[3].asInt());
-	Common::Rect rect2(r2.u.farr->arr[0].asInt(), r2.u.farr->arr[1].asInt(), r2.u.farr->arr[2].asInt(), r2.u.farr->arr[3].asInt());
+	LingoRect rect1(r1);
+	LingoRect rect2(r2);
 
 	// Return the overlapping area as a rect (rect(0,0,0,0) if none).
-	Common::Rect inter = rect1.findIntersectingRect(rect2);
+	LingoRect inter(MAX(rect1.left, rect2.left), MAX(rect1.top, rect2.top),
+		MIN(rect1.right, rect2.right), MIN(rect1.bottom, rect2.bottom));
+	if (rect1.isEmpty() || rect2.isEmpty() || inter.isEmpty())
+		inter = LingoRect(0, 0, 0, 0);
 
-	d.type = RECT;
-	d.u.farr = new FArray;
-	d.u.farr->arr.push_back(Datum((int)inter.left));
-	d.u.farr->arr.push_back(Datum((int)inter.top));
-	d.u.farr->arr.push_back(Datum((int)inter.right));
-	d.u.farr->arr.push_back(Datum((int)inter.bottom));
-
-	g_lingo->push(d);
+	g_lingo->push(inter.toDatum());
 }
 
 void LB::b_inflate(int nargs) {
@@ -3867,26 +3887,11 @@ void LB::b_inflate(int nargs) {
 
 	TYPECHECK(sR, RECT);
 
-	Common::Rect sourceRect(sR.u.farr->arr[0].asInt(),
-		                    sR.u.farr->arr[1].asInt(),
-		                    sR.u.farr->arr[2].asInt(),
-		                    sR.u.farr->arr[3].asInt());
+	LingoRect sourceRect(sR);
+	LingoRect inflatedRect(sourceRect.left - inflateWidth, sourceRect.top - inflateHeight,
+		sourceRect.right + inflateWidth, sourceRect.bottom + inflateHeight);
 
-	int inflatedLeft = sourceRect.left - inflateWidth;
-	int inflatedTop = sourceRect.top - inflateHeight;
-	int inflatedRight = sourceRect.right + inflateWidth;
-	int inflatedBottom = sourceRect.bottom + inflateHeight;
-
-	Datum inflatedRect;
-	inflatedRect.type = RECT;
-
-	inflatedRect.u.farr = new FArray();
-	inflatedRect.u.farr->arr.push_back(Datum(inflatedLeft));
-	inflatedRect.u.farr->arr.push_back(Datum(inflatedTop));
-	inflatedRect.u.farr->arr.push_back(Datum(inflatedRight));
-	inflatedRect.u.farr->arr.push_back(Datum(inflatedBottom));
-
-	g_lingo->push(inflatedRect);
+	g_lingo->push(inflatedRect.toDatum());
 }
 
 void LB::b_inside(int nargs) {
@@ -3903,17 +3908,8 @@ void LB::b_inside(int nargs) {
 		return;
 	}
 
-	// Don't construct a Common::Rect here: games can pass inverted rects
-	// (e.g. Daedalus combat hotspots), which would trip its validity assert.
-	// Like the Mac PtInRect, an empty or inverted rect contains no points.
-	int left = r2.u.farr->arr[0].asInt();
-	int top = r2.u.farr->arr[1].asInt();
-	int right = r2.u.farr->arr[2].asInt();
-	int bottom = r2.u.farr->arr[3].asInt();
-	int x = p1.u.farr->arr[0].asInt();
-	int y = p1.u.farr->arr[1].asInt();
-
-	d = (x >= left && x < right && y >= top && y < bottom) ? 1 : 0;
+	// Like the Mac PtInRect, an empty or inverted rect contains no points
+	d = LingoRect(r2).contains(p1.u.farr->arr[0].asInt(), p1.u.farr->arr[1].asInt()) ? 1 : 0;
 
 	g_lingo->push(d);
 }
@@ -3998,16 +3994,11 @@ void LB::b_union(int nargs) {
 		return;
 	}
 
-	Datum res;
-	res.type = RECT;
+	LingoRect r1(rect1);
+	LingoRect r2(rect2);
+	LingoRect res(MIN(r1.left, r2.left), MIN(r1.top, r2.top), MAX(r1.right, r2.right), MAX(r1.bottom, r2.bottom));
 
-	res.u.farr = new FArray();
-	res.u.farr->arr.push_back(Datum(MIN(rect1.u.farr->arr[0].u.i, rect2.u.farr->arr[0].u.i)));
-	res.u.farr->arr.push_back(Datum(MIN(rect1.u.farr->arr[1].u.i, rect2.u.farr->arr[1].u.i)));
-	res.u.farr->arr.push_back(Datum(MAX(rect1.u.farr->arr[2].u.i, rect2.u.farr->arr[2].u.i)));
-	res.u.farr->arr.push_back(Datum(MAX(rect1.u.farr->arr[3].u.i, rect2.u.farr->arr[3].u.i)));
-
-	g_lingo->push(res);
+	g_lingo->push(res.toDatum());
 }
 
 
@@ -4546,20 +4537,26 @@ void LB::b_getVolumes(int nargs) {
 	g_lingo->push(d);
 }
 
+// Partly a stub: updateFrame and the other recording commands don't change
+// the score yet. A recording session only stops jumps from rebuilding the
+// frame, so the sprites Lingo sets up stay in place.
+static void setScoreRecording(bool recording) {
+	Movie *movie = g_director->getCurrentMovie();
+	Score *score = movie ? movie->getScore() : nullptr;
+	if (score)
+		score->_recording = recording;
+}
+
 void LB::b_beginRecording(int nargs) {
 	g_lingo->printSTUBWithArglist("b_beginRecording", nargs);
 	g_lingo->dropStack(nargs);
-	Score *score = g_director->getCurrentMovie()->getScore();
-	if (score)
-		score->_recording = true;
+	setScoreRecording(true);
 }
 
 void LB::b_endRecording(int nargs) {
 	g_lingo->printSTUBWithArglist("b_endRecording", nargs);
 	g_lingo->dropStack(nargs);
-	Score *score = g_director->getCurrentMovie()->getScore();
-	if (score)
-		score->_recording = false;
+	setScoreRecording(false);
 }
 
 // Shockwave D6
