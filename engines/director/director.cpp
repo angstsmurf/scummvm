@@ -33,6 +33,7 @@
 #include "director/director.h"
 #include "director/debugger.h"
 #include "director/archive.h"
+#include "director/saved-archive.h"
 #include "director/cast.h"
 #include "director/movie.h"
 #include "director/picture.h"

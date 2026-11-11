@@ -3,6 +3,7 @@ MODULE := engines/director
 MODULE_OBJS = \
 	archive.o \
 	archive-save.o \
+	saved-archive.o \
 	cast.o \
 	channel.o \
 	cursor.o \
