@@ -113,6 +113,8 @@ public:
 	bool getEditable();
 
 	bool respondsToMouse();
+	// The tweened flag is score authoring data and doesn't affect drawing
+	byte getDrawThickness() const { return _thickness & ~kTTweened; }
 	bool isActive();
 	bool shouldHilite();
 	bool checkSpriteType();
