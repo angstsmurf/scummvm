@@ -188,7 +188,13 @@ Datum CastMember::getField(int field) {
 
 	switch (field) {
 	case kTheBackColor:
-		d = (int)g_director->reverseTransformColor(getBackColor());
+		// A bitmap's or shape's colors live on the sprite, not the member:
+		// D4 reports backColor 255 for every one, whatever the member
+		// record holds
+		if (colorsLiveOnSprite())
+			d = 255;
+		else
+			d = (int)g_director->reverseTransformColor(getBackColor());
 		break;
 	case kTheCastLibNum:
 		d = _cast->_castLibID;
@@ -207,7 +213,11 @@ Datum CastMember::getField(int field) {
 			d = Datum(castInfo->directory + g_director->_dirSeparator + castInfo->fileName);
 		break;
 	case kTheForeColor:
-		d = (int)g_director->reverseTransformColor(getForeColor());
+		// See kTheBackColor: D4 reports foreColor 0
+		if (colorsLiveOnSprite())
+			d = 0;
+		else
+			d = (int)g_director->reverseTransformColor(getForeColor());
 		break;
 	case kTheHeight:
 		d = _cast->getCastMemberInitialRect(_castId).height();
@@ -277,7 +287,9 @@ void CastMember::setField(int field, const Datum &d) {
 
 	switch (field) {
 	case kTheBackColor:
-		_cast->getCastMember(_castId)->setBackColor(g_director->transformColor(d.asInt()));
+		// D4 ignores sets of a bitmap's or shape's colors, see getField()
+		if (!colorsLiveOnSprite())
+			_cast->getCastMember(_castId)->setBackColor(g_director->transformColor(d.asInt()));
 		return;
 	case kTheCastType:
 	case kTheType:
@@ -297,7 +309,8 @@ void CastMember::setField(int field, const Datum &d) {
 		}
 		return;
 	case kTheForeColor:
-		_cast->getCastMember(_castId)->setForeColor(g_director->transformColor(d.asInt()));
+		if (!colorsLiveOnSprite())
+			_cast->getCastMember(_castId)->setForeColor(g_director->transformColor(d.asInt()));
 		return;
 	case kTheHeight:
 		warning("BUILDBOT: CastMember::setField(): Attempt to set read-only field \"%s\" of cast %d", g_lingo->field2str(field), _castId);

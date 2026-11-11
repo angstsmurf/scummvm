@@ -1014,13 +1014,6 @@ Datum BitmapCastMember::getField(int field) {
 		d.type = PICTUREREF;
 		d.u.picture = getPicture();
 		break;
-	case kTheForeColor:
-	case kTheBackColor:
-		// A bitmap's colors live on the sprite, not the member: D4 reports
-		// foreColor 0 and backColor 255 for every bitmap member and ignores
-		// sets.
-		d = (field == kTheForeColor) ? 0 : 255;
-		break;
 	default:
 		d = CastMember::getField(field);
 	}
@@ -1030,10 +1023,6 @@ Datum BitmapCastMember::getField(int field) {
 
 void BitmapCastMember::setField(int field, const Datum &d) {
 	switch (field) {
-	case kTheForeColor:
-	case kTheBackColor:
-		// See getField(): a no-op
-		return;
 	case kTheDepth:
 		warning("BitmapCastMember::setField(): Attempt to set read-only field %s of cast %d", g_lingo->field2str(field), _castId);
 		return;
