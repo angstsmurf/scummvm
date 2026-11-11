@@ -110,7 +110,8 @@ Common::u32char_type_t numToChar(int num);
 int compareStringOrder(const Common::String &s1, const Common::String &s2);
 bool compareStringEquality(const Common::String &s1, const Common::String &s2);
 
-// Our implementation of strstr() with Director character order
+// Like strstr() with Director character order, but returns the 0-based
+// character index of the first match, or -1 if there is none
 int findStringEquality(const Common::String &str, const Common::String &substr);
 
 Common::String encodePathForDump(const Common::String &path);

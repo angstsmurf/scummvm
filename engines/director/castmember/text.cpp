@@ -922,16 +922,7 @@ void TextCastMember::setField(int field, const Datum &d) {
 	case kTheBoxType:
 		{
 			// The possible values are #adjust, #scroll, #fixed, and #limit.
-			Common::String type = d.asString();
-			if (type.equalsIgnoreCase("adjust")) {
-				_textType = kTextTypeAdjustToFit;
-			} else if (type.equalsIgnoreCase("scroll")) {
-				_textType = kTextTypeScrolling;
-			} else if (type.equalsIgnoreCase("fixed")) {
-				_textType = kTextTypeFixed;
-			} else if (type.equalsIgnoreCase("limit")) {
-				_textType = kTextTypeLimit;
-			} else {
+			if (!str2textType(d.asString(), _textType)) {
 				warning("TextCastMember::setField(): Unknown boxType %s", d.asString(true).c_str());
 				return;
 			}

@@ -108,6 +108,7 @@ public:
 	CastMemberID getCurrentPalette();
 	bool hasPuppetPalette();
 	bool controlsPalette();
+	bool scorePaletteActive();
 
 	Channel *getChannelById(uint16 id);
 	Sprite *getSpriteById(uint16 id);

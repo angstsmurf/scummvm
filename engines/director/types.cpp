@@ -361,4 +361,15 @@ Common::String textType2str(TextType value) {
 	}
 }
 
+bool str2textType(const Common::String &str, TextType &value) {
+	static const TextType types[] = { kTextTypeAdjustToFit, kTextTypeScrolling, kTextTypeFixed, kTextTypeLimit };
+	for (auto type : types) {
+		if (str.equalsIgnoreCase(textType2str(type))) {
+			value = type;
+			return true;
+		}
+	}
+	return false;
+}
+
 } // End of namespace Director

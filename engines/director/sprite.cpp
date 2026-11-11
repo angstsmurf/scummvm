@@ -339,22 +339,21 @@ uint32 Sprite::getBackColor() {
 // Sprites store their colors as palette indices in single bytes, so larger
 // values set from Lingo wrap around. The Daedalus Encounter sets 3099 and
 // 3799 in 16-bit mode to get indices 27 and 215.
-bool Sprite::setForeColor(uint32 index) {
+static bool setSpriteColor(uint32 index, uint32 &color, uint32 &colorIndex) {
 	index &= 0xff;
-	uint32 color = g_director->transformColor(index);
-	bool changed = index != _foreColorIndex || color != _foreColor;
-	_foreColorIndex = index;
-	_foreColor = color;
+	uint32 newColor = g_director->transformColor(index);
+	bool changed = index != colorIndex || newColor != color;
+	colorIndex = index;
+	color = newColor;
 	return changed;
 }
 
+bool Sprite::setForeColor(uint32 index) {
+	return setSpriteColor(index, _foreColor, _foreColorIndex);
+}
+
 bool Sprite::setBackColor(uint32 index) {
-	index &= 0xff;
-	uint32 color = g_director->transformColor(index);
-	bool changed = index != _backColorIndex || color != _backColor;
-	_backColorIndex = index;
-	_backColor = color;
-	return changed;
+	return setSpriteColor(index, _backColor, _backColorIndex);
 }
 
 uint32 Sprite::getForeColor() {

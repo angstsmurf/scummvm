@@ -256,6 +256,8 @@ public:
 	TransParams *_puppetTransition;
 
 	MovieReference _nextMovie;
+	// A go to another movie is waiting to be carried out
+	bool hasPendingMovieSwitch() const { return !_nextMovie.movie.empty(); }
 	Common::List<MovieReference> _movieStack;
 	bool _newMovieStarted;
 	bool _newMovieFirstDraw;

@@ -152,6 +152,11 @@ bool Score::controlsPalette() {
 	return true;
 }
 
+// Whether the score's palette channel sets the screen palette right now
+bool Score::scorePaletteActive() {
+	return !_puppetPalette && controlsPalette();
+}
+
 bool Score::processImmediateFrameScript(Common::String s, int id) {
 	s.trim();
 
@@ -199,7 +204,7 @@ bool Score::processFrozenScripts(bool recursion, int count) {
 		// it sends enterFrame to whatever frame is current by then.
 		if (enterFrameFollowsStepMovie() && currentScript.name &&
 				currentScript.name->equalsIgnoreCase("stepMovie") &&
-				!_nextFrame && _window->_nextMovie.movie.empty() &&
+				!_nextFrame && !_window->hasPendingMovieSwitch() &&
 				_playState != kPlayStopped && !_window->_playbackPaused) {
 			uint32 frozenCount = _window->frozenLingoStateCount();
 			_exitFrameCalled = false;
@@ -363,7 +368,7 @@ void Score::step() {
 
 	if (_playState == kPlayStopped)
 		return;
-	bool hasJump = (_nextFrame != 0) || !_window->_nextMovie.movie.empty();
+	bool hasJump = (_nextFrame != 0) || _window->hasPendingMovieSwitch();
 
 	if (_haveInteractivity && !hasJump) {
 		if (!_movie->_inputEventQueue.empty() && !_window->frozenLingoStateCount()) {
@@ -393,7 +398,7 @@ void Score::step() {
 				g_system->getMillis() < _nextFrameDelay;
 			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst && !delayed) {
 				_movie->processEvent(kEventIdle);
-				_idleWentToFrame = goFromIdleRestartsTimer() && _nextFrame != 0 && _window->_nextMovie.movie.empty();
+				_idleWentToFrame = goFromIdleRestartsTimer() && _nextFrame != 0 && !_window->hasPendingMovieSwitch();
 			}
 
 			if (_version >= kFileVer600) {
@@ -471,7 +476,7 @@ bool Score::isWaitingForNextFrame() {
 	// pass, on frames with a tempo of 4 fps.
 	bool goFromFrozenHandler = _nextFrame &&
 		_window->frozenLingoStateCount() > 0 &&
-		_window->_nextMovie.movie.empty();
+		!_window->hasPendingMovieSwitch();
 
 	if (_waitForChannel) {
 		if (_waitForChannelCue != 0 && _waitForChannelCue != -2) {
@@ -746,7 +751,7 @@ void Score::update() {
 
 	// Don't process frozen script if we use jump instructions
 	// like "go to frame", or open a new movie.
-	bool hasJump = (_nextFrame != 0) || !_window->_nextMovie.movie.empty();
+	bool hasJump = (_nextFrame != 0) || _window->hasPendingMovieSwitch();
 	if ((g_director->getVersion() < 400) && hasJump)
 		_skipIdle = true;
 
@@ -793,7 +798,7 @@ void Score::update() {
 	// enters the new frame, so a go from idle during a "delay" cuts the delay
 	// short. That includes "go to the frame": Director 4 re-enters the frame at
 	// once, and only then resumes the handler that called go.
-	if (_nextFrameDelay && hasJump && _window->_nextMovie.movie.empty())
+	if (_nextFrameDelay && hasJump && !_window->hasPendingMovieSwitch())
 		_nextFrameDelay = 0;
 
 	// Check for delay
@@ -961,7 +966,7 @@ void Score::update() {
 	// Attempt to thaw and continue any frozen execution after startMovie and enterFrame.
 	// If they don't complete (i.e. another freezing event like a "go to frame"),
 	// force another cycle of Score::update().
-	if (!_nextFrame && _window->_nextMovie.movie.empty() && !processFrozenScripts())
+	if (!_nextFrame && !_window->hasPendingMovieSwitch() && !processFrozenScripts())
 		return;
 
 	if (!_window->_playbackPaused) {
@@ -1180,7 +1185,7 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 }
 
 bool Score::renderPrePaletteCycle(RenderMode mode) {
-	if (_puppetPalette || !controlsPalette())
+	if (!scorePaletteActive())
 		return false;
 
 	// Skip this if we don't have a palette instruction
@@ -1297,7 +1302,7 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 }
 
 void Score::setLastPalette() {
-	if (_puppetPalette || !controlsPalette())
+	if (!scorePaletteActive())
 		return;
 
 	bool isCachedPalette = false;
@@ -1345,7 +1350,7 @@ bool Score::isPaletteColorCycling() {
 }
 
 void Score::renderPaletteCycle(RenderMode mode) {
-	if (_puppetPalette || !controlsPalette())
+	if (!scorePaletteActive())
 		return;
 
 	// If the palette is defined in the frame and doesn't match
