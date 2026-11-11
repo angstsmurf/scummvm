@@ -270,6 +270,38 @@ static void quirkMcLuhanWin() {
 	fontMan->loadWindowsFont("MCLUHAN/SYSTEM/MCL1N___.FON");
 }
 
+// Safecracker's European releases name each language's projector after a
+// language code: "sc_fra.exe" on Windows, "SafeCracker (FRA)" on Mac
+static const char *safecrackerLangCode(Common::Language language) {
+	static const struct {
+		Common::Language language;
+		const char *code;
+	} codes[] = {
+		{ Common::FR_FRA, "fra" },
+		{ Common::DE_DEU, "ger" },
+		{ Common::IT_ITA, "ita" },
+		{ Common::NL_NLD, "nl" },
+		{ Common::ES_ESP, "spa" },
+		{ Common::SV_SWE, "swe" },
+	};
+
+	for (auto &c : codes) {
+		if (c.language == language)
+			return c.code;
+	}
+	return "eng";
+}
+
+static Common::File *openSafecrackerInstaller(const char *installerName) {
+	Common::File *installer = new Common::File();
+	if (!installer->open(Common::Path(installerName))) {
+		warning("quirkSafecrackerWin(): Cannot open installer \"%s\"", installerName);
+		delete installer;
+		return nullptr;
+	}
+	return installer;
+}
+
 // Mounts the files inside the installer on the CD and runs the projector
 // from there, so that the game can be played without installing it
 static void quirkSafecrackerWin() {
@@ -277,61 +309,34 @@ static void quirkSafecrackerWin() {
 	if (!g_director->getRawEXEName().equalsIgnoreCase(installerName))
 		return;
 
-	// The English DreamCatcher release has an Installer VISE executable
-	Common::File *installer = new Common::File();
-	if (installer->open(Common::Path(installerName))) {
-		Common::Archive *archive = Common::createWinVISEArchive(installer);
-		if (archive) {
-			SearchMan.add(installerName, archive, 5);
-			g_director->_exeNameOverride = "sc_eng.exe";
-			return;
-		}
-	} else {
-		delete installer;
+	// The English DreamCatcher release has an Installer VISE executable.
+	// The archive readers take ownership of the stream and delete it when
+	// loading fails, so the file is opened again for the second reader.
+	Common::File *installer = openSafecrackerInstaller(installerName);
+	if (!installer)
+		return;
+
+	Common::Archive *archive = Common::createWinVISEArchive(installer);
+	if (archive) {
+		SearchMan.add(installerName, archive, 5);
+		g_director->_exeNameOverride = "sc_eng.exe";
+		return;
 	}
 
 	// The European multi-language release has another installer, holding
 	// the projector and movies for each language
-	installer = new Common::File();
-	if (!installer->open(Common::Path(installerName))) {
-		warning("quirkSafecrackerWin(): Cannot open installer \"%s\"", installerName);
-		delete installer;
+	installer = openSafecrackerInstaller(installerName);
+	if (!installer)
 		return;
-	}
 
-	Common::Archive *archive = Common::createDCLInstallerArchive(installer);
+	archive = Common::createDCLInstallerArchive(installer);
 	if (!archive) {
 		warning("quirkSafecrackerWin(): Failed to open installer \"%s\"", installerName);
 		return;
 	}
 
-	const char *lang;
-	switch (g_director->getLanguage()) {
-	case Common::FR_FRA:
-		lang = "fra";
-		break;
-	case Common::DE_DEU:
-		lang = "ger";
-		break;
-	case Common::IT_ITA:
-		lang = "ita";
-		break;
-	case Common::NL_NLD:
-		lang = "nl";
-		break;
-	case Common::ES_ESP:
-		lang = "spa";
-		break;
-	case Common::SV_SWE:
-		lang = "swe";
-		break;
-	default:
-		lang = "eng";
-		break;
-	}
-
 	SearchMan.add(installerName, archive, 5);
-	g_director->_exeNameOverride = Common::String::format("sc_%s.exe", lang);
+	g_director->_exeNameOverride = Common::String::format("sc_%s.exe", safecrackerLangCode(g_director->getLanguage()));
 }
 
 // Mac archives such as Installer VISE store their names in Mac Roman, but
@@ -414,19 +419,11 @@ static void quirkSafecrackerMac() {
 		return;
 	}
 
-	const char *lang;
-	switch (g_director->getLanguage()) {
-	case Common::FR_FRA: lang = "FRA"; break;
-	case Common::DE_DEU: lang = "GER"; break;
-	case Common::IT_ITA: lang = "ITA"; break;
-	case Common::NL_NLD: lang = "NL"; break;
-	case Common::ES_ESP: lang = "SPA"; break;
-	case Common::SV_SWE: lang = "SWE"; break;
-	default: lang = "ENG"; break;
-	}
+	Common::String lang = safecrackerLangCode(g_director->getLanguage());
+	lang.toUppercase();
 
 	SearchMan.add(installerName, new MacRomanPathArchive(archive, installer), 5);
-	g_director->_exeNameOverride = Common::String::format("SafeCracker\xe2\x84\xa2 (%s):SafeCracker\xe2\x84\xa2 PPC (%s)", lang, lang);
+	g_director->_exeNameOverride = Common::String::format("SafeCracker\xe2\x84\xa2 (%s):SafeCracker\xe2\x84\xa2 PPC (%s)", lang.c_str(), lang.c_str());
 }
 
 static void quirkTrekTechWin() {
@@ -508,9 +505,11 @@ const struct Quirk {
 	{ "mcluhan", Common::kPlatformWindows, &quirkMcLuhanWin },
 	{ "mcluhan", Common::kPlatformMacintosh, &quirkMcLuhanMac },
 
-	// Star Trek titles install fonts into the system
+	// Safecracker can run straight from the installers on its CDs
 	{ "safecracker", Common::kPlatformWindows, &quirkSafecrackerWin },
 	{ "safecracker", Common::kPlatformMacintosh, &quirkSafecrackerMac },
+
+	// Star Trek titles install fonts into the system
 	{ "trektech", Common::kPlatformWindows, &quirkTrekTechWin },
 	{ "trekguidetng", Common::kPlatformWindows, &quirkTrekGuideTNGWin },
 
