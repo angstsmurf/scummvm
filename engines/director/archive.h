@@ -83,13 +83,18 @@ public:
 
 	virtual bool openFile(const Common::Path &path);
 	virtual bool openStream(Common::SeekableReadStream *stream, uint32 offset = 0) = 0;
-	// Where writeToFile() puts the movie
+	// Where writeToFile() puts the movie. Each mode has one kind of caller:
 	enum SaveMode {
+		// An explicit save from Lingo (saveMovie), which the game asked to
+		// keep: written to the save folder
 		kSaveToDisk,
-		// Kept in memory until ScummVM quits
+		// The automatic save of a changed movie or cast library on a movie
+		// switch with updateMovieEnabled set (Movie::saveChanges()). Kept
+		// in memory until ScummVM quits; see there for why it isn't on disk
 		kSaveForSession,
-		// Kept in memory while the cast library stays open: only until the
-		// next movie switch that leaves it unused (SavedArchive::closeOpenFiles)
+		// The unsaved changes of an external cast library that the next
+		// movie keeps open (Movie::keepOpenCasts()). Kept in memory only
+		// until a movie switch leaves it unused (SavedArchive::closeOpenFiles)
 		kSaveWhileOpen
 	};
 	virtual bool writeToFile(Common::String filename, Movie *movie, SaveMode mode = kSaveToDisk) {
@@ -220,6 +225,7 @@ private:
 	static const uint32 kNoParent = 0xFFFFFFFF;
 	uint32 findParentIndex(uint32 tag, uint16 index);	// kNoParent when absent
 	CastMember *findResourceOwner(Movie *movie, uint32 tag, uint16 index);	// nullptr when unresolvable
+	CastMember *findChangedOwner(Movie *movie, uint32 tag, uint16 index);	// nullptr when kept verbatim
 	Cast *findCast(Movie *movie, uint32 libResourceId);	// the movie's cast stored in this archive
 	Cast *findConfigCast(Movie *movie);	// the cast whose config this archive holds
 

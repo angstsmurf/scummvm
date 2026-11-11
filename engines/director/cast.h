@@ -93,6 +93,7 @@ public:
 	void loadArchive();
 	void setArchive(Common::SharedPtr<Archive> archive);
 	Common::SharedPtr<Archive> getArchive() const { return _castArchive; };
+	bool isStoredIn(const Archive *archive) const { return _castArchive.get() == archive; }
 	Archive *getMacResourceFork();
 	Movie *getMovie() const { return _movie; }
 	void setMovie(Movie *movie) { _movie = movie; }

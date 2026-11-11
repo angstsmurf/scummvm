@@ -44,6 +44,42 @@
 
 namespace Director {
 
+// Size and writer of a child resource re-serialized from its changed owner
+// (see RIFXArchive::findChangedOwner())
+static uint32 changedResourceSize(CastMember *member, uint32 tag) {
+	switch (tag) {
+	case MKTAG('B', 'I', 'T', 'D'):
+		return ((BitmapCastMember *)member)->getBITDResourceSize();
+	case MKTAG('S', 'T', 'X', 'T'):
+		return ((TextCastMember *)member)->getSTXTResourceSize();
+	case MKTAG('C', 'L', 'U', 'T'):
+		return ((PaletteCastMember *)member)->getPaletteDataSize();
+	case MKTAG('S', 'C', 'V', 'W'):
+		return ((FilmLoopCastMember *)member)->getSCVWResourceSize();
+	default:
+		error("changedResourceSize(): unexpected tag %s", tag2str(tag));
+	}
+}
+
+static void writeChangedResource(CastMember *member, uint32 tag, Common::SeekableWriteStream *out, uint32 offset) {
+	switch (tag) {
+	case MKTAG('B', 'I', 'T', 'D'):
+		((BitmapCastMember *)member)->writeBITDResource(out, offset);
+		break;
+	case MKTAG('S', 'T', 'X', 'T'):
+		((TextCastMember *)member)->writeSTXTResource(out, offset);
+		break;
+	case MKTAG('C', 'L', 'U', 'T'):
+		((PaletteCastMember *)member)->writePaletteData(out, offset);
+		break;
+	case MKTAG('S', 'C', 'V', 'W'):
+		((FilmLoopCastMember *)member)->writeSCVWResource(out, offset);
+		break;
+	default:
+		error("writeChangedResource(): unexpected tag %s", tag2str(tag));
+	}
+}
+
 bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mode) {
 	if (_rifxType == MKTAG('F', 'G', 'D', 'M') || _rifxType == MKTAG('F', 'G', 'D', 'C')) {
 		warning("STUB: RIFXArchive::writeToFile(): saving Afterburner movies is not supported");
@@ -53,7 +89,7 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mo
 	// Refuse rather than silently lose runtime changes to members whose
 	// writer can't re-serialize them for this version
 	for (auto &it : *movie->getCasts()) {
-		if (it._value->getArchive().get() == this && it._value->hasUnsavableChanges()) {
+		if (it._value->isStoredIn(this) && it._value->hasUnsavableChanges()) {
 			warning("RIFXArchive::writeToFile(): not saving '%s': modified cast members would lose their changes", movie->getMacName().c_str());
 			return false;
 		}
@@ -187,29 +223,13 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie, SaveMode mo
 		case MKTAG('C', 'L', 'U', 'T'):
 		case MKTAG('S', 'C', 'V', 'W'):
 			{
-				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				// The owner is not always the type the tag implies, e.g. a D4
-				// script cast member owns its source text in an 'STXT'
 				// Unchanged members keep their original data, as in Director,
 				// which rewrites only dirty resources: e.g. the bitmap writer
 				// doesn't compress, and stores 16-bit pixels interleaved
-				if (member && member->needsSaving()) {
-					if (it->tag == MKTAG('B', 'I', 'T', 'D') && member->_type == kCastBitmap) {
-						((BitmapCastMember *)member)->writeBITDResource(saveFile, it->offset);
-						continue;
-					}
-					if (it->tag == MKTAG('S', 'T', 'X', 'T') && (member->_type == kCastText || member->_type == kCastButton)) {
-						((TextCastMember *)member)->writeSTXTResource(saveFile, it->offset);
-						continue;
-					}
-					if (it->tag == MKTAG('C', 'L', 'U', 'T') && member->_type == kCastPalette) {
-						((PaletteCastMember *)member)->writePaletteData(saveFile, it->offset);
-						continue;
-					}
-					if (it->tag == MKTAG('S', 'C', 'V', 'W') && member->_type == kCastFilmLoop) {
-						((FilmLoopCastMember *)member)->writeSCVWResource(saveFile, it->offset);
-						continue;
-					}
+				CastMember *member = findChangedOwner(movie, it->tag, it->index);
+				if (member) {
+					writeChangedResource(member, it->tag, saveFile, it->offset);
+					continue;
 				}
 			}
 			// fall through
@@ -295,6 +315,134 @@ void RIFXArchive::invalidateAfterSave(const Common::String &filename) {
 		g_director->markArchiveStale(Common::Path(convertPath(filename), g_director->_dirSeparator));
 }
 
+// Offsets in the layout that writeToFile() and writeMemoryMap() produce
+enum {
+	kRifxHeaderSize = 12,		// 'RIFX', size, movie type; the imap follows
+	kChunkHeaderSize = 8,		// tag, size
+	kImapMmapOffsetPos = 12,	// mmap offset, from the start of the imap chunk
+	kMmapHeaderSize = 24,		// from the end of the mmap chunk header
+	kMmapEntrySize = 20,		// tag, size, offset, flags, unk1, next free
+	kMmapEntrySizePos = 4,
+	kMmapEntryOffsetPos = 8
+};
+
+namespace {
+
+// A saved movie as the game file plus a tail of changed resources (see
+// RIFXArchive::writeOverlay())
+struct OverlayBuild {
+	const byte *base = nullptr;	// the game file
+	uint32 baseSize = 0;
+	uint32 hdrLen = 0;			// RIFX header and imap
+	Common::MemoryWriteStreamDynamic tail{DisposeAfterUse::YES};
+	Common::Array<uint32> newOffsets;	// per built resource
+	uint rifxIndex = 0;
+	uint mmapIndex = 0;
+	bool haveMmap = false;
+	uint kept = 0;
+	uint moved = 0;
+};
+
+} // End of anonymous namespace
+
+// Resources whose data is unchanged stay where they are in the game file;
+// the rest go to the tail. The chunk headers aren't compared: the readers
+// go by the memory map, and a big-endian game file has its headers
+// swapped compared to the little-endian image. origResources hold the
+// offsets in the game file, in the same order as builtResources.
+static bool diffResources(OverlayBuild &ob, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources, const Common::Array<Resource *> &origResources) {
+	if (ob.baseSize & 1)
+		ob.tail.writeByte(0);
+
+	ob.newOffsets.resize(builtResources.size());
+	for (uint i = 0; i < builtResources.size(); i++) {
+		const Resource *res = builtResources[i];
+		switch (res->tag) {
+		case MKTAG('R', 'I', 'F', 'X'):
+		case MKTAG('X', 'F', 'I', 'R'):
+			ob.rifxIndex = i;
+			ob.newOffsets[i] = 0;
+			continue;
+		case MKTAG('i', 'm', 'a', 'p'):
+			ob.newOffsets[i] = kRifxHeaderSize;
+			continue;
+		case MKTAG('m', 'm', 'a', 'p'):
+			ob.mmapIndex = i;
+			ob.haveMmap = true;
+			continue;
+		default:
+			break;
+		}
+
+		if ((uint64)res->offset + kChunkHeaderSize + res->size > imageSize) {
+			warning("RIFXArchive::writeOverlay: '%s' %d lies outside the movie", tag2str(res->tag), i);
+			return false;
+		}
+		const byte *data = image + res->offset;
+
+		const Resource *orig = i < origResources.size() ? origResources[i] : nullptr;
+		if (orig && orig->offset >= (int32)ob.hdrLen && (uint64)orig->offset + kChunkHeaderSize + res->size <= ob.baseSize &&
+				!memcmp(ob.base + orig->offset + kChunkHeaderSize, data + kChunkHeaderSize, res->size)) {
+			ob.newOffsets[i] = orig->offset;
+			ob.kept++;
+			continue;
+		}
+
+		ob.newOffsets[i] = ob.baseSize + ob.tail.pos();
+		ob.tail.write(data, kChunkHeaderSize + res->size);
+		if (ob.tail.pos() & 1)
+			ob.tail.writeByte(0);
+		ob.moved++;
+	}
+
+	if (!ob.haveMmap) {
+		warning("RIFXArchive::writeOverlay: no mmap");
+		return false;
+	}
+	return true;
+}
+
+// Appends the memory map to the tail, with the new offsets and the new
+// movie size in the RIFX entry. Returns the mmap's offset in the movie.
+static uint32 appendMmap(OverlayBuild &ob, const byte *image, const Common::Array<Resource *> &builtResources) {
+	const Resource *mmap = builtResources[ob.mmapIndex];
+	uint32 mmapPos = ob.tail.pos();
+	uint32 mmapOffset = ob.baseSize + mmapPos;
+	ob.newOffsets[ob.mmapIndex] = mmapOffset;
+	ob.tail.write(image + mmap->offset, kChunkHeaderSize + mmap->size);
+
+	uint32 movieSize = ob.baseSize + (uint32)ob.tail.size();
+	byte *entries = ob.tail.getData() + mmapPos + kChunkHeaderSize + kMmapHeaderSize;
+	for (uint i = 0; i < builtResources.size(); i++)
+		WRITE_LE_UINT32(entries + i * kMmapEntrySize + kMmapEntryOffsetPos, ob.newOffsets[i]);
+	WRITE_LE_UINT32(entries + ob.rifxIndex * kMmapEntrySize + kMmapEntrySizePos, movieSize - kChunkHeaderSize);
+	return mmapOffset;
+}
+
+// Writes the overlay: the new RIFX header and imap, then the tail
+static void emitOverlay(Common::WriteStream *out, OverlayBuild &ob, const byte *image, const Common::String &baseKey, uint32 baseCrc, uint32 mmapOffset) {
+	uint32 movieSize = ob.baseSize + (uint32)ob.tail.size();
+
+	byte *header = (byte *)malloc(ob.hdrLen);
+	memcpy(header, image, ob.hdrLen);
+	WRITE_LE_UINT32(header + 4, movieSize - kChunkHeaderSize);
+	WRITE_LE_UINT32(header + kRifxHeaderSize + kImapMmapOffsetPos, mmapOffset);
+
+	SavedArchive::writeOverlayHeader(out, baseKey, ob.baseSize, baseCrc, movieSize, 2);
+	out->writeUint32BE(0);
+	out->writeUint32BE(ob.hdrLen);
+	out->write(header, ob.hdrLen);
+	out->writeUint32BE(ob.baseSize);
+	out->writeUint32BE(ob.tail.size());
+	out->write(ob.tail.getData(), ob.tail.size());
+	free(header);
+
+	SavedArchive::Stamp stamp;
+	stamp.origSize = ob.baseSize;
+	stamp.origCrc = baseCrc;
+	SavedArchive::writeStamp(out, stamp);
+}
+
 bool RIFXArchive::writeOverlay(Common::WriteStream *out, const byte *image, uint32 imageSize, const Common::Array<Resource *> &builtResources) {
 	// The movie must be a file of its own, read from the game files
 	if (_startOffset != 0 || getPathName().empty())
@@ -307,123 +455,34 @@ bool RIFXArchive::writeOverlay(Common::WriteStream *out, const byte *image, uint
 		return false;
 	Common::String baseKey = saved->baseKeyFor(getPathName().toString('/'));
 
-	uint32 baseSize = 0;
-	byte *base = SavedArchive::readOriginal(baseKey, baseSize);
+	OverlayBuild ob;
+	byte *base = SavedArchive::readOriginal(baseKey, ob.baseSize);
 	if (!base)
 		return false;
+	ob.base = base;
+	ob.hdrLen = kRifxHeaderSize + kChunkHeaderSize + getImapSize();
 
-	uint32 hdrLen = 12 + 8 + getImapSize();
-	uint32 baseTag = baseSize >= 4 ? READ_BE_UINT32(base) : 0;
-	if (baseSize < hdrLen || (baseTag != MKTAG('R', 'I', 'F', 'X') && baseTag != MKTAG('X', 'F', 'I', 'R'))) {
+	uint32 baseTag = ob.baseSize >= 4 ? READ_BE_UINT32(base) : 0;
+	if (ob.baseSize < ob.hdrLen || (baseTag != MKTAG('R', 'I', 'F', 'X') && baseTag != MKTAG('X', 'F', 'I', 'R'))) {
 		// e.g. a MacBinary file, whose data fork doesn't start at 0
 		free(base);
 		return false;
 	}
-	uint32 baseCrc = Common::CRC32().crcFast(base, baseSize);
+	uint32 baseCrc = Common::CRC32().crcFast(base, ob.baseSize);
 
-	// Resources whose data is unchanged stay where they are in the game
-	// file; the rest go to a tail after it. The chunk headers aren't
-	// compared: the readers go by the memory map, and a big-endian game
-	// file has its headers swapped compared to the little-endian image.
-	Common::MemoryWriteStreamDynamic tail(DisposeAfterUse::YES);
-	if (baseSize & 1)
-		tail.writeByte(0);
-
-	Common::Array<uint32> newOffsets;
-	newOffsets.resize(builtResources.size());
-	uint32 mmapIndex = 0, rifxIndex = 0;
-	bool haveMmap = false;
-	uint32 kept = 0, moved = 0;
-
-	for (uint i = 0; i < builtResources.size(); i++) {
-		const Resource *res = builtResources[i];
-		switch (res->tag) {
-		case MKTAG('R', 'I', 'F', 'X'):
-		case MKTAG('X', 'F', 'I', 'R'):
-			rifxIndex = i;
-			newOffsets[i] = 0;
-			continue;
-		case MKTAG('i', 'm', 'a', 'p'):
-			newOffsets[i] = 12;
-			continue;
-		case MKTAG('m', 'm', 'a', 'p'):
-			mmapIndex = i;
-			haveMmap = true;
-			continue;
-		default:
-			break;
-		}
-
-		if ((uint64)res->offset + 8 + res->size > imageSize) {
-			warning("RIFXArchive::writeOverlay: '%s' %d lies outside the movie", tag2str(res->tag), i);
-			free(base);
-			return false;
-		}
-		const byte *data = image + res->offset;
-
-		// builtResources are copies of _resources, which hold the offsets
-		// in the file this archive was read from
-		const Resource *orig = i < _resources.size() ? _resources[i] : nullptr;
-		if (orig && orig->offset >= (int32)hdrLen && (uint64)orig->offset + 8 + res->size <= baseSize &&
-				!memcmp(base + orig->offset + 8, data + 8, res->size)) {
-			newOffsets[i] = orig->offset;
-			kept++;
-			continue;
-		}
-
-		newOffsets[i] = baseSize + tail.pos();
-		tail.write(data, 8 + res->size);
-		if (tail.pos() & 1)
-			tail.writeByte(0);
-		moved++;
-	}
+	// builtResources are copies of _resources, which hold the offsets in
+	// the file this archive was read from
+	bool ok = diffResources(ob, image, imageSize, builtResources, _resources);
 	free(base);
-
-	if (!haveMmap) {
-		warning("RIFXArchive::writeOverlay: no mmap");
+	ob.base = nullptr;
+	if (!ok)
 		return false;
-	}
 
-	// The memory map goes last, with the new offsets
-	const Resource *mmap = builtResources[mmapIndex];
-	uint32 mmapPos = tail.pos();
-	uint32 mmapOffset = baseSize + mmapPos;
-	newOffsets[mmapIndex] = mmapOffset;
-	tail.write(image + mmap->offset, 8 + mmap->size);
-
-	uint32 movieSize = baseSize + tail.size();
-	byte *tailData = tail.getData();
-	// As laid out by writeMemoryMap(): a 24-byte header, 20-byte entries
-	uint32 entries = mmapPos + 8 + 24;
-	for (uint i = 0; i < builtResources.size(); i++) {
-		uint32 entry = entries + i * 20;
-		WRITE_LE_UINT32(tailData + entry + 8, newOffsets[i]);
-	}
-	// The RIFX entry's size is the movie's
-	WRITE_LE_UINT32(tailData + entries + rifxIndex * 20 + 4, movieSize - 8);
-
-	// The new RIFX header and imap
-	byte *header = (byte *)malloc(hdrLen);
-	memcpy(header, image, hdrLen);
-	WRITE_LE_UINT32(header + 4, movieSize - 8);
-	WRITE_LE_UINT32(header + 12 + 12, mmapOffset);
-
-	SavedArchive::writeOverlayHeader(out, baseKey, baseSize, baseCrc, movieSize, 2);
-	out->writeUint32BE(0);
-	out->writeUint32BE(hdrLen);
-	out->write(header, hdrLen);
-	out->writeUint32BE(baseSize);
-	out->writeUint32BE(tail.size());
-	out->write(tailData, tail.size());
-	free(header);
-
-	SavedArchive::Stamp stamp;
-	stamp.origSize = baseSize;
-	stamp.origCrc = baseCrc;
-	SavedArchive::writeStamp(out, stamp);
+	uint32 mmapOffset = appendMmap(ob, image, builtResources);
+	emitOverlay(out, ob, image, baseKey, baseCrc, mmapOffset);
 
 	debugC(3, kDebugSaving, "RIFXArchive::writeOverlay: over '%s': %d resources kept, %d saved, %d of %d bytes",
-		baseKey.c_str(), kept, moved, (int)tail.size() + hdrLen, movieSize);
+		baseKey.c_str(), ob.kept, ob.moved, (int)(ob.tail.size() + ob.hdrLen), (int)(ob.baseSize + ob.tail.size()));
 	return true;
 }
 
@@ -599,7 +658,7 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 	// Iterate over the casts stored in this file
 	for (auto it : *(movie->getCasts())) {
 		cast = it._value;
-		if (cast->getArchive().get() != this)
+		if (!cast->isStoredIn(this))
 			continue;
 
 		// Iterate over all the loaded members of the cast to check for new cast members
@@ -779,60 +838,15 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 			break;
 
 		case MKTAG('S', 'T', 'X', 'T'):
-			{
-				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->needsSaving() && (member->_type == kCastText || member->_type == kCastButton)) {
-					resSize = ((TextCastMember *)member)->getSTXTResourceSize();
-					it->size = resSize;
-				} else {
-					// Kept verbatim; see the matching case in writeToFile()
-					resSize = it->size;
-				}
-
-				it->offset = currentSize;
-				currentSize += resSize + 8;
-			}
-			break;
-
 		case MKTAG('C', 'L', 'U', 'T'):
-			{
-				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->needsSaving() && member->_type == kCastPalette) {
-					resSize = ((PaletteCastMember *)member)->getPaletteDataSize();
-					it->size = resSize;
-				} else {
-					resSize = it->size;
-				}
-
-				it->offset = currentSize;
-				currentSize += resSize + 8;
-			}
-			break;
-
 		case MKTAG('B', 'I', 'T', 'D'):
-			{
-				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->needsSaving() && member->_type == kCastBitmap) {
-					resSize = ((BitmapCastMember *)member)->getBITDResourceSize();
-					it->size = resSize;
-				} else {
-					resSize = it->size;
-				}
-
-				it->offset = currentSize;
-				currentSize += resSize + 8;
-			}
-			break;
-
 		case MKTAG('S', 'C', 'V', 'W'):
 			{
-				CastMember *member = findResourceOwner(movie, it->tag, it->index);
-				if (member && member->needsSaving() && member->_type == kCastFilmLoop) {
-					resSize = ((FilmLoopCastMember *)member)->getSCVWResourceSize();
-					it->size = resSize;
-				} else {
-					resSize = it->size;
-				}
+				// Kept verbatim unless changed; see the matching case in writeToFile()
+				CastMember *member = findChangedOwner(movie, it->tag, it->index);
+				if (member)
+					it->size = changedResourceSize(member, it->tag);
+				resSize = it->size;
 
 				it->offset = currentSize;
 				currentSize += resSize + 8;
@@ -980,13 +994,40 @@ CastMember *RIFXArchive::findResourceOwner(Movie *movie, uint32 tag, uint16 inde
 	return cast ? cast->getCastMember(parent.castId + cast->_castArrayStart) : nullptr;
 }
 
+// The type of member whose writer produces each child resource. The
+// owner is not always that type, e.g. a D4 script cast member owns its
+// source text in an 'STXT'
+static bool ownerWritesTag(const CastMember *member, uint32 tag) {
+	switch (tag) {
+	case MKTAG('B', 'I', 'T', 'D'):
+		return member->_type == kCastBitmap;
+	case MKTAG('S', 'T', 'X', 'T'):
+		return member->_type == kCastText || member->_type == kCastButton;
+	case MKTAG('C', 'L', 'U', 'T'):
+		return member->_type == kCastPalette;
+	case MKTAG('S', 'C', 'V', 'W'):
+		return member->_type == kCastFilmLoop;
+	default:
+		return false;
+	}
+}
+
+// The owner of a child resource when it has changed and its writer can
+// re-serialize the resource; nullptr when the original bytes are kept
+CastMember *RIFXArchive::findChangedOwner(Movie *movie, uint32 tag, uint16 index) {
+	CastMember *member = findResourceOwner(movie, tag, index);
+	if (!member || !member->needsSaving() || !ownerWritesTag(member, tag))
+		return nullptr;
+	return member;
+}
+
 // The movie's cast whose members this file stores under libResourceId. A
 // cast file holds a single library, which may have a different id from
 // the one in the movie's MCsL (and may share it with the internal cast)
 Cast *RIFXArchive::findCast(Movie *movie, uint32 libResourceId) {
 	for (auto &it : *movie->getCasts()) {
 		Cast *cast = it._value;
-		if (cast->getArchive().get() != this)
+		if (!cast->isStoredIn(this))
 			continue;
 		if (cast->_isExternal || cast->_libResourceId == libResourceId)
 			return cast;
@@ -996,7 +1037,7 @@ Cast *RIFXArchive::findCast(Movie *movie, uint32 libResourceId) {
 
 Cast *RIFXArchive::findConfigCast(Movie *movie) {
 	for (auto &it : *movie->getCasts()) {
-		if (it._value->_isExternal && it._value->getArchive().get() == this)
+		if (it._value->_isExternal && it._value->isStoredIn(this))
 			return it._value;
 	}
 	return movie->getCast();
