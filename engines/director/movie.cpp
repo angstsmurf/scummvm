@@ -30,6 +30,7 @@
 
 #include "director/director.h"
 #include "director/archive.h"
+#include "director/saved-archive.h"
 #include "director/cast.h"
 #include "director/movie.h"
 #include "director/score.h"
@@ -636,7 +637,7 @@ void Movie::saveChanges() {
 // drop those of libraries this movie didn't use, which were closed when it
 // was loaded, and keep the ones this movie made.
 void Movie::keepOpenCasts() {
-	SavedArchive *saved = (SavedArchive *)SearchMan.getArchive(kSavedFilesArchive);
+	SavedArchive *saved = SavedArchive::get();
 	if (!saved)
 		return;
 
