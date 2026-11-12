@@ -87,7 +87,7 @@ enum SpriteCopyBackMask {
 	kSCBInk = 0x00040,
 	kSCBPattern = 0x00080,
 	kSCBCastId = 0x00100,
-	kSCBStartPoint = 0x00200,
+	kSCBLocH = 0x00200,
 	kSCBHeight = 0x00400,
 	kSCBWidth = 0x00800,
 	kSCBMoveable = 0x01000,
@@ -95,6 +95,8 @@ enum SpriteCopyBackMask {
 	kSCBSpriteListIdx = 0x04000,
 	kSCBFlags = 0x08000,
 	kSCBAngle = 0x10000,
+	kSCBLocV = 0x20000,
+	kSCBStartPoint = kSCBLocH | kSCBLocV,
 };
 
 class Sprite {

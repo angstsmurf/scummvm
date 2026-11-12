@@ -712,8 +712,13 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		if (nextSprite->_copyBackMask & kSCBSpriteListIdx)
 			_spriteListIdx = nextSprite->_spriteListIdx;
 	}
-	if (!getAutoPuppet(kAPLoc) && (nextSprite->_copyBackMask & kSCBStartPoint)) {
-		_startPoint = nextSprite->_startPoint;
+	// Separately: D4 keeps a Lingo change to the locV of a non-puppet when
+	// the next frame only moves it sideways, and vice versa (T_SPRT16)
+	if (!getAutoPuppet(kAPLoc)) {
+		if (nextSprite->_copyBackMask & kSCBLocH)
+			_startPoint.x = nextSprite->_startPoint.x;
+		if (nextSprite->_copyBackMask & kSCBLocV)
+			_startPoint.y = nextSprite->_startPoint.y;
 	}
 	// height and width seem to be copied back if the cast ID changes (e.g. intro of sabotenman)
 	if (!getAutoPuppet(kAPHeight) && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBHeight))) {
