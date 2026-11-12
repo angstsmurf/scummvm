@@ -230,7 +230,10 @@ void Sprite::createQDMatte() {
 		break;
 	case kOutlinedOvalSprite:
 	case kOvalSprite:
-		primitives.drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, g_director->_wm->_colorBlack, true, &plotFill);
+		if (g_director->getPlatform() == Common::kPlatformWindows)
+			drawWindowsOval(primitives, fillAreaRect, 0, true, g_director->_wm->_colorBlack, &plotFill);
+		else
+			primitives.drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, g_director->_wm->_colorBlack, true, &plotFill);
 		break;
 	case kLineBottomTopSprite:
 	case kLineTopBottomSprite:

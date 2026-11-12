@@ -457,6 +457,9 @@ struct DirectorPlotData {
 	}
 };
 
+// graphics.cpp
+void drawWindowsOval(Graphics::Primitives &primitives, const Common::Rect &rect, int lineSize, bool filled, uint32 color, void *data);
+
 extern DirectorEngine *g_director;
 extern Debugger *g_debugger;
 
