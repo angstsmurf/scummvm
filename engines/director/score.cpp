@@ -660,13 +660,13 @@ void Score::updateNextFrameTime() {
 				_nextFrameTime = g_system->getMillis() + 1000.0 / (float)_currentFrameRate;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): setting _nextFrameTime to %d based on a framerate of %d", _nextFrameTime, _currentFrameRate);
 			} else {
-				if (tempo == 128 && queuedClickEndsClickWait() && _movie->hasQueuedClick()) {
-					// A click that Lingo has not handled yet ends the wait at
-					// once. It is still sent as mouseDown and mouseUp
-					// afterwards. This happens when a handler clicks (e.g.
+				if (tempo == 128 && keyEndsClickWait() && _movie->hasQueuedClickOrKey()) {
+					// A click or key that Lingo has not handled yet ends the
+					// wait at once. It is still sent to Lingo afterwards.
+					// This happens when a handler clicks or types (e.g.
 					// through an XObject) and then does "go" to a frame that
 					// waits for a click. Checked in D4 and D5 for Windows.
-					debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click ends the wait for a mouse click");
+					debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click or key ends the wait for a mouse click");
 				} else if (tempo == 128) {
 					_waitForClick = true;
 					_waitForClickCursor = false;
@@ -704,11 +704,11 @@ void Score::updateNextFrameTime() {
 				_waitForChannelCue = tempoCuePoint;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): waiting for sound channel 2, cue point %d before next frame", _waitForChannelCue);
 				_nextFrameTime = g_system->getMillis();
-			} else if (tempo == 248 && queuedClickEndsClickWait() && _movie->hasQueuedClick()) {
+			} else if (tempo == 248 && keyEndsClickWait() && _movie->hasQueuedClickOrKey()) {
 				// Same as tempo 128 above. D6 and D7 end the wait in their
-				// event dispatchers on the next mouseDown, which is still
-				// sent to Lingo.
-				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click ends the wait for a mouse click");
+				// event dispatchers on the next mouseDown or keyDown, which
+				// is still sent to Lingo.
+				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click or key ends the wait for a mouse click");
 				_nextFrameTime = g_system->getMillis();
 			} else if (tempo == 248) {
 				_waitForClick = true;

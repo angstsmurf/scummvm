@@ -158,6 +158,9 @@ public:
 	void createScriptInstances(int frameNum);
 	Datum createScriptInstance(BehaviorElement *behavior);
 
+	// D4+: a key, or a click Lingo hasn't handled yet, ends a wait for a click
+	bool keyEndsClickWait() const { return _version >= kFileVer400; }
+
 private:
 	// How each projector version steps through frames, as measured in the
 	// projectors. The comments at the call sites hold the evidence.
@@ -175,8 +178,6 @@ private:
 	// D2-D5 rebuild the frame from the score on every jump, even to the
 	// current frame, dropping Lingo changes to non-puppet sprites
 	bool jumpRebuildsFrame() const { return _version < kFileVer600; }
-	// D4+: a click Lingo hasn't handled yet ends a wait for a click
-	bool queuedClickEndsClickWait() const { return _version >= kFileVer400; }
 	// D4+ stop nesting go at depth 2 (skipping stepMovie and enterFrame)
 	bool hasGoNestingLimit() const { return _version >= kFileVer400; }
 

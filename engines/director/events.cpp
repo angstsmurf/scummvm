@@ -396,6 +396,16 @@ bool Movie::processSysEvent(Common::Event &event) {
 
 		debugC(1, kDebugEvents, "Movie::processEvent(): movie '%s', keycode: %d", _macName.c_str(), _vm->_keyCode);
 
+		// D4+ end a wait for a click on a key too. D4 for Mac takes the
+		// key out of the event queue; D5 and later still send it to Lingo
+		// (T_KEYW01).
+		if (sc->_waitForClick && sc->keyEndsClickWait()) {
+			sc->_waitForClick = false;
+			sc->renderCursor(_window->getMousePos(), true);
+			if (g_director->getVersion() < 500)
+				return true;
+		}
+
 		_lastEventTime = g_director->getMacTicks();
 		_lastKeyTime = _lastEventTime;
 		if (_timeOutKeyDown)
