@@ -1098,13 +1098,32 @@ void readSpriteDataD5(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			error("readSpriteDataD5(): Miscomputed field position: %" PRId64, stream.pos() - startPosition);
 		}
 	}
+
+	// As in D4, the member of a QuickDraw shape is its pattern, never a
+	// cast member to draw (T_SPRT15/T_SPRT17 converted to D5)
+	if (sprite.isQDShape()) {
+		if (sprite._castId.member) {
+			sprite._pattern = sprite._castId.member;
+			sprite._castId = CastMemberID(0, 0);
+			sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+		}
+	} else if (sprite._pattern) {
+		sprite._castId = CastMemberID(sprite._pattern, sprite._castId.castLib ? sprite._castId.castLib : DEFAULT_CAST_LIB);
+		sprite._pattern = 0;
+		sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+	}
 }
 
 void writeSpriteDataD5(Common::SeekableWriteStream *writeStream, Sprite &sprite) {
 	writeStream->writeByte(sprite._spriteType);				// 0
 	writeStream->writeByte(sprite._inkData);				// 1
-	writeStream->writeSint16BE(sprite._castId.castLib);		// 2, 3
-	writeStream->writeUint16BE(sprite._castId.member);		// 4, 5
+	if (sprite.isQDShape() && sprite._pattern) {
+		writeStream->writeSint16BE(DEFAULT_CAST_LIB);		// 2, 3
+		writeStream->writeUint16BE(sprite._pattern);		// 4, 5
+	} else {
+		writeStream->writeSint16BE(sprite._castId.castLib);	// 2, 3
+		writeStream->writeUint16BE(sprite._castId.member);	// 4, 5
+	}
 	writeStream->writeSint16BE(sprite._scriptId.castLib);	// 6, 7
 	writeStream->writeUint16BE(sprite._scriptId.member);	// 8, 9
 	writeStream->writeByte(sprite._foreColor);				// 10
