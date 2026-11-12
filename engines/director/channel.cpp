@@ -323,6 +323,9 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_backColorIndex != nextSprite->_backColorIndex ||
 			_sprite->_foreColorIndex != nextSprite->_foreColorIndex ||
 			_sprite->_editable != nextSprite->_editable ||
+			// A score frame may make a sprite moveable without changing anything
+			// else about it (Alice: STONE.DIR, frames 44-47).
+			_sprite->_moveable != nextSprite->_moveable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
 			_sprite->getDrawThickness() != nextSprite->getDrawThickness();
 		if (!_sprite->_moveable)
