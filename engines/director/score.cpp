@@ -393,7 +393,7 @@ void Score::step() {
 			bool pollFirst = _idleWentToFrame && g_system->getMillis() >= _nextFrameTime;
 			_idleWentToFrame = false;
 			// In D7, the frame step returns at once while a "delay" runs, before
-			// it sends idle (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
+			// it sends idle (checked in DIRAPI.DLL 7.0.2).
 			bool delayed = delayBlocksIdle() && _nextFrameDelay &&
 				g_system->getMillis() < _nextFrameDelay;
 			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst && !delayed) {
@@ -450,7 +450,7 @@ void Score::stopPlay() {
 void Score::setDelay(uint32 ticks) {
 	// While the delay runs, D4 to D6 keep calling the exitFrame handler
 	// (see Score::update()). Even if the handler sets a new delay value, only
-	// the first one is acknowledged (T_EVNT26).
+	// the first one is acknowledged. Checked in D4.
 	if (!_nextFrameDelay) {
 		_nextFrameDelay = g_system->getMillis() + (ticks * 1000 / 60);
 		debugC(5, kDebugEvents, "Score::setDelay(): delaying %d ticks, next frame time at %d", ticks, _nextFrameDelay);
@@ -779,13 +779,13 @@ void Score::update() {
 		// exitFrame is not called in this case.
 		//
 		// In D4 to D6, while a "delay" runs, each pass of the score loop sends
-		// idle and then exitFrame again, until the delay is over (T_EVNT32:
-		// thousands of re-runs per second in the D4 projector). Otherwise,
+		// idle and then exitFrame again, until the delay is over
+		// (thousands of re-runs per second in the D4 projector). Otherwise,
 		// exitFrame is only sent once per frame; pausing the movie from
-		// exitFrame must not repeat it (T_EVNT12). The delay is checked after
+		// exitFrame must not repeat it. The delay is checked after
 		// exitFrame, so the pass that ends the delay sends exitFrame too.
 		// D7 checks the delay first and sends nothing until it is over
-		// (DIRAPI.DLL 7.0.2, FUN_6800e4d8).
+		// (checked in DIRAPI.DLL 7.0.2).
 		bool exitFrameAgain = exitFrameRepeatsDuringDelay() &&
 			_nextFrameDelay && !_window->frozenLingoStateCount();
 		if (_haveInteractivity && !_window->_skipFrameAdvance && (!_exitFrameCalled || exitFrameAgain)) {
@@ -796,7 +796,7 @@ void Score::update() {
 		}
 	}
 
-	// In every projector from D3 to D7 (D7: DIRAPI FUN_68010154), "go" clears
+	// In every projector from D3 to D7 (D7: DIRAPI.DLL), "go" clears
 	// any pending delay when it enters the new frame, so a go from idle during
 	// a "delay" cuts the delay short. That includes "go to the frame":
 	// Director 4 re-enters the frame at once, and only then resumes the
@@ -997,13 +997,12 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 	playSoundChannel(false, sound1Changed, sound2Changed);
 
 	// Entering the last frame of the score while locked leaves no
-	// transition pending in the D5 projector: the frame loader
-	// (FUN_1008d854) then takes the pending flag from score+0x1702,
-	// which is 0 on the stage (cleared by FUN_1006bb80).
+	// transition pending in the D5 projector: the frame loader then takes
+	// the pending flag from a score field that the stage leaves at 0.
 	_frameDrawPending = _window->_updateLock && frameId + 1 < _numFrames;
 	if (_window->_updateLock) {
 		// The D5 projector skips the whole frame draw while the stage is
-		// locked, transition included (FUN_1005c5d4). The frame stays
+		// locked, transition included. The frame stays
 		// pending for the unlock to draw.
 		updateSprites(mode);
 		incrementFilmLoops();
@@ -1037,8 +1036,8 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 }
 
 void Score::renderUnlockedStage() {
-	// Unlocking runs the normal stage update in the D5 projector
-	// (FUN_10024a00 -> FUN_10024ed8 -> FUN_1005c5d4). A frame entered
+	// Unlocking runs the normal stage update in the D5 projector,
+	// the same one that draws a new frame. A frame entered
 	// while locked has not been drawn yet, so its transition plays now.
 	if (_frameDrawPending) {
 		_frameDrawPending = false;

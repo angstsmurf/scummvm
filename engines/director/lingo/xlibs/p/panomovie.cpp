@@ -589,7 +589,7 @@ void NavMovieXCMD::m_navMovieCmd(int nargs) {
 PanoMovieWidget::PanoMovieWidget(PanoMovieState *movie, Graphics::MacWidget *parent, int x, int y, int w, int h, Graphics::MacWindowManager *wm) :
 	Graphics::MacWidget(parent, x, y, w, h, wm, true), _movie(movie) {
 
-	_priority = 10000; // We stay on top of everything
+	_priority = 10000; // Stay on top of everything
 }
 
 bool PanoMovieWidget::processEvent(Common::Event &event) {

@@ -326,7 +326,7 @@ void FileObject::clear() {
 			outFile->write(_outStream->getData(), _outStream->size());
 			outFile->finalize();
 			// Add to search index
-			SavedArchive::get()->_addFile(*_filename);
+			SavedArchive::get()->addFile(*_filename);
 			delete outFile;
 		}
 		delete _outStream;

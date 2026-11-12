@@ -302,14 +302,13 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 
 	if (!forceRedraw) {
 		// D5 first collects the changed areas, replacing any two that
-		// overlap with their union (FUN_1009d310), then redraws each
+		// overlap with their union, then redraws each
 		// collected area from scratch. Pixels no sprite owns, like a
 		// panorama an XCMD drew straight to the stage, get erased whenever
 		// a merged area spans them. Trails sprites are drawn on top
 		// afterwards and leave their old area alone. The D4 Windows
-		// projector does the same (T_MERG01 in D4-unit and D5-unit), and
-		// so do the Mac D3 (L-Zone, FUN_00035516) and D2 (Warlock,
-		// FUN_00016f7e) projectors, so assume every version does.
+		// projector does the same, and so do the Mac D3 (L-Zone) and D2
+		// (Warlock) projectors, so assume every version does.
 		Common::Array<Common::Rect> areas;
 		Common::Array<Channel *> trails;
 

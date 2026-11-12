@@ -36,7 +36,7 @@ SavedArchive::SavedArchive(const Common::String &target) {
 
 	debugC(3, kDebugLoading, "DirectorEngine:: loadSaveFiles: Loading save files");
 	for (auto &saveFileName : saveFileList) {
-		_addFile(saveFileName);
+		addFile(saveFileName);
 	}
 }
 
@@ -169,7 +169,7 @@ Common::String SavedArchive::keyFor(const Common::String &fileName) const {
 	return convertPath(name);
 }
 
-bool SavedArchive::_addFile(const Common::String &fileName) {
+bool SavedArchive::addFile(const Common::String &fileName) {
 	Common::String key = keyFor(fileName);
 	Entry &entry = _entries[key];
 	if (!entry.diskName.empty())
@@ -181,7 +181,7 @@ bool SavedArchive::_addFile(const Common::String &fileName) {
 }
 
 void SavedArchive::addWrittenFile(const Common::String &fileName) {
-	_addFile(fileName);
+	addFile(fileName);
 	Entry &entry = _entries[keyFor(fileName)];
 	entry.trust = kTrusted;
 	entry.inSession = false;
@@ -237,7 +237,7 @@ void SavedArchive::closeOpenFiles(const Common::Array<Common::Path> &inUse) {
 // Bump this whenever the movie writer changes its output; raise
 // kMinTrustedVersion to it when the change fixes saves that broke a game,
 // so saves written before the fix are ignored and the game files used
-// instead. 1: unchanged resources kept verbatim (e02180d7893).
+// instead. 1: unchanged resources kept verbatim.
 // 2: overlays, holding only the changes to the game file.
 static const uint32 kSavedMovieVersion = 2;
 static const uint32 kMinTrustedVersion = 1;

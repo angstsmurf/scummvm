@@ -58,7 +58,7 @@ public:
 	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 
 	// Register a save file found on disk
-	bool _addFile(const Common::String &path);
+	bool addFile(const Common::String &path);
 	// A save was just written: register it and trust it without checking
 	void addWrittenFile(const Common::String &fileName);
 	// Keep a save in memory instead, for the rest of the session. It takes
