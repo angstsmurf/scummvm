@@ -683,13 +683,17 @@ void readSpriteDataD4(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._copyBackMask |= kSCBInk;
 			break;
 		case 6:
+			// One field: the pattern for QuickDraw shapes, the cast member
+			// otherwise. D4 never looks up a member for a shape, so a castNum
+			// left over from an earlier frame must not be drawn (Alice drip room)
 			if (sprite.isQDShape()) {
 				sprite._pattern = stream.readUint16();
-				sprite._copyBackMask |= kSCBPattern;
+				sprite._castId = CastMemberID(0, 0);
 			} else {
+				sprite._pattern = 0;
 				sprite._castId = CastMemberID(stream.readUint16(), DEFAULT_CAST_LIB);
-				sprite._copyBackMask |= kSCBCastId;
 			}
+			sprite._copyBackMask |= kSCBPattern | kSCBCastId;
 			break;
 		case 8:
 			sprite._startPoint.y = (int16)stream.readUint16();
