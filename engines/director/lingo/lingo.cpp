@@ -2045,9 +2045,10 @@ CastMemberID Lingo::resolveCastMember(const Datum &memberID, const Datum &castLi
 
 CastMemberID Lingo::resolveFieldMember(const Datum &member, const Datum &castLib) {
 	// A script and a field may share a name, so prefer fields, but fall back
-	// to any member by that name. Checked in D4 for Windows.
-	if (g_director->getVersion() < 500 && member.type == STRING) {
-		CastMemberID memberID = member.asMemberID(kCastText);
+	// to any member by that name. Checked in D4 and D5 for Windows (T_LING05).
+	if (member.type == STRING) {
+		Datum lib = castLib.type == CASTLIBREF ? Datum(castLib.u.i) : castLib;
+		CastMemberID memberID = resolveCastMember(member, lib, kCastText);
 		if (memberID.member != -1)
 			return memberID;
 	}
