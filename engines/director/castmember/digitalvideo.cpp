@@ -430,7 +430,7 @@ void DigitalVideoCastMember::startVideo() {
 		// cursor from the movieRate.
 		_getFirstFrame = true;
 		// Draw the first frame without starting the clock, or the
-		// movieTime reads 1 instead of 0 (T_DVID05)
+		// movieTime reads 1 instead of 0. Checked in D4.
 		_video->stop();
 		if (_channel) {
 			_channel->_movieRate = 0.0;

@@ -1545,7 +1545,7 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		break;
 	case kTheUpdateLock:
 		{
-			// In the D5 projector (FUN_10026ed0), locking only sets a flag
+			// In the D5 projector, locking only sets a flag
 			// that makes every stage draw a no-op. Unlocking clears it and
 			// updates the whole stage at once, playing the transition of a
 			// frame entered while locked.

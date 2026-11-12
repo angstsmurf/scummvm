@@ -55,7 +55,7 @@ uint32 DirectorEngine::transformColor(uint32 color) {
 /**
  * Turns a color from transformColor() back into a palette index, for
  * returning to Lingo.
- **/
+ */
 uint32 DirectorEngine::reverseTransformColor(uint32 color) {
 	if (_pixelformat.bytesPerPixel == 1)
 		return color;

@@ -1912,8 +1912,6 @@ bool compareStringEquality(const Common::String &s1, const Common::String &s2) {
 }
 
 int findStringEquality(const Common::String &str, const Common::String &substr) {
-	// Returns the 0-based character index of the first occurrence of substr
-	// in str, comparing characters as Lingo does, or -1 if not found.
 	Common::U32String u32Str = str.decode(Common::kUtf8);
 	Common::U32String u32Sub = substr.decode(Common::kUtf8);
 	int strLen = u32Str.size();

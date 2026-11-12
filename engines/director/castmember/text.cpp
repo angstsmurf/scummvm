@@ -336,7 +336,8 @@ Common::Rect TextCastMember::computeFieldDims(const Common::Rect &bbox) {
 	// The Windows D3.1 projector insets the top by gutter / 2 and the
 	// bottom by gutter - gutter / 2, so there the total is gutter.
 
-	// for mactext, we can expand now, but we can't shrink. so we may pass the small size when we have adjustToFit text style
+	// An adjust-to-fit field grows with its text, so start it no larger
+	// than the member rect
 	if (_textType == kTextTypeAdjustToFit) {
 		dims.right = MIN<int>(dims.right, dims.left + _initialRect.width());
 		dims.bottom = MIN<int>(dims.bottom, dims.top + _initialRect.height());
@@ -344,7 +345,6 @@ Common::Rect TextCastMember::computeFieldDims(const Common::Rect &bbox) {
 		// Fixed, scrolling and limit fields. The projectors only check
 		// for adjust to fit, so a limit field gets the same box as a
 		// fixed one.
-		// use initialRect to create widget for fixed style text, this maybe related to version.
 		if (g_director->getVersion() < 300) {
 			// The D2 projector ignores the size of the sprite in the
 			// score and takes the box from the member rect. It has no
@@ -420,8 +420,8 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 
 // A "limit to field size" field stops taking keys once its text fills one
 // line. The D4 projector checks this right before it hands a key to
-// TextEdit (FUN_00030cfe in the Mac player, called after the keyDown
-// scripts have passed the key on). With no selection, any key but backspace
+// TextEdit (in the Mac player, after the keyDown scripts have passed the
+// key on). With no selection, any key but backspace
 // is dropped if the width of the whole text, plus the width of an "n" and
 // 6 pixels, is more than the width of the member's rect. It measures in the
 // style of the first character and doesn't look at the key itself, so a full

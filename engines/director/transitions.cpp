@@ -165,7 +165,8 @@ void Window::stepTransition(TransParams &t, int step) {
 // Every event, mouseUp included, stays queued and reaches Lingo afterwards.
 // That includes a key typed while Lingo ran before the transition: ScummVM
 // has already taken it from the queue for Lingo, so it is tracked by
-// _keyHeldByLingo instead (T_TABT02: the key ends the wipe at the first check).
+// _keyHeldByLingo instead. In the D5 projector, such a key ends the
+// transition at the first check.
 // The input that stays queued for Lingo while a transition plays
 static bool isQueuedInputEvent(const Common::Event &event) {
 	return Common::isMouseEvent(event) || event.type == Common::EVENT_KEYDOWN || event.type == Common::EVENT_KEYUP;
