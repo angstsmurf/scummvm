@@ -78,6 +78,7 @@ public:
 	void setDirty();
 	void setNeedsDraw() { _needsDraw = true; }
 	void setPosition(int x, int y, bool force = false);
+	void updateDragPosition(Sprite *nextSprite);
 	void setCast(CastMemberID memberID);
 	void setAutoType();
 	void setClean(Sprite *nextSprite, bool partial = false);

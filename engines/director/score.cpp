@@ -1138,6 +1138,9 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		// this doesn't include changes in dimension or position!
 		bool widgetRedrawn = channel->updateWidget();
 
+		if (withClean)
+			channel->updateDragPosition(nextSprite);
+
 		if (channel->isActiveVideo()) {
 			channel->updateVideoTime();
 			_movie->_videoPlayback = true;

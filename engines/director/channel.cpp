@@ -331,8 +331,14 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_moveable != nextSprite->_moveable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
 			_sprite->getDrawThickness() != nextSprite->getDrawThickness();
-		if (!_sprite->_moveable)
+		if (g_director->getVersion() < 600) {
+			// A moveable sprite with a drag position stays there, see
+			// updateDragPosition(); otherwise it follows the score.
+			Common::Point pos = (nextSprite->_moveable && _hasDragPosition) ? _dragPosition : nextSprite->getPosition();
+			isDirtyFlag |= _sprite->getPosition() != pos;
+		} else if (!_sprite->_moveable) {
 			isDirtyFlag |= _sprite->getPosition() != nextSprite->getPosition();
+		}
 		if (isStretched() && !hasTextCastMember(_sprite))
 			isDirtyFlag |= _sprite->_width != nextSprite->_width || _sprite->_height != nextSprite->_height;
 	}
@@ -738,12 +744,8 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 
 	_sprite->replaceFrom(nextSprite);
 
-	// Before D6 there is no auto-puppeting of the location. Instead, the
-	// projector keeps a drag position for every moveable channel and puts it
-	// over the score location on each frame, until the channel stops being
-	// moveable (Mac D4: Score_applyDragPositions @ 0x41df8). Without this, a
-	// dragged sprite jumps back whenever the score rewrites its location,
-	// e.g. on every go("LOOP") in Alice's STONE.DIR.
+	// Before D6 there is no auto-puppeting of the location, see
+	// updateDragPosition().
 	if (g_director->getVersion() < 600) {
 		if (!_sprite->_moveable)
 			_hasDragPosition = false;
@@ -764,6 +766,26 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 	if (g_director->getVersion() >= 600) {
 		_startFrame = _sprite->_spriteInfo.startFrame;
 		_endFrame = _sprite->_spriteInfo.endFrame;
+	}
+}
+
+// Before D6 the projector keeps a drag position for every channel that was
+// moveable in the previous frame, and puts it over the score location
+// (Mac D4: Score_applyDragPositions @ 0x41df8). It is taken from the score
+// one frame after the sprite becomes moveable, unless Lingo or a drag set
+// it first, and dropped once the sprite stops being moveable. Real D4:
+// T_SPRT14. Without it a dragged sprite jumps back whenever the score
+// rewrites its location, e.g. on every go("LOOP") in Alice's STONE.DIR.
+void Channel::updateDragPosition(Sprite *nextSprite) {
+	if (g_director->getVersion() >= 600 || !nextSprite || _sprite->_puppet)
+		return;
+
+	// _sprite still holds the previous frame here
+	if (!_sprite->_moveable) {
+		_hasDragPosition = false;
+	} else if (!_hasDragPosition) {
+		_hasDragPosition = true;
+		_dragPosition = nextSprite->getPosition();
 	}
 }
 
