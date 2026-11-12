@@ -763,7 +763,8 @@ void LC::cb_v4theentitypush() {
 					// For "the member", D5 and above have a lib ID followed by a member ID
 					// Pre-resolve them here.
 					Datum member = g_lingo->pop();
-					CastMemberID resolved = g_lingo->toCastMemberID(member, id);
+					// A field lookup prefers fields over other members of the same name
+					CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(member, id) : g_lingo->toCastMemberID(member, id);
 					id = Datum(resolved);
 				}
 				debugC(3, kDebugLingoExec, "cb_v4theentitypush: calling getTheEntity(%s, %s, %s)", g_lingo->entity2str(entity), id.asString(true).c_str(), g_lingo->field2str(field));
@@ -924,7 +925,8 @@ void LC::cb_v4theentityassign() {
 				// For "the member", D5 and above have a lib ID followed by a member ID
 				// Pre-resolve them here.
 				Datum member = g_lingo->pop();
-				CastMemberID resolved = g_lingo->toCastMemberID(member, id);
+				// A field lookup prefers fields over other members of the same name
+				CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(member, id) : g_lingo->toCastMemberID(member, id);
 				id = Datum(resolved);
 			}
 			debugC(3, kDebugLingoExec, "cb_v4theentityassign: calling setTheEntity(%s, %s, %s, %s)", g_lingo->entity2str(entity), id.asString(true).c_str(), g_lingo->field2str(field), value.asString(true).c_str());
