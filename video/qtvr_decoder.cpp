@@ -327,7 +327,8 @@ float QuickTimeDecoder::getPanRange() const {
 // Half of the horizontal field of view actually shown, in degrees.
 // See projectPanorama(): warp mode 0 spreads _hfov linearly over the
 // width, the other modes project a plane whose half width is
-// tan(fov / 2) * w / h (mhlr UpdateHFOV)
+// tan(fov / 2) * w / h (UpdateHFOV in the QTVR 1.0 panorama media
+// handler, the 'mhlr' component, referred to as the mhlr below)
 float QuickTimeDecoder::getHalfHFOV() const {
 	// No view size until setTargetSize(), which clamps the pan again
 	if (_width == 0 || _height == 0)
@@ -1402,7 +1403,7 @@ void QuickTimeDecoder::PanoTrackHandler::projectPanorama(uint8 scaleFactor,
 	float maxProjectedY = bottomRightVector[1] / bottomRightVector[2];
 
 	if (_decoder->_warpMode == 1) {
-		// One-dimensional warping (QTVR 1.0, mhlr 0x10007308 / 0x100082f8):
+		// One-dimensional warping (QTVR 1.0 mhlr):
 		// the view plane stays vertical. The tilt moves its window up or
 		// down instead of rotating it, so vertical lines stay vertical.
 		// Each column only gets the cylinder's cos(angle) vertical scaling.
@@ -1785,7 +1786,7 @@ void QuickTimeDecoder::handleMouseMove(int16 x, int16 y) {
 	_cursorPos = Common::Point(x, y);
 }
 
-// The QTVR 1.0 navigable player (FUN_1000377c) turns an object by a pan and
+// The QTVR 1.0 navigable player turns an object by a pan and
 // tilt that follow the mouse continuously at field of view / smaller side of
 // the drag box per pixel. A mostly horizontal drag leaves the tilt alone, and a
 // mostly vertical one the pan. Once a drag has started inside the box it goes
@@ -1868,7 +1869,7 @@ void QuickTimeDecoder::handleObjectMouseButton(bool isDown, int16 x, int16 y, bo
 		updateObjectEdgeRotation();
 }
 
-// The drag box is the movie box inset by a tenth of its smaller side (FUN_10000ea0)
+// The drag box is the movie box inset by a tenth of its smaller side
 Common::Rect QuickTimeDecoder::getObjectBox() {
 	int w = getWidth();
 	int h = getHeight();
@@ -1881,7 +1882,7 @@ Common::Rect QuickTimeDecoder::getObjectBox() {
 	return Common::Rect(inset, inset, MAX(inset, w - inset), MAX(inset, h - inset));
 }
 
-// Which border of the drag box the mouse is in (FUN_10002bcc): 8 above, 4
+// Which border of the drag box the mouse is in: 8 above, 4
 // below, 1 left, 2 right, 0 inside. The side the mouse is furthest past wins,
 // and depth is how far past it is
 int QuickTimeDecoder::getObjectEdge(int16 x, int16 y, int &dRow, int &dCol, int &depth) {
@@ -1920,7 +1921,7 @@ int QuickTimeDecoder::getObjectEdge(int16 x, int16 y, int &dRow, int &dCol, int 
 	return code;
 }
 
-// Holding the button in the border (FUN_10002cd8) first steps one column or
+// Holding the button in the border first steps one column or
 // row, then turns by depth / 6 degrees per tick, at most 34 degrees at a time
 void QuickTimeDecoder::updateObjectEdgeRotation() {
 	if (!_isMouseButtonDown || _objectDragging || !_nextVideoTrack)
@@ -1953,7 +1954,7 @@ void QuickTimeDecoder::updateObjectEdgeRotation() {
 	setObjectView(_objectHPan + dCol * step, _objectVPan - dRow * step);
 }
 
-// Keep the pan and tilt within the movie's range (FUN_100018d0) and show the
+// Keep the pan and tilt within the movie's range and show the
 // frame for them
 void QuickTimeDecoder::setObjectView(float hPan, float vPan) {
 	float hRange = _nav.endHPan - _nav.startHPan;
@@ -1979,7 +1980,7 @@ void QuickTimeDecoder::setObjectView(float hPan, float vPan) {
 		track->setCurFrame(frame);
 }
 
-// Show a column and row, with the pan and tilt they were shot at (FUN_10001978)
+// Show a column and row, with the pan and tilt they were shot at
 void QuickTimeDecoder::setObjectColumnRow(int column, int row) {
 	column = limitObjectColumn(column);
 	row = CLIP<int>(row, 0, MAX<int>(_nav.rows, 1) - 1);
