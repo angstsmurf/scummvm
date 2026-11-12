@@ -229,6 +229,7 @@ public:
 	const Common::Rect &getTileRect(int num);
 	uint32 transformColor(uint32 color);
 	uint32 reverseTransformColor(uint32 color);
+	uint32 findBlendColor(byte r, byte g, byte b);
 	Graphics::MacPatterns &getPatterns();
 	void setCursor(DirectorCursor type);
 	void draw();
@@ -361,6 +362,7 @@ public:
 private:
 	byte _currentPalette[768];
 	uint16 _currentPaletteLength;
+	Common::Array<byte> _inverseTable;	// Windows Director's 15-bit colour lookup, built on demand
 	bool _gammaCorrection;
 	Lingo *_lingo;
 	uint16 _version;
