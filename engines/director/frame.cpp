@@ -737,6 +737,20 @@ void readSpriteDataD4(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 		}
 	}
 
+	// A frame may change the type alone and keep bytes 6-7, which then
+	// have to be read the other way (T_SPRT15)
+	if (sprite.isQDShape()) {
+		if (sprite._castId.member) {
+			sprite._pattern = sprite._castId.member;
+			sprite._castId = CastMemberID(0, 0);
+			sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+		}
+	} else if (sprite._pattern) {
+		sprite._castId = CastMemberID(sprite._pattern, DEFAULT_CAST_LIB);
+		sprite._pattern = 0;
+		sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+	}
+
 	// Sometimes removed sprites leave garbage in the channel
 	// We set it to zero, so then could skip
 	if (sprite._width <= 0 || sprite._height <= 0)
