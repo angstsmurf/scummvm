@@ -248,7 +248,133 @@ bool claimInverseCells(Common::Array<byte> &table, Common::Array<bool> &claimed,
 	return got;
 }
 
+
+// The points of an oval as Windows Director plots them: one every 4 degrees,
+// clockwise from the top, around the box with the bottom and right edges
+// pulled in by shrink pixels. inset shrinks both radii.
+void windowsOvalPoints(const Common::Rect &rect, int shrink, int inset, Common::Array<Common::Point> &points) {
+	double rx = (rect.right - shrink - rect.left) * 0.5;
+	double ry = (rect.bottom - shrink - rect.top) * 0.5;
+	double cx = rect.left + rx;
+	double cy = rect.top + ry;
+	rx -= inset;
+	ry -= inset;
+	for (int a = 0; a <= 360; a += 4) {
+		int q = a % 90;
+		// Director's x87 table has sin 30 and cos 60 at exactly 0.5; a point
+		// can land on a .5 there
+		double s = q == 30 ? 0.5 : q ? sin(q * M_PI / 180.0) : 0.0;
+		double c = q == 60 ? 0.5 : q ? cos(q * M_PI / 180.0) : 1.0;
+		double sn, cs;
+		switch (a / 90 % 4) {
+		case 0: sn = s; cs = c; break;
+		case 1: sn = c; cs = -s; break;
+		case 2: sn = -s; cs = -c; break;
+		default: sn = -c; cs = s; break;
+		}
+		points.push_back(Common::Point((int)(sn * rx + cx + 0.5), (int)(cy - cs * ry + 0.5)));
+	}
+}
+
+// Fills polygons like GDI does: alternate rule, sampled at whole scanlines,
+// from the first pixel at or right of an edge to the last one left of the next
+void fillWindowsPolygons(Graphics::Primitives &primitives, const Common::Array<Common::Point> *polys, int numPolys, uint32 color, void *data) {
+	int yMin = polys[0][0].y, yMax = yMin;
+	for (int i = 0; i < numPolys; i++)
+		for (auto &pt : polys[i]) {
+			yMin = MIN<int>(yMin, pt.y);
+			yMax = MAX<int>(yMax, pt.y);
+		}
+	Common::Array<double> xs;
+	for (int y = yMin; y < yMax; y++) {
+		xs.clear();
+		for (int i = 0; i < numPolys; i++) {
+			const Common::Array<Common::Point> &p = polys[i];
+			for (uint j = 0; j < p.size(); j++) {
+				const Common::Point &p0 = p[j];
+				const Common::Point &p1 = p[(j + 1) % p.size()];
+				if ((p0.y <= y && y < p1.y) || (p1.y <= y && y < p0.y))
+					xs.push_back(p0.x + (double)(y - p0.y) * (p1.x - p0.x) / (p1.y - p0.y));
+			}
+		}
+		Common::sort(xs.begin(), xs.end());
+		for (uint j = 0; j + 1 < xs.size(); j += 2) {
+			int x0 = (int)ceil(xs[j]);
+			int x1 = (int)ceil(xs[j + 1]) - 1;
+			if (x0 <= x1)
+				primitives.drawHLine(x0, x1, y, color, data);
+		}
+	}
+}
+
+// Rounds num / den (den > 0) to the nearest integer; up decides the halves
+int roundWindowsLine(int num, int den, bool up) {
+	int q = num >= 0 ? num / den : -((-num + den - 1) / den);
+	int rem2 = 2 * (num - q * den);
+	if (rem2 > den || (rem2 == den && up))
+		q++;
+	return q;
+}
+
+// A line as the Windows GDI draws it with a one pixel pen, from a to b without
+// b: it steps from the upper end, and a halfway minor coordinate goes the way
+// the line heads
+void drawWindowsLine(Graphics::Primitives &primitives, Common::Point a, Common::Point b, uint32 color, void *data) {
+	Common::Point end = b;
+	if (b.y < a.y)
+		SWAP(a, b);
+	int dx = b.x - a.x, dy = b.y - a.y;
+	int adx = ABS(dx), ady = ABS(dy);
+	int n = MAX(adx, ady);
+	for (int i = 0; i <= n; i++) {
+		Common::Point p;
+		if (adx >= ady) {
+			p.x = a.x + (dx > 0 ? i : -i);
+			p.y = a.y + (adx ? roundWindowsLine(dy * i, adx, dy > 0) : 0);
+		} else {
+			p.y = a.y + i;
+			p.x = a.x + roundWindowsLine(dx * i, ady, dx > 0);
+		}
+		if (p != end)
+			primitives.drawPoint(p.x, p.y, color, data);
+	}
+}
+
 } // End of anonymous namespace
+
+/**
+ * Draws an oval as Windows Director does (sc_eng.exe FUN_00439f20). A filled
+ * oval is a polygon of the 4-degree points and gets no frame. A frame one
+ * pixel thick is a polyline through the points of a box one pixel smaller, a
+ * thicker one the ring between the points and a second set inset by the line
+ * size. Neither matches QuickDraw's ovals: a 60x60 oval covers 59x59 pixels.
+ */
+void drawWindowsOval(Graphics::Primitives &primitives, const Common::Rect &rect, int lineSize, bool filled, uint32 color, void *data) {
+	if (rect.width() < 2 || rect.height() < 2)
+		return;
+	Common::Array<Common::Point> polys[2];
+	if (filled) {
+		windowsOvalPoints(rect, 1, 0, polys[0]);
+		fillWindowsPolygons(primitives, polys, 1, color, data);
+		return;
+	}
+	if (lineSize <= 0)
+		return;
+	if (lineSize == 1) {
+		windowsOvalPoints(rect, 2, 0, polys[0]);
+		for (uint i = 0; i + 1 < polys[0].size(); i++)
+			drawWindowsLine(primitives, polys[0][i], polys[0][i + 1], color, data);
+		return;
+	}
+	windowsOvalPoints(rect, 1, 0, polys[0]);
+	if (rect.width() - 1 < lineSize * 2 || rect.height() - 1 < lineSize * 2) {
+		// GDI Ellipse with a thick pen; close enough to fill it
+		fillWindowsPolygons(primitives, polys, 1, color, data);
+		return;
+	}
+	windowsOvalPoints(rect, 1, lineSize, polys[1]);
+	fillWindowsPolygons(primitives, polys, 2, color, data);
+}
 
 /**
  * The colour nearest to an RGB value, as Windows Director picks it for
@@ -849,6 +975,9 @@ void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
 	strokeRect.moveTo(srcRect.left, srcRect.top);
 	Graphics::MacPlotData plotStroke(dst, nullptr, &d->getPatterns(), strokePattern, strokeRect.left + wpos.x, strokeRect.top + wpos.y, {(int16)ms->lineSize, (int16)ms->lineSize}, ms->backColor);
 
+	// Windows ovals draw their frame in single pixels inside the oval
+	Graphics::MacPlotData plotFrame(dst, nullptr, &d->getPatterns(), strokePattern, fillAreaRect.left + wpos.x, fillAreaRect.top + wpos.y, {1, 1}, ms->backColor);
+
 	Graphics::Primitives *primitives = g_director->getInkPrimitives();
 
 	// A blended shape is drawn into a buffer first: the fill spans of an oval
@@ -897,11 +1026,25 @@ void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
 		break;
 	case kOvalSprite:
 		ms->pd = &plotFill;
-		primitives->drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, ms->foreColor, true, this);
+		if (d->getPlatform() == Common::kPlatformWindows)
+			drawWindowsOval(*primitives, fillAreaRect, ms->lineSize, true, ms->foreColor, this);
+		else
+			primitives->drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, ms->foreColor, true, this);
+		// Windows draws no frame around a filled oval (T_SPRT18)
+		if (d->getPlatform() == Common::kPlatformWindows)
+			break;
 		// fall through
 	case kOutlinedOvalSprite:
 		if (ms->lineSize <= 0)
 			break;
+		if (d->getPlatform() == Common::kPlatformWindows) {
+			// The frame is drawn in single pixels inside the oval
+			ms->pd = &plotFrame;
+			if (!outline)
+				ms->tile = nullptr;
+			drawWindowsOval(*primitives, fillAreaRect, ms->lineSize, false, ms->foreColor, this);
+			break;
+		}
 		ms->pd = &plotStroke;
 
 		if (!outline)
