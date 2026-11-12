@@ -145,9 +145,14 @@ bool Score::hasPuppetPalette() {
 }
 
 bool Score::controlsPalette() {
-	// In D4, only the stage's palette channel (and puppetPalette) changes
-	// the screen palette; movies in windows have it disabled.
-	if (_version < kFileVer500)
+	// In D4 and D5, only the stage's palette channel (and puppetPalette)
+	// changes the screen palette; movies in windows have it disabled and
+	// show the stage's palette. In real D5 for Windows, a window whose
+	// palette channel sets Rainbow still reads framePalette -101 and draws
+	// in the stage's colours, with or without a stage puppet palette
+	// (T_SPRT05). The D6 and D7 code shows no such check, so windows keep
+	// their palette there (unverified in a real D6/D7).
+	if (_version < kFileVer600)
 		return _window->isStage();
 	return true;
 }
