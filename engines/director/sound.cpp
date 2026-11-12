@@ -100,13 +100,31 @@ void DirectorSound::playFile(Common::String filename, int soundChannel) {
 	_channels[soundChannel]->fromLastMovie = false;
 }
 
-void DirectorSound::playMCI(Audio::AudioStream &stream, uint32 from, uint32 to) {
-	Audio::SeekableAudioStream *seekStream = dynamic_cast<Audio::SeekableAudioStream *>(&stream);
-	Audio::SubSeekableAudioStream *subSeekStream = new Audio::SubSeekableAudioStream(seekStream, Audio::Timestamp(from, seekStream->getRate()), Audio::Timestamp(to, seekStream->getRate()));
+void DirectorSound::playMCI(Audio::SeekableAudioStream *stream, uint32 from, uint32 to) {
+	debugC(5, kDebugSound, "DirectorSound::playMCI(): from %d to %d, length %d ms", from, to, stream->getLength().msecs());
+
+	// The alias keeps the stream, so it can be played again
+	_mixer->stopHandle(_scriptSound);
+	// Without a "to", play to the end. Never go past it: a huge end time
+	// overflows the frame count and plays nothing.
+	Audio::Timestamp end = stream->getLength();
+	if (to < (uint32)end.msecs())
+		end = Audio::Timestamp(to, stream->getRate());
+
+	Audio::SubSeekableAudioStream *subSeekStream = new Audio::SubSeekableAudioStream(stream, Audio::Timestamp(from, stream->getRate()), end, DisposeAfterUse::NO);
+	_mciStream = stream;
 
 	// TODO: make sound enable settings work on this one
-	_mixer->stopHandle(_scriptSound);
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_scriptSound, subSeekStream);
+}
+
+void DirectorSound::stopMCI(Audio::SeekableAudioStream *stream) {
+	if (_mciStream != stream)
+		return;
+
+	debugC(5, kDebugSound, "DirectorSound::stopMCI()");
+	_mixer->stopHandle(_scriptSound);
+	_mciStream = nullptr;
 }
 
 uint8 DirectorSound::getChannelVolume(int soundChannel) {

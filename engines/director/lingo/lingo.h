@@ -24,6 +24,7 @@
 
 namespace Audio {
 class AudioStream;
+class SeekableAudioStream;
 }
 namespace Common {
 class SeekableReadStreamEndian;
@@ -469,6 +470,7 @@ public:
 	void lingoError(const char *s, ...);
 
 	void func_mci(const Common::String &name);
+	void closeAudioAlias(const Common::String &alias);
 	void func_mciwait(const Common::String &name);
 	void func_beep(int repeats);
 	void func_goto(Datum &frame, Datum &movie, bool commandgo = false );
@@ -564,7 +566,7 @@ public:
 public:
 	Common::HashMap<uint32, const char *> _eventHandlerTypes;
 	Common::HashMap<Common::String, uint32, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _eventHandlerTypeIds;
-	Common::HashMap<Common::String, Audio::AudioStream *> _audioAliases;
+	Common::HashMap<Common::String, Audio::SeekableAudioStream *> _audioAliases;
 
 	DatumHash _globalvars;
 
