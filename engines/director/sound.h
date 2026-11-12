@@ -29,6 +29,7 @@ namespace Audio {
 	class SoundHandle;
 	class PCSpeaker;
 	class RewindableAudioStream;
+	class SeekableAudioStream;
 	class LoopableAudioStream;
 }
 
@@ -172,6 +173,8 @@ private:
 	Common::HashMap<int, SoundChannel *> _channels;
 	Common::HashMap<int, int> _volumes;
 	Audio::SoundHandle _scriptSound;
+	// The MCI alias stream playing in _scriptSound
+	Audio::SeekableAudioStream *_mciStream = nullptr;
 	Audio::Mixer *_mixer;
 	Audio::PCSpeaker *_speaker;
 
@@ -189,7 +192,8 @@ public:
 
 	SoundChannel *getChannel(int soundChannel);
 	void playFile(Common::String filename, int soundChannel);
-	void playMCI(Audio::AudioStream &stream, uint32 from, uint32 to);
+	void playMCI(Audio::SeekableAudioStream *stream, uint32 from, uint32 to);
+	void stopMCI(Audio::SeekableAudioStream *stream);
 	void playStream(Audio::AudioStream &stream, int soundChannel);
 	void playSound(SoundID soundId, int soundChannel, bool forPuppet = false);
 	void playCastMember(CastMemberID memberID, int soundChannel, bool forPuppet = false);

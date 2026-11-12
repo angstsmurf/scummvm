@@ -29,11 +29,12 @@
 #include "audio/audiostream.h"
 #include "audio/decoders/wave.h"
 
-#include "common/file.h"
+#include "common/macresman.h"
 
 #include "director/director.h"
 #include "director/score.h"
 #include "director/sound.h"
+#include "director/util.h"
 #include "director/window.h"
 
 namespace Director {
@@ -108,6 +109,7 @@ static const CmdTableRow table[] = {
 	{"alias"		,0x00000400L	,-1			,MCI_STRING},
 	{"type"			,0x00002000L	,-1			,MCI_STRING},
 	{"shareable"	,0x00000100L	,-1			,MCI_FLAG},
+	{"buffer"		,0x00020000L	,-1			,MCI_INTEGER},
 	{""				,0x00000000L	,-1			,MCI_END_COMMAND},
 	{"notify"		,0x00000001L	,-1			,MCI_FLAG},
 	{"wait"			,0x00000002L	,-1			,MCI_FLAG},
@@ -430,6 +432,16 @@ static MCIError parseMCICommand(const Common::String &name, MCICommand &parsedCm
 	return MCIERR_NO_ERROR;
 }
 
+void Lingo::closeAudioAlias(const Common::String &alias) {
+	if (!_audioAliases.contains(alias))
+		return;
+
+	Audio::SeekableAudioStream *stream = _audioAliases[alias];
+	_vm->getCurrentWindow()->getSoundManager()->stopMCI(stream);
+	_audioAliases.erase(alias);
+	delete stream;
+}
+
 void Lingo::func_mci(const Common::String &name) {
 
 	MCICommand parsedCmd;
@@ -444,35 +456,47 @@ void Lingo::func_mci(const Common::String &name) {
 
 	switch (parsedCmd.id) {
 	case MCI_OPEN: {
-		Common::File *file = new Common::File();
+		// The device is a file name, which may carry a drive letter
+		Common::Path path = findPath(parsedCmd.device);
+		Common::SeekableReadStream *file = path.empty() ? nullptr : Common::MacResManager::openFileOrDataFork(path);
 
-		if (!file->open(Common::Path(parsedCmd.device, g_director->_dirSeparator))) {
+		if (!file) {
 			warning("func_mci(): Failed to open %s", parsedCmd.device.c_str());
 			g_lingo->_theResult = Datum(Common::String::format("MCI Error: Failed to open %s", parsedCmd.device.c_str()));
-			delete file;
 			return;
 		}
 
-		parsedCmd.parameters["type"].string.toLowercase(); /* In the case the open command type has something like WaveAudio instead of waveaudio */
+		/* In the case the open command type has something like WaveAudio instead of waveaudio */
+		Common::String type = parsedCmd.parameters["type"].string;
+		type.toLowercase();
+		// Without a type, MCI picks the device from the file extension
+		if (type.empty() && parsedCmd.device.hasSuffixIgnoreCase(".wav"))
+			type = "waveaudio";
 
-		if (parsedCmd.parameters["type"].string == "waveaudio") {
-			Audio::AudioStream *sound = Audio::makeWAVStream(file, DisposeAfterUse::YES);
-			if (parsedCmd.parameters.contains("alias")) {
-				_audioAliases[parsedCmd.parameters["alias"].string] = sound;
+		if (type == "waveaudio") {
+			Audio::SeekableAudioStream *sound = Audio::makeWAVStream(file, DisposeAfterUse::YES);
+			if (sound && parsedCmd.parameters.contains("alias")) {
+				Common::String alias = parsedCmd.parameters["alias"].string;
+				closeAudioAlias(alias);
+				_audioAliases[alias] = sound;
 			} else {
 				delete sound;
 			}
 		} else {
-			warning("func_mci(): Unhandled audio type %s", parsedCmd.parameters["type"].string.c_str());
+			warning("func_mci(): Unhandled audio type %s", type.c_str());
 			delete file;
-			g_lingo->_theResult = Datum(Common::String::format("MCI Error: Unhandle audio type %s", parsedCmd.parameters["type"].string.c_str()));
+			g_lingo->_theResult = Datum(Common::String::format("MCI Error: Unhandled audio type %s", type.c_str()));
 			return;
 		}
 		}
 		break;
 
 	case MCI_PLAY: {
-		warning("func_mci(): MCI play file: %s, from: %d, to: %d", parsedCmd.device.c_str(), parsedCmd.parameters["from"].integer, parsedCmd.parameters["to"].integer);
+		// Look up "to" before anything reads it with [], which would add it
+		uint32 to = parsedCmd.parameters.contains("to") ? parsedCmd.parameters["to"].integer : -1;
+		uint32 from = parsedCmd.parameters["from"].integer;
+
+		debugC(5, kDebugLingoExec, "func_mci(): MCI play file: %s, from: %d, to: %d", parsedCmd.device.c_str(), from, to);
 
 		if (!_audioAliases.contains(parsedCmd.device)) {
 			warning("func_mci(): Unknown alias %s", parsedCmd.device.c_str());
@@ -480,11 +504,17 @@ void Lingo::func_mci(const Common::String &name) {
 			return;
 		}
 
-		uint32 from = parsedCmd.parameters["from"].integer;
-		uint32 to = parsedCmd.parameters.contains("to") ? parsedCmd.parameters["to"].integer : -1;
-
-		_vm->getCurrentWindow()->getSoundManager()->playMCI(*_audioAliases[parsedCmd.device], from, to);
+		_vm->getCurrentWindow()->getSoundManager()->playMCI(_audioAliases[parsedCmd.device], from, to);
 		}
+		break;
+
+	case MCI_STOP:
+		if (_audioAliases.contains(parsedCmd.device))
+			_vm->getCurrentWindow()->getSoundManager()->stopMCI(_audioAliases[parsedCmd.device]);
+		break;
+
+	case MCI_CLOSE:
+		closeAudioAlias(parsedCmd.device);
 		break;
 
 	case MCI_STATUS: {
