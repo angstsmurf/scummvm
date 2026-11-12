@@ -661,12 +661,11 @@ void Score::updateNextFrameTime() {
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): setting _nextFrameTime to %d based on a framerate of %d", _nextFrameTime, _currentFrameRate);
 			} else {
 				if (tempo == 128 && queuedClickEndsClickWait() && _movie->hasQueuedClick()) {
-					// In D4, a click that Lingo has not handled yet ends the
-					// wait at once. It is still sent as mouseDown and mouseUp
+					// A click that Lingo has not handled yet ends the wait at
+					// once. It is still sent as mouseDown and mouseUp
 					// afterwards. This happens when a handler clicks (e.g.
 					// through an XObject) and then does "go" to a frame that
-					// waits for a click. Checked in D4 for Windows; other
-					// versions have not been checked.
+					// waits for a click. Checked in D4 and D5 for Windows.
 					debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click ends the wait for a mouse click");
 				} else if (tempo == 128) {
 					_waitForClick = true;
@@ -704,6 +703,12 @@ void Score::updateNextFrameTime() {
 				_waitForChannel = 2;
 				_waitForChannelCue = tempoCuePoint;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): waiting for sound channel 2, cue point %d before next frame", _waitForChannelCue);
+				_nextFrameTime = g_system->getMillis();
+			} else if (tempo == 248 && queuedClickEndsClickWait() && _movie->hasQueuedClick()) {
+				// Same as tempo 128 above. D6 and D7 end the wait in their
+				// event dispatchers on the next mouseDown, which is still
+				// sent to Lingo.
+				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click ends the wait for a mouse click");
 				_nextFrameTime = g_system->getMillis();
 			} else if (tempo == 248) {
 				_waitForClick = true;
