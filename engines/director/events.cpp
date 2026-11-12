@@ -281,11 +281,16 @@ bool Movie::processSysEvent(Common::Event &event) {
 	case Common::EVENT_RBUTTONDOWN:
 		pos = event.mouse;
 		if (sc->_waitForClick) {
+			// The click ends a wait for a click. D4 for Mac takes it out
+			// of the event queue; the D5, D6 and D7 event dispatchers end
+			// the wait and then handle the mouseDown as usual.
 			sc->_waitForClick = false;
 			sc->renderCursor(pos, true);
-		} else {
-			pos = event.mouse;
+			if (g_director->getVersion() < 500)
+				return result;
+		}
 
+		{
 			if (g_director->getVersion() >= 600) {
 				if (_lastClickedSpriteId && _lastClickedSpriteId != spriteId) {
 					processInputEvent(kEventMouseUpOutSide, _lastClickedSpriteId, pos);
