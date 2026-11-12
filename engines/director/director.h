@@ -145,6 +145,11 @@ struct MacShape {
 	const Common::Rect *tileRect;
 
 	Graphics::MacPlotData *pd;
+
+	// Blended shapes: the shape's pixels before blending, so that overlapping
+	// strokes and fill spans blend only once
+	Common::Array<uint64> *blendBuf = nullptr;	// colour | 1 << 32 once drawn
+	Common::Rect blendRect;
 };
 
 struct PatternTile {

@@ -388,7 +388,17 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 
 			*dst = tmpDst;
 		}
-	} else if (p->alpha) {
+
+		if (p->ms->blendBuf) {
+			// Collect the pixel; inkBlitShape blends each one once
+			if (p->ms->blendRect.contains(x, y))
+				(*p->ms->blendBuf)[(y - p->ms->blendRect.top) * p->ms->blendRect.width() + (x - p->ms->blendRect.left)] = src | (1ULL << 32);
+			return;
+		}
+	}
+
+	// Shapes blend too (Alice: the yellow circles in STONE.DIR)
+	if (p->alpha) {
 		// Sprite blend does not respect colourization; defaults to matte ink
 		byte rSrc, gSrc, bSrc;
 		byte rDst, gDst, bDst;
@@ -714,6 +724,20 @@ void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
 
 	Graphics::Primitives *primitives = g_director->getInkPrimitives();
 
+	// A blended shape is drawn into a buffer first: the fill spans of an oval
+	// overlap, and the stroke goes over the fill, which would blend those
+	// pixels twice
+	Common::Array<uint64> blendBuf;
+	if (alpha) {
+		ms->blendRect = srcRect.findIntersectingRect(destRect);
+		if (ms->blendRect.isEmpty())
+			return;
+		blendBuf.resize(ms->blendRect.width() * ms->blendRect.height());
+		for (uint i = 0; i < blendBuf.size(); i++)
+			blendBuf[i] = 0;
+		ms->blendBuf = &blendBuf;
+	}
+
 	switch (ms->spriteType) {
 	case kRectangleSprite:
 		ms->pd = &plotFill;
@@ -768,6 +792,20 @@ void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
 		break;
 	default:
 		warning("DirectorPlotData::inkBlitShape: Expected shape type but got type %d", ms->spriteType);
+	}
+
+	if (alpha) {
+		ms->blendBuf = nullptr;
+		MacShape *shape = ms;
+		ms = nullptr;	// drawPoint blends the collected colour as it is
+		for (int y = shape->blendRect.top; y < shape->blendRect.bottom; y++) {
+			for (int x = shape->blendRect.left; x < shape->blendRect.right; x++) {
+				uint64 src = blendBuf[(y - shape->blendRect.top) * shape->blendRect.width() + (x - shape->blendRect.left)];
+				if (src)
+					primitives->drawPoint(x, y, (uint32)src, this);
+			}
+		}
+		ms = shape;
 	}
 }
 
