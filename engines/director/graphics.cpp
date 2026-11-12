@@ -220,6 +220,131 @@ bool DirectorEngine::setPalette(const CastMemberID &id) {
 	return true;
 }
 
+namespace {
+
+struct InverseBox {
+	byte index;
+	bool active;
+	bool faceActive[6];	// rMin, rMax, gMin, gMax, bMin, bMax
+	byte face[6];
+};
+
+byte inverseCell(byte c) {
+	return MIN(c + 4, 255) >> 3;
+}
+
+bool claimInverseCells(Common::Array<byte> &table, Common::Array<bool> &claimed, byte index, int r0, int r1, int g0, int g1, int b0, int b1) {
+	bool got = false;
+	for (int r = r0; r <= r1; r++)
+		for (int g = g0; g <= g1; g++)
+			for (int b = b0; b <= b1; b++) {
+				int k = (r << 10) | (g << 5) | b;
+				if (!claimed[k]) {
+					claimed[k] = true;
+					table[k] = index;
+					got = true;
+				}
+			}
+	return got;
+}
+
+} // End of anonymous namespace
+
+/**
+ * The colour nearest to an RGB value, as Windows Director picks it for
+ * blend ink in 8-bit: a 32x32x32 table, where every palette entry claims
+ * its own cell and then grows a box one cell a round, taking the cells
+ * nobody owns yet. Black seeds first, then white, then the rest in palette
+ * order, so a tie goes to the earlier (brighter) entry. sc_eng.exe (D5)
+ * FUN_0042a540; the colours match the Win D4 projector (T_SPRT17).
+ */
+uint32 DirectorEngine::findBlendColor(byte r, byte g, byte b) {
+	if (_pixelformat.bytesPerPixel != 1 || getPlatform() != Common::kPlatformWindows || _currentPaletteLength < 2)
+		return _wm->findBestColor(r, g, b);
+
+	if (_inverseTable.empty()) {
+		int n = _currentPaletteLength;
+		_inverseTable.resize(32768);
+		Common::Array<bool> claimed(32768, false);
+		Common::Array<InverseBox> boxes;
+
+		auto seed = [&](int i) {
+			byte cr = inverseCell(_currentPalette[i * 3]);
+			byte cg = inverseCell(_currentPalette[i * 3 + 1]);
+			byte cb = inverseCell(_currentPalette[i * 3 + 2]);
+			if (!claimInverseCells(_inverseTable, claimed, i, cr, cr, cg, cg, cb, cb))
+				return false;
+			InverseBox box;
+			box.index = i;
+			box.active = true;
+			for (int f = 0; f < 6; f++)
+				box.faceActive[f] = true;
+			box.face[0] = box.face[1] = cr;
+			box.face[2] = box.face[3] = cg;
+			box.face[4] = box.face[5] = cb;
+			boxes.push_back(box);
+			return true;
+		};
+
+		bool lastSeeded = seed(n - 1);
+		InverseBox last;
+		if (lastSeeded) {
+			last = boxes.back();
+			boxes.pop_back();
+		}
+		seed(0);
+		for (int i = 1; i < n - 1; i++)
+			seed(i);
+		if (lastSeeded)
+			boxes.push_back(last);
+
+		bool grew = true;
+		while (grew) {
+			grew = false;
+			for (auto &box : boxes) {
+				if (!box.active)
+					continue;
+				for (int f = 0; f < 6; f++) {
+					if (!box.faceActive[f])
+						continue;
+					if (f % 2 == 0) {
+						if (box.face[f] == 0)
+							box.faceActive[f] = false;
+						else
+							box.face[f]--;
+					} else {
+						if (box.face[f] == 31)
+							box.faceActive[f] = false;
+						else
+							box.face[f]++;
+					}
+				}
+				const byte *c = box.face;
+				bool any = false;
+				for (int f = 0; f < 6; f++) {
+					if (!box.faceActive[f])
+						continue;
+					int lo[3] = { c[0], c[2], c[4] };
+					int hi[3] = { c[1], c[3], c[5] };
+					lo[f / 2] = hi[f / 2] = c[f];
+					if (claimInverseCells(_inverseTable, claimed, box.index, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]))
+						any = true;
+					else
+						box.faceActive[f] = false;
+				}
+				if (any)
+					grew = true;
+				else
+					box.active = false;
+			}
+		}
+		_inverseTable[0] = n - 1;
+		_inverseTable[0x7fff] = 0;
+	}
+
+	return _inverseTable[(inverseCell(r) << 10) | (inverseCell(g) << 5) | inverseCell(b)];
+}
+
 void DirectorEngine::setPalette(const byte *palette, uint16 count) {
 
 	memset(_currentPalette, 0, 768);
@@ -272,6 +397,8 @@ void DirectorEngine::shiftPalette(int startIndex, int endIndex, bool reverse) {
 }
 
 void DirectorEngine::syncPalette() {
+	_inverseTable.clear();
+
 	byte paletteBuf[768];
 	// In true color mode, gamma correction is applied to the screen output
 	// instead, see DirectorEngine::run()
@@ -409,7 +536,7 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 		rDst = lerpByte(rSrc, rDst, p->alpha, 255);
 		gDst = lerpByte(gSrc, gDst, p->alpha, 255);
 		bDst = lerpByte(bSrc, bDst, p->alpha, 255);
-		*dst = wm->findBestColor(rDst, gDst, bDst);
+		*dst = g_director->findBlendColor(rDst, gDst, bDst);
 		return;
 	}
 
