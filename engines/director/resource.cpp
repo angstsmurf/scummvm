@@ -337,7 +337,7 @@ Archive *DirectorEngine::loadEXE(const Common::Path &movie) {
 		// ownership handed to RIFFArchive
 		exeStream = nullptr;
 	} else {
-		Common::WinResources *exe = Common::WinResources::createFromEXE(movie);
+		Common::WinResources *exe = Common::WinResources::createFromEXE(exeStream);
 		if (!exe) {
 			debugC(5, kDebugLoading, "DirectorEngine::loadEXE(): Failed to open EXE '%s'", movie.toString().c_str());
 			delete exeStream;
