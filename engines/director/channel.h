@@ -142,6 +142,10 @@ public:
 	Common::Rect _lastRenderedBbox;
 	bool _lastTrail;
 
+	// D2-D5: position a moveable sprite was dragged to, kept across frames
+	bool _hasDragPosition;
+	Common::Point _dragPosition;
+
 	int _startFrame;
 	int _endFrame;
 	Common::Array<Datum> _scriptInstanceList;

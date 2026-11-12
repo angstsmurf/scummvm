@@ -65,6 +65,7 @@ Channel::Channel(Score *sc, Sprite *sp, int priority) {
 	_needsDraw = false;
 	_hideFromStage = false;
 	_lastTrail = false;
+	_hasDragPosition = false;
 
 	if (sp) {
 		_startFrame = sp->_spriteInfo.startFrame;
@@ -99,6 +100,8 @@ Channel& Channel::operator=(const Channel &channel) {
 	_visible = channel._visible;
 	_widgetDirty = channel._widgetDirty;
 	_hideFromStage = channel._hideFromStage;
+	_hasDragPosition = channel._hasDragPosition;
+	_dragPosition = channel._dragPosition;
 
 	_startFrame = channel._startFrame;
 	_endFrame = channel._endFrame;
@@ -735,6 +738,19 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 
 	_sprite->replaceFrom(nextSprite);
 
+	// Before D6 there is no auto-puppeting of the location. Instead, the
+	// projector keeps a drag position for every moveable channel and puts it
+	// over the score location on each frame, until the channel stops being
+	// moveable (Mac D4: Score_applyDragPositions @ 0x41df8). Without this, a
+	// dragged sprite jumps back whenever the score rewrites its location,
+	// e.g. on every go("LOOP") in Alice's STONE.DIR.
+	if (g_director->getVersion() < 600) {
+		if (!_sprite->_moveable)
+			_hasDragPosition = false;
+		else if (_hasDragPosition)
+			_sprite->_startPoint = _dragPosition;
+	}
+
 	// TODO: auto expand text size is meaning less for us, not all text
 	// since we are using initialRect for the text cast member now, then the sprite size is meaning less for us.
 	// thus, we keep the _sprite size here
@@ -763,6 +779,12 @@ void Channel::setPosition(int x, int y, bool force) {
 		newPos.y = MIN(constraintBbox.bottom, MAX(constraintBbox.top, newPos.y));
 	}
 	_sprite->setPosition(newPos.x, newPos.y);
+	if (g_director->getVersion() < 600) {
+		// Remember where a moveable sprite was dragged or moved by Lingo,
+		// see replaceSprite().
+		_hasDragPosition = _sprite->_moveable;
+		_dragPosition = newPos;
+	}
 	// Update the dimensons on the widget
 	if (_widget) {
 		Common::Rect dims = _widget->getDimensions();
