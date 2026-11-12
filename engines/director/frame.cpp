@@ -371,11 +371,11 @@ void readSpriteDataD2(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 8:
 			sprite._startPoint.y = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocV;
 			break;
 		case 10:
 			sprite._startPoint.x = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocH;
 			break;
 		case 12:
 			sprite._height = (int16)stream.readUint16();
@@ -697,11 +697,11 @@ void readSpriteDataD4(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 8:
 			sprite._startPoint.y = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocV;
 			break;
 		case 10:
 			sprite._startPoint.x = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocH;
 			break;
 		case 12:
 			sprite._height = (int16)stream.readUint16();
@@ -1055,11 +1055,11 @@ void readSpriteDataD5(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 12:
 			sprite._startPoint.y = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocV;
 			break;
 		case 14:
 			sprite._startPoint.x = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocH;
 			break;
 		case 16:
 			sprite._height = (int16)stream.readUint16();
@@ -1504,12 +1504,12 @@ void readSpriteDataD6(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 12:
 			sprite._startPoint.y = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocV;
 			debugC(6, kDebugLoading, "    sprite._startPoint.y: %d", sprite._startPoint.y);
 			break;
 		case 14:
 			sprite._startPoint.x = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocH;
 			debugC(6, kDebugLoading, "    sprite._startPoint.x: %d", sprite._startPoint.x);
 			break;
 		case 16:
@@ -1946,11 +1946,11 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			break;
 		case 12:
 			sprite._startPoint.y = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocV;
 			break;
 		case 14:
 			sprite._startPoint.x = (int16)stream.readUint16();
-			sprite._copyBackMask |= kSCBStartPoint;
+			sprite._copyBackMask |= kSCBLocH;
 			break;
 		case 16:
 			sprite._height = (int16)stream.readUint16();
