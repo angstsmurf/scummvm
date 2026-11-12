@@ -193,6 +193,7 @@ public:
 	void setCurrentMovie(Movie *movie);
 	Common::SharedPtr<Archive> getMainArchive() const { return _mainArchive; }
 	void setMainArchive(Common::SharedPtr<Archive> archive) { _mainArchive = archive; }
+	Archive *getMainResourceFork();
 	Common::String getCurrentPath() const;
 	Common::String getCurrentAbsolutePath();
 	Common::Path getStartupPath() const;
@@ -296,6 +297,9 @@ public:
 	char _dirSeparator;
 	bool _fixStageSize;
 	Common::SharedPtr<Archive> _mainArchive;
+	// The resource fork of a D4+ Mac projector, whose movie is in the data fork
+	Archive *_mainResFork = nullptr;
+	bool _mainResForkProbed = false;
 	Common::Rect _fixStageRect;
 	Common::List<Common::String> _extraSearchPath;
 	bool _emulateMultiButtonMouse;
