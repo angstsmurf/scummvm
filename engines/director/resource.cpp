@@ -567,6 +567,23 @@ Archive *DirectorEngine::loadEXERIFX(Common::SeekableReadStream *stream, uint32 
 	return result;
 }
 
+Archive *DirectorEngine::getMainResourceFork() {
+	if (_mainResForkProbed)
+		return _mainResFork;
+	_mainResForkProbed = true;
+
+	if (!_mainArchive || getPlatform() != Common::kPlatformMacintosh || getVersion() < 400)
+		return nullptr;
+
+	MacArchive *resFork = new MacArchive();
+	if (!resFork->openFile(findPath(_mainArchive->getPathName()))) {
+		delete resFork;
+		return nullptr;
+	}
+	_mainResFork = resFork;
+	return _mainResFork;
+}
+
 Archive *DirectorEngine::loadMac(const Common::Path &movie) {
 	Archive *result = nullptr;
 	if (g_director->getVersion() < 400) {

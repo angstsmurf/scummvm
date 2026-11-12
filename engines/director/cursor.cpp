@@ -219,39 +219,25 @@ void Cursor::readFromResource(Datum resourceId) {
 		return;
 	}
 	switch(resourceId.asInt()) {
-	case -1:
-	case 0:
 	case 1:
 	case 2:
 	case 3:
 	case 4:
+		// The Mac original gets these with GetCursor too, so a CURS resource
+		// replaces the system cursor, like the pocket watch in Alice
+		if (g_director->getPlatform() == Common::kPlatformMacintosh && readFromResources(resourceId.asInt()))
+			break;
+		readBuiltinType(resourceId);
+		break;
+	case -1:
+	case 0:
 	case 200:
 		readBuiltinType(resourceId);
 		break;
 	default:
-		bool readSuccessful = false;
-
-		Cast *cast = g_director->getCurrentMovie()->getCast();
-		if (cast && cast->getArchive()) {
-			readSuccessful = readFromArchive(cast->getArchive().get(), resourceId.asInt());
-			if (readSuccessful)
-				break;
-
-			Archive *resFork = cast->getMacResourceFork();
-			if (resFork) {
-				readSuccessful = readFromArchive(resFork, resourceId.asInt());
-				if (readSuccessful)
-					break;
-			}
-		}
-
-		readSuccessful = readFromOpenResFiles(resourceId.asInt());
-
-		// Cursors can be located in the main archive, which may not
-		// be in _allOpenResFiles
-		if (!readSuccessful && g_director->getPlatform() == Common::kPlatformMacintosh) {
-			readSuccessful = readFromArchive(g_director->getMainArchive().get(), resourceId.asInt());
-		}
+		bool readSuccessful = readFromResources(resourceId.asInt());
+		if (readSuccessful)
+			break;
 
 		// TODO: figure out where to read custom cursor in windows platform
 		// currently, let's just set arrow for default one.
@@ -281,6 +267,34 @@ void Cursor::readFromResource(Datum resourceId) {
 			resetCursor(Graphics::kMacCursorArrow, true, resourceId);
 		}
 	}
+}
+
+// Search the movie's resources, then the open resource files and the main archive
+bool Cursor::readFromResources(uint16 resourceId) {
+	Cast *cast = g_director->getCurrentMovie()->getCast();
+	if (cast && cast->getArchive()) {
+		if (readFromArchive(cast->getArchive().get(), resourceId))
+			return true;
+
+		Archive *resFork = cast->getMacResourceFork();
+		if (resFork && readFromArchive(resFork, resourceId))
+			return true;
+	}
+
+	if (readFromOpenResFiles(resourceId))
+		return true;
+
+	if (g_director->getPlatform() != Common::kPlatformMacintosh)
+		return false;
+
+	// Cursors can be located in the main archive, which may not
+	// be in _allOpenResFiles
+	if (readFromArchive(g_director->getMainArchive().get(), resourceId))
+		return true;
+
+	// The projector stays in the resource chain while other movies play
+	Archive *projectorResFork = g_director->getMainResourceFork();
+	return projectorResFork && readFromArchive(projectorResFork, resourceId);
 }
 
 // Search the open resource files, most recently opened first
