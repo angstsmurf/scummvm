@@ -564,10 +564,11 @@ Common::SeekableReadStreamEndian *RIFFArchive::getResource(uint32 tag, uint16 id
 	offset += stringSize + 1;
 	size -= stringSize + 1;
 
-	// 'DIB ' was observed to always have two 0 bytes
-	// other resources such as 'SND ' need alignment to nearest word boundary.
-	bool needsAlignment = offset & 1;
-	if (needsAlignment || tag == MKTAG('D', 'I', 'B', ' ')) {
+	// The name is a Pascal string padded to an even length, length byte
+	// included. This is not alignment to the file: chunks may start at odd
+	// offsets (Pingu KUZIRA.MMM has its 'VWSC' at 0xa59 and its 'CLUT',
+	// named "EGASHIRA", at 0x1e6f1).
+	if (!(stringSize & 1)) {
 		offset++;
 		size--;
 	}
