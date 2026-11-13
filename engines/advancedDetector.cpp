@@ -76,6 +76,15 @@ public:
 		return fsNode.createReadStream();
 	}
 
+	// Lets MacResManager find a native resource fork (..namedfork/rsrc on macOS)
+	Common::SeekableReadStream *createReadStreamForMemberAltStream(const Common::Path &path, Common::AltStreamType altStreamType) const override {
+		AdvancedMetaEngineDetectionBase::FileMap::const_iterator it = _fileMap.find(path);
+		if (it == _fileMap.end())
+			return nullptr;
+
+		return it->_value.createReadStreamForAltStream(altStreamType);
+	}
+
 private:
 	const AdvancedMetaEngineDetectionBase::FileMap &_fileMap;
 };
