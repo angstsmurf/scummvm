@@ -1,6 +1,7 @@
 MODULE := engines/director
 
 MODULE_OBJS = \
+	accelerator.o \
 	archive.o \
 	archive-save.o \
 	saved-archive.o \
