@@ -356,7 +356,8 @@ bool Channel::isDirty(Sprite *nextSprite) {
 Common::Rect Channel::getRollOverBbox() {
 	// In D4 and below, the rollOver command will check against whatever the last
 	// contents of the sprite were, regardless of whether the score has zeroed it out.
-	if (g_director->getVersion() < 500 && _sprite->_castId.member == 0) {
+	// A D2/D3 QuickDraw shape has no cast member, but is not blank.
+	if (g_director->getVersion() < 500 && _sprite->_castId.member == 0 && !_sprite->isQDShape()) {
 		return _rollOverBbox;
 	}
 	return getBbox();

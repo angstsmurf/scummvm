@@ -590,7 +590,7 @@ void Score::updateCurrentFrame() {
 		// box was for rollOver testing.
 		if (_version < kFileVer500) {
 			for (uint ch = 0; ch < _channels.size(); ch++) {
-				if (_channels[ch]->_sprite->_castId.member != 0) {
+				if (_channels[ch]->_sprite->_castId.member != 0 || _channels[ch]->_sprite->isQDShape()) {
 					_channels[ch]->_rollOverBbox = _channels[ch]->getBbox();
 				}
 			}
