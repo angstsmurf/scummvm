@@ -102,6 +102,7 @@
  */
 
 #include "director/director.h"
+#include "director/archive.h"
 #include "director/window.h"
 
 #include "director/lingo/lingo.h"
@@ -109,6 +110,7 @@
 #include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/p/popupmenuxobj.h"
 
+#include "graphics/managed_surface.h"
 #include "graphics/macgui/macpopupmenu.h"
 
 namespace Director {
@@ -154,6 +156,10 @@ void PopUpMenuXObj::close(ObjectType type) {
 
 PopUpMenuXObject::PopUpMenuXObject(ObjectType ObjectType) : Object<PopUpMenuXObject>("PopMenu") {
 	_objType = ObjectType;
+	_menuId = 0;
+	_mark = 0x12;
+	_smart = false;
+	_lastItem = 0;
 }
 
 void PopUpMenuXObj::m_new(int nargs) {
@@ -164,8 +170,51 @@ void PopUpMenuXObj::m_new(int nargs) {
 
 	new Graphics::MacPopUp(menuId, g_director->_wm->getScreenBounds(), g_director->_wm, menuList.c_str());
 	me->_menuId = menuId;
+	me->_mark = 0x12;	// checkMark
+	me->_smart = false;
+	me->_lastItem = 0;
 
 	g_lingo->push(g_lingo->_state->me);
+}
+
+static Graphics::MacPopUp *getPopUp(PopUpMenuXObject *me) {
+	return static_cast<Graphics::MacPopUp *>(g_director->_wm->getMenu(me->_menuId));
+}
+
+// The XObject's DoPopMenu: mark the item to open at, call PopUpMenuSelect,
+// then take the mark off again. Returns the chosen item, 0 if none.
+static int doPopMenu(PopUpMenuXObject *me, int left, int top, int itemNum) {
+	Graphics::MacPopUp *menu = getPopUp(me);
+	if (!menu)
+		return 0;
+	if (itemNum < 0) {
+		warning("PopUpMenuXObj: negative item number %d", itemNum);
+		return 0;
+	}
+
+	int popItem = 0;
+	if (itemNum > 0)
+		popItem = itemNum;
+	else if (me->_smart)
+		popItem = me->_lastItem;
+	if (popItem > 0)
+		menu->setItemMark(popItem, me->_mark);
+
+	// Convert window coordinates to screen coordinates
+	Common::Rect windowRect = g_director->getCurrentWindow()->getMacWindow()->getInnerDimensions();
+	int screenTop = top + windowRect.top - 1;
+	int screenLeft = left + windowRect.left - 1;
+
+	int selected = menu->drawAndSelectMenu(screenLeft, screenTop, popItem);
+
+	if (popItem > 0)
+		menu->setItemMark(popItem, 0);
+
+	// A cancelled menu forgets the last item too
+	if (me->_smart && itemNum == 0)
+		me->_lastItem = selected;
+
+	return selected;
 }
 
 void PopUpMenuXObj::m_popNum(int nargs) {
@@ -175,14 +224,7 @@ void PopUpMenuXObj::m_popNum(int nargs) {
 	int top = g_lingo->pop().asInt();
 	int left = g_lingo->pop().asInt();
 
-	// Convert window coordinates to screen coordinates
-	Common::Rect windowRect = g_director->getCurrentWindow()->getMacWindow()->getInnerDimensions();
-	int screenTop = top + windowRect.top - 1;
-	int screenLeft = left + windowRect.left - 1;
-
-	Graphics::MacPopUp *menu = static_cast<Graphics::MacPopUp *>(g_director->_wm->getMenu(me->_menuId));
-	int selected = menu->drawAndSelectMenu(screenLeft, screenTop, itemNum);
-	g_lingo->push(Datum(selected));
+	g_lingo->push(Datum(doPopMenu(me, left, top, itemNum)));
 }
 
 void PopUpMenuXObj::m_popText(int nargs) {
@@ -192,24 +234,83 @@ void PopUpMenuXObj::m_popText(int nargs) {
 	int top = g_lingo->pop().asInt();
 	int left = g_lingo->pop().asInt();
 
-	// Convert window coordinates to screen coordinates
-	Common::Rect windowRect = g_director->getCurrentWindow()->getMacWindow()->getInnerDimensions();
-	int screenTop = top + windowRect.top - 1;
-	int screenLeft = left + windowRect.left - 1;
-
-	Graphics::MacPopUp *menu = static_cast<Graphics::MacPopUp *>(g_director->_wm->getMenu(me->_menuId));
-	int selected = menu->drawAndSelectMenu(screenLeft, screenTop, itemNum);
-	Common::String selectedText = menu->getItemText(selected);
+	int selected = doPopMenu(me, left, top, itemNum);
+	Graphics::MacPopUp *menu = getPopUp(me);
+	Common::String selectedText = selected > 0 && menu ? menu->getItemText(selected) : "";
 
 	g_lingo->push(Datum(selectedText));
 }
 
 void PopUpMenuXObj::m_smart(int nargs) {
 	PopUpMenuXObject *me = static_cast<PopUpMenuXObject *>(g_lingo->_state->me.u.obj);
-	bool isSmart = g_lingo->pop().asInt() != 0;
+	me->_smart = g_lingo->pop().asInt() != 0;
+}
 
-	Graphics::MacPopUp *menu = static_cast<Graphics::MacPopUp *>(g_director->_wm->getMenu(me->_menuId));
-	menu->setSmart(isSmart);
+void PopUpMenuXObj::m_setItemMark(int nargs) {
+	PopUpMenuXObject *me = static_cast<PopUpMenuXObject *>(g_lingo->_state->me.u.obj);
+	me->_mark = g_lingo->pop().asInt() & 0xff;
+}
+
+// ICON resources are 32x32 1-bit images, looked up like GetResource does
+static Graphics::ManagedSurface *loadIcon(uint16 id) {
+	const uint32 tag = MKTAG('I', 'C', 'O', 'N');
+	Common::SeekableReadStreamEndian *stream = nullptr;
+
+	for (auto &it : g_director->_allOpenResFiles) {
+		Archive *archive = g_director->_allSeenResFiles[it].get();
+		if (archive && archive->hasResource(tag, id)) {
+			stream = archive->getResource(tag, id);
+			break;
+		}
+	}
+	if (!stream) {
+		Archive *archive = g_director->getMainResourceFork();
+		if (archive && archive->hasResource(tag, id))
+			stream = archive->getResource(tag, id);
+	}
+	if (!stream)
+		return nullptr;
+
+	if (stream->size() < 128) {
+		delete stream;
+		return nullptr;
+	}
+
+	Graphics::ManagedSurface *icon = new Graphics::ManagedSurface(32, 32, Graphics::PixelFormat::createFormatCLUT8());
+	for (int y = 0; y < 32; y++) {
+		uint32 row = stream->readUint32BE();
+		byte *dst = (byte *)icon->getBasePtr(0, y);
+		for (int x = 0; x < 32; x++)
+			dst[x] = (row >> (31 - x)) & 1;
+	}
+	delete stream;
+	return icon;
+}
+
+void PopUpMenuXObj::m_setItemIcon(int nargs) {
+	PopUpMenuXObject *me = static_cast<PopUpMenuXObject *>(g_lingo->_state->me.u.obj);
+
+	int iconID = g_lingo->pop().asInt();
+	int itemNum = g_lingo->pop().asInt();
+
+	// The XObject takes IDs 256-512 and hands SetItemIcon (iconID - 256),
+	// so the Menu Manager shows ICON iconID
+	if (iconID < 0x100 || iconID > 0x200) {
+		warning("PopUpMenuXObj::m_setItemIcon(): icon ID %d out of range", iconID);
+		return;
+	}
+
+	Graphics::MacPopUp *menu = getPopUp(me);
+	if (!menu)
+		return;
+
+	Graphics::ManagedSurface *icon = nullptr;
+	if (iconID != 0x100) {
+		icon = loadIcon(iconID);
+		if (!icon)
+			warning("PopUpMenuXObj::m_setItemIcon(): ICON %d not found", iconID);
+	}
+	menu->setItemIcon(itemNum, icon);
 }
 
 XOBJSTUBNR(PopUpMenuXObj::m_appendMenu)
@@ -218,7 +319,5 @@ XOBJSTUBNR(PopUpMenuXObj::m_enableItem)
 XOBJSTUB(PopUpMenuXObj::m_getItem, "")
 XOBJSTUB(PopUpMenuXObj::m_getMenuID, 0)
 XOBJSTUBNR(PopUpMenuXObj::m_setItem)
-XOBJSTUBNR(PopUpMenuXObj::m_setItemMark)
-XOBJSTUBNR(PopUpMenuXObj::m_setItemIcon)
 
 } // End of namespace Director

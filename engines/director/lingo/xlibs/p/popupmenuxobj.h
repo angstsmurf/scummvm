@@ -27,6 +27,9 @@ namespace Director {
 class PopUpMenuXObject : public Object<PopUpMenuXObject> {
 public:
 	int _menuId;
+	int _mark;		// mark character, 0x12 = check mark, 0 = none
+	bool _smart;	// item 0 opens at and marks the last chosen item
+	int _lastItem;
 	PopUpMenuXObject(ObjectType objType);
 };
 
