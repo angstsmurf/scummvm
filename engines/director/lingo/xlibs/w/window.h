@@ -22,11 +22,33 @@
 #ifndef DIRECTOR_LINGO_XLIBS_WINDOW_H
 #define DIRECTOR_LINGO_XLIBS_WINDOW_H
 
+namespace Graphics {
+class MacWindow;
+class ManagedSurface;
+}
+
 namespace Director {
+
+class PanelXObject;
 
 class WindowXObject : public Object<WindowXObject> {
 public:
 	WindowXObject(ObjectType objType);
+	~WindowXObject() override;
+
+	void create(int procID, const Common::String &title);
+	void destroy();
+	void redraw();
+	PanelXObject *findPanel(const Common::String &name);
+	PanelXObject *panelAt(const Common::Point &pos);
+	void addPanel(const Common::String &name, PanelXObject *panel);
+	void removePanel(PanelXObject *panel);
+
+	Graphics::MacWindow *_window = nullptr;
+	Datum _handler;
+	// Panels by name, in the order they were added.
+	Common::Array<Common::String> _panelNames;
+	Common::Array<Datum> _panels;
 };
 
 namespace WindowXObj {
@@ -59,6 +81,10 @@ void m_windowPtr(int nargs);
 void m_setTitle(int nargs);
 void m_disposeAll(int nargs);
 void m_nthWindow(int nargs);
+
+// Sends the clicks and keys queued by the XObject windows to their
+// handler objects. Call when no Lingo is running.
+void processEvents();
 
 } // End of namespace WindowXObj
 
