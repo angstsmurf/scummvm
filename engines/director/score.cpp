@@ -2032,6 +2032,15 @@ void Score::playSoundChannel(bool puppetOnly, bool sound1Changed, bool sound2Cha
 	DirectorSound *sound = _window->getSoundManager();
 	CastMemberID sound1 = _currentFrame->_mainChannels.sound1;
 	CastMemberID sound2 = _currentFrame->_mainChannels.sound2;
+	if (_version < kFileVer300) {
+		// D2 has one sound channel. The Mac D2 player plays it only when
+		// soundType1 is non-zero and never reads the sound2 bytes, which
+		// can hold leftover data (FM Towns MACROMND.MMM).
+		if (_currentFrame->_mainChannels.soundType1 == 0)
+			sound1 = CastMemberID();
+		sound2 = CastMemberID();
+		sound2Changed = false;
+	}
 	for (int i = (int)_channels.size() - 1; i >= 0; i--) {
 		if (_channels[i]->hasSubChannels()) {
 			if (sound1.isNull())
