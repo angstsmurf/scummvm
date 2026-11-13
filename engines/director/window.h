@@ -44,6 +44,17 @@ class Window;
 struct MacShape;
 struct LingoState;
 
+struct AccelOptions {
+	uint repeat = 1;
+	int tempo = 0;
+	bool loop = false;
+	bool click = false;
+	bool clickStop = false;
+	bool noUpdate = false;
+	bool usePlayRect = false;
+	Common::Rect playRect;
+};
+
 struct TransParams {
 	TransitionType type;
 	uint frame;
@@ -130,6 +141,9 @@ public:
 	uint32 getStageColor() { return _stageColor; }
 
 	void reset();
+
+	// accelerator.cpp
+	void playAccel(const Common::Path &path, const AccelOptions &opts);
 
 	// transitions.cpp
 	void exitTransition(TransParams &t, Graphics::ManagedSurface *nextFrame, Common::Rect clipRect);

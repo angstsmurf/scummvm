@@ -2154,8 +2154,6 @@ void LB::b_play(int nargs) {
 }
 
 void LB::b_playAccel(int nargs) {
-	g_lingo->printSTUBWithArglist("b_playAccel", nargs);
-
 /*
 	byFrame	Read one frame at a time from disk.
 	click		Stop and pass on mouse event.
@@ -2173,8 +2171,60 @@ void LB::b_playAccel(int nargs) {
 	whatFits	Play only what fits into memory.
 	tempo, n	Set the tempo of the movie.
 */
+	if (nargs < 1) {
+		warning("b_playAccel: no file name");
+		g_lingo->dropStack(nargs);
+		return;
+	}
 
-	g_lingo->dropStack(nargs);
+	Common::Array<Datum> args;
+	args.resize(nargs);
+	for (int i = nargs - 1; i >= 0; i--)
+		args[i] = g_lingo->pop();
+
+	AccelOptions opts;
+	auto intArg = [&](int &i) {
+		if (i + 1 < nargs && args[i + 1].type != SYMBOL)
+			return args[++i].asInt();
+		warning("b_playAccel: missing value for %s", args[i].asString().c_str());
+		return 0;
+	};
+
+	for (int i = 1; i < nargs; i++) {
+		Common::String opt = args[i].asString();
+		if (opt.equalsIgnoreCase("repeat")) {
+			opts.repeat = MAX(intArg(i), 1);
+		} else if (opt.equalsIgnoreCase("tempo")) {
+			opts.tempo = intArg(i);
+		} else if (opt.equalsIgnoreCase("loop")) {
+			opts.loop = true;
+		} else if (opt.equalsIgnoreCase("click")) {
+			opts.click = true;
+		} else if (opt.equalsIgnoreCase("clickStop")) {
+			opts.clickStop = true;
+		} else if (opt.equalsIgnoreCase("noUpdate")) {
+			opts.noUpdate = true;
+		} else if (opt.equalsIgnoreCase("playRect")) {
+			int l = intArg(i), t = intArg(i), r = intArg(i), b = intArg(i);
+			opts.playRect = Common::Rect(l, t, r, b);
+			opts.usePlayRect = true;
+		} else if (opt.equalsIgnoreCase("byFrame") || opt.equalsIgnoreCase("noFlush") ||
+				opt.equalsIgnoreCase("noSound") || opt.equalsIgnoreCase("sync") ||
+				opt.equalsIgnoreCase("whatFits")) {
+			// Memory and timing hints, nothing to do
+		} else {
+			warning("b_playAccel: unknown option %s", opt.c_str());
+		}
+	}
+
+	Common::String file = args[0].asString();
+	Common::Path path = findPath(file);
+	if (path.empty()) {
+		warning("b_playAccel: couldn't find %s", file.c_str());
+		return;
+	}
+
+	g_director->getCurrentWindow()->playAccel(path, opts);
 }
 
 void LB::b_preLoad(int nargs) {
