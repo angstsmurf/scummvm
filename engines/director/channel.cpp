@@ -462,6 +462,32 @@ bool Channel::isMatteBoxIntersect(Channel *channel) {
 }
 
 
+// The bounding box of channel lies within my matte
+bool Channel::isMatteBoxWithin(Channel *channel) {
+	Common::Rect myBbox = getBbox();
+	Common::Rect yourBbox = channel->getBbox();
+
+	if (!myBbox.contains(yourBbox))
+		return false;
+	Graphics::Surface *myMatte = nullptr;
+
+	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
+		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
+
+	if (!myMatte)
+		return false;
+
+	for (int i = yourBbox.top; i < yourBbox.bottom; i++) {
+		const byte *my = (const byte *)myMatte->getBasePtr(yourBbox.left - myBbox.left, i - myBbox.top);
+
+		for (int j = yourBbox.left; j < yourBbox.right; j++, my++)
+			if (!*my)
+				return false;
+	}
+
+	return true;
+}
+
 // this contains channel. i.e. myBox contain yourBox
 bool Channel::isMatteWithin(Channel *channel) {
 	Common::Rect myBbox = getBbox();

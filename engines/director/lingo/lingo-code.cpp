@@ -1079,9 +1079,17 @@ void LC::c_within() {
 		return;
 	}
 
-	// don't regard quick draw shape as matte type
-	if ((!sprite1->_sprite->isQDShape() && sprite1->_sprite->_ink == kInkTypeMatte) && (!sprite2->_sprite->isQDShape() && sprite2->_sprite->_ink == kInkTypeMatte)) {
+	// Like intersects, the D3 projector only uses the shape of sprite 2 when
+	// it is a matte bitmap, then tests sprite 1's matte (if it is a matte
+	// bitmap too) or its bounding box against it. Anything else is
+	// box-in-box.
+	bool s1IsBitmap = sprite1->_sprite->_cast && sprite1->_sprite->_cast->_type == kCastBitmap;
+	bool s2IsBitmap = sprite2->_sprite->_cast && sprite2->_sprite->_cast->_type == kCastBitmap;
+
+	if ((s1IsBitmap && sprite1->_sprite->_ink == kInkTypeMatte) && (s2IsBitmap && sprite2->_sprite->_ink == kInkTypeMatte)) {
 		g_lingo->push(Datum(sprite2->isMatteWithin(sprite1)));
+	} else if (s2IsBitmap && sprite2->_sprite->_ink == kInkTypeMatte) {
+		g_lingo->push(Datum(sprite2->isMatteBoxWithin(sprite1)));
 	} else {
 		g_lingo->push(Datum(sprite2->getBbox().contains(sprite1->getBbox())));
 	}
