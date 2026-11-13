@@ -870,16 +870,27 @@ bool SNDDecoder::loadStream(Common::SeekableReadStreamEndian &stream) {
 
 bool SNDDecoder::processCommands(Common::SeekableReadStreamEndian &stream) {
 	uint16 cmdCount = stream.readUint16();
+	bool nullCmd = false;
 	for (uint16 i = 0; i < cmdCount; i++) {
 		uint16 cmd = stream.readUint16();
 		if (cmd == 0x8050 || cmd == 0x8051) {
 			if (!processBufferCommand(stream))
 				return false;
+		} else if (cmd == 0) {
+			// nullCmd
+			stream.skip(6);
+			nullCmd = true;
 		} else {
 			warning("SNDDecoder: Unsupported command: %d", cmd);
 			return false;
 		}
 	}
+
+	// Some resources have a nullCmd where the bufferCmd should be, with the
+	// sound header right after the command list (FM Towns MACROMND.MMM,
+	// 'snd ' 1339).
+	if (!_data && nullCmd)
+		return processSoundHeader(stream);
 
 	return true;
 }
@@ -896,6 +907,11 @@ bool SNDDecoder::processBufferCommand(Common::SeekableReadStreamEndian &stream) 
 		warning("SNDDecoder: Bad sound header offset. Expected: %d, read: %d", (int)stream.pos(), offset);
 		return false;
 	}
+
+	return processSoundHeader(stream);
+}
+
+bool SNDDecoder::processSoundHeader(Common::SeekableReadStreamEndian &stream) {
 	/*uint32 dataPtr =*/stream.readUint32();
 	uint32 param = stream.readUint32();
 	_rate = stream.readUint16();
