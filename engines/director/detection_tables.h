@@ -1717,6 +1717,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "headbone",			"Headbone CD-ROM Sampler" },
 	{ "hoffman",			"H+a Collection" },
 	{ "housejam",			"HouseJam - An excerpt from Meet MediaBand" },
+	{ "hypercard23",		"HyperCard 2.3 Self-Running Demo" },  // Promo for Apple software
 	{ "ilearn",				"iLearn" },
 	{ "imagineers",			"The Imagineers" },
 	{ "imaginopolis",		"Microsoft Imaginopolis" },
@@ -4763,6 +4764,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 								"LINGO.INI",  "4f75e838a13079b4fc75af0fd6f70f3c", 826, 404),
 
 	MACGAME1("hurlman", "", "Hurlman", "6385f77fa00b44ccbb04258b864eeae6", 338931, 400),
+
+	// From the HyperCard 2.3 Demo CD. Music and sounds are external AIFF files in the "•Audio" folder.
+	MACDEMO1("hypercard23", "Demo", "Demo", "cdb27c916044ae4dceb4b7326063fa03", 301669, 400),
 
 	// full game is not Director
 	WINDEMO2("hyperblade", "Demo", "HYPER.EXE", "4a8fd0d74faef305bc935e1aac94d3e8", 712817,
