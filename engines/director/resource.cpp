@@ -124,6 +124,7 @@ Common::Error Window::loadInitialMovie() {
 	// we sometimes need to load them manually.
 	if (!g_director->getStartMovie().startMovie.empty())
 		loadStartMovieXLibs();
+	loadBuiltinXLibs();
 
 	return Common::kNoError;
 }
@@ -650,10 +651,17 @@ void Window::loadStartMovieXLibs() {
 	if (strcmp(g_director->getGameId(), "warlock") == 0 && g_director->getPlatform() != Common::kPlatformWindows) {
 		g_lingo->openXLib("FPlayXObj", kXObj, Common::Path());
 	}
+}
 
-	// After D5 we always have list of Xlibs to load
+void Window::loadBuiltinXLibs() {
+	// Before D5, the Mac authoring app and the Player carry FileIO and
+	// SerialPort as XCODs: "This XObject is built into MacroMind Director
+	// (and the Player), so you don't have to open an XLibrary to use it."
+	// Movies run from the authoring app (e.g. The Apartment) have no
+	// projector to supply them, so open them always. From D5 on, Xtras
+	// are listed explicitly.
 	if (g_director->getVersion() < 500 && g_director->getPlatform() == Common::kPlatformMacintosh) {
-		// SerialPort is Mac-only
+		g_lingo->openXLib("FileIO", kXObj, Common::Path());
 		g_lingo->openXLib("SerialPort", kXObj, Common::Path());
 	}
 }
