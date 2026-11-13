@@ -1173,9 +1173,14 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		}
 
 		if (channel->isDirty(nextSprite) || memberModified[i] || widgetRedrawn || mode == kRenderForceUpdate) {
-			// Only clean out the channel if we're moving to a different frame
+			// Only clean out the channel if we're moving to a different frame.
+			// Otherwise (e.g. while paused) still rebuild the widget of a
+			// modified member, such as a text member whose text Lingo set
+			// (The Apartment, PopUp Menus).
 			if (withClean)
 				channel->setClean(nextSprite);
+			else if (memberModified[i])
+				channel->replaceWidget();
 			bool invalidCastMember = currentSprite ? (currentSprite->_spriteType == kCastMemberSprite && currentSprite->_cast == nullptr) : false;
 			// Check again to see if a video has just been started by setClean.
 			if (channel->isActiveVideo())
