@@ -1060,8 +1060,17 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 			Channel *channel = score->_channels[movie->_currentEditableTextChannel];
 
 			if (channel->_widget) {
+				// Keep the returns inside the selection, as Director's
+				// own carriage returns, so it compares equal to the
+				// same span of the text (The Apartment's "Selecting
+				// Text" test selects a sentence that crosses one).
+				Common::U32String sel = ((Graphics::MacText *)channel->_widget)->getSelection(false, true);
+				for (uint i = 0; i < sel.size(); i++) {
+					if (sel[i] == '\n')
+						sel.setChar('\r', i);
+				}
 				d.type = STRING;
-				d.u.s = new Common::String(Common::convertFromU32String(((Graphics::MacText *)channel->_widget)->getSelection(false, false)));
+				d.u.s = new Common::String(Common::convertFromU32String(sel));
 			}
 		}
 		break;
