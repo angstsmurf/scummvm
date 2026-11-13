@@ -612,8 +612,24 @@ void Score::updateCurrentFrame() {
 		// D6 keeps the fields Lingo set (auto-puppet) until the sprite span
 		// ends, so it doesn't take this path.
 		if (jumping && jumpRebuildsFrame()) {
-			for (auto &it : _currentFrame->_sprites)
-				it->_copyBackMask = static_cast<uint32>(-1);
+			for (uint ch = 0; ch < _currentFrame->_sprites.size(); ch++) {
+				Sprite *next = _currentFrame->_sprites[ch];
+				next->_copyBackMask = static_cast<uint32>(-1);
+
+				// A D2/D3 score sprite has no editable or moveable bit.
+				// Only the immediate sprite scripts (editableText,
+				// moveableSprite) set them, so a rebuild keeps them while
+				// the channel shows the same member. Otherwise the field
+				// would lose its focus and edit state on every jump
+				// (Spaceship Warlock: STAMBUL/FNCOPS loops with go marker(0)).
+				if (_version < kFileVer400 && ch < _channels.size()) {
+					Sprite *cur = _channels[ch]->_sprite;
+					if (cur->_castId.member && cur->_castId == next->_castId) {
+						next->_editable |= cur->_editable;
+						next->_moveable |= cur->_moveable;
+					}
+				}
+			}
 		}
 
 		for (uint ch = 0; ch < _channels.size(); ch++)
