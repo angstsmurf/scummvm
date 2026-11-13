@@ -337,6 +337,8 @@ public:
 	 * line in lines contains a splitted word.
 	 */
 	int wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines, Common::Array<bool> &lineContinuation, int initWidth = 0, uint32 mode = kWordWrapOnExplicitNewLines) const;
+	/** @overload */
+	int wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, Common::Array<bool> &lineContinuation, int initWidth = 0, uint32 mode = kWordWrapOnExplicitNewLines) const;
 
 	/**
 	 * Scales the single gylph at @p chr the given the @p scale and the pointer @p grayScaleMap to the grayscale array. It fills @p scaleSurface surface 

@@ -84,7 +84,18 @@ void MacTextCanvas::chopChunk(const Common::U32String &str, int *curLinePtr, int
 	int w = getLineWidth(curLine, true);
 	D(9, "** chopChunk before wrap \"%s\"", Common::toPrintable(str.encode()).c_str());
 
-	chunk->getFont()->wordWrapText(str, maxWidth, text, lineContinuations, w);
+	if (chunk->plainByteMode()) {
+		// Wrap the bytes that render() draws. A character outside the font's
+		// byte range, like U+201C for Mac Roman 0xD2, would otherwise be
+		// measured with the missing glyph width.
+		Common::CodePage encoding = chunk->getEncoding();
+		Common::Array<Common::String> encodedText;
+		chunk->getFont()->wordWrapText(Common::convertFromU32String(str, encoding), maxWidth, encodedText, lineContinuations, w);
+		for (auto &line : encodedText)
+			text.push_back(Common::U32String(line, encoding));
+	} else {
+		chunk->getFont()->wordWrapText(str, maxWidth, text, lineContinuations, w);
+	}
 
 	for (int i = 0; i < (int)text.size(); i++) {
 		D(9, "Line Continuations [%d] : %d", i, lineContinuations[i]);
