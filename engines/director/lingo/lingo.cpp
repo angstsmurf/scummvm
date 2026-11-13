@@ -427,8 +427,31 @@ void LingoArchive::removeCode(ScriptType type, uint16 id) {
 	if (!ctx)
 		return;
 
-	ctx->decRefCount();
 	scriptContexts[type].erase(id);
+
+	// Forget the archive-wide entries for this script's handlers, so that a
+	// call no longer reaches the freed context (set the scriptText recompiles
+	// a script). Another score or movie script that defines the same name
+	// takes over, the lowest member first.
+	for (auto &it : ctx->_functionHandlers) {
+		if (!functionHandlers.contains(it._key) || functionHandlers[it._key].ctx != ctx)
+			continue;
+		functionHandlers.erase(it._key);
+		uint16 bestId = 0;
+		Symbol best;
+		for (ScriptType t : { kScoreScript, kMovieScript }) {
+			for (auto &sc : scriptContexts[t]) {
+				if ((best.type == VOIDSYM || sc._key < bestId) && sc._value->_functionHandlers.contains(it._key)) {
+					best = sc._value->_functionHandlers[it._key];
+					bestId = sc._key;
+				}
+			}
+		}
+		if (best.type != VOIDSYM)
+			functionHandlers[it._key] = best;
+	}
+
+	ctx->decRefCount();
 }
 
 void LingoArchive::replaceCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName) {
