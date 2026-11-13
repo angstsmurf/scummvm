@@ -171,7 +171,9 @@ DirectorPlotData Channel::getPlotData() {
 		pd.srcAlpha = true;
 
 	pd.srfMask = nullptr;
-	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
+	// A D2/D3 text member on a button sprite is drawn as a button, which
+	// keeps its frame like a button member does.
+	if (_sprite->_cast && _sprite->_cast->_type == kCastText && !isButtonSprite(_sprite->_spriteType)) {
 		// kInkTypeCopy -- no mask, default rendering
 
 		if (_sprite->_ink == kInkTypeMatte || _sprite->_ink == kInkTypeNotCopy
@@ -888,7 +890,8 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 
 			// Only auto-expanding text (and buttons) size the sprite from the widget:
 			// fixed text would re-add its shadow chrome each rebuild and creep larger.
-			if (_sprite->_cast->_type == kCastButton ||
+			// A D2/D3 text member on a button sprite is drawn as a button too.
+			if (_sprite->_cast->_type == kCastButton || isButtonSprite(_sprite->_spriteType) ||
 					(_sprite->_cast->_type == kCastText && !((Graphics::MacText *)_widget)->getFixDims())) {
 				sizeSpriteFromWidget();
 			}
