@@ -342,6 +342,18 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			//
 			// mouseEnter and mouseLeave events should also defer to the value of channelId.
 			CastMemberID targetCast = _currentMouseDownCastID;
+			// D2-3 handle an immediate click at mouseDown with either the
+			// sprite script or the cast member's mouseUp handler, never both
+			// (L-Zone Sprite_trackMouseUp 0x1abe4). The sprite script has
+			// already run at mouseDown, so the mouseUp ends here. In The
+			// Apartment's Pattern Viewer, the arrow's cast script went to
+			// the next marker after each step.
+			if (event.event == kEventMouseUp && _vm->getVersion() < 400 &&
+					_currentMouseDownSpriteImmediate && _currentMouseDownSpriteScriptID.member) {
+				ScriptContext *spriteScript = getScriptContext(kScoreScript, _currentMouseDownSpriteScriptID);
+				if (spriteScript && spriteScript->_eventHandlers.contains(kEventGeneric))
+					return;
+			}
 			if ((event.event == kEventKeyUp) || (event.event == kEventKeyDown))
 				targetCast = _currentKeyDownCastID;
 			if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown) ||
