@@ -359,16 +359,29 @@ void readSpriteDataD2(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._stretch = sprite._inkData & 0x80 ? true : false;
 			sprite._copyBackMask |= kSCBInk;
 			break;
-		case 6:
+		case 6: {
+			CastMemberID castId;
 			if (sprite.isQDShape()) {
 				sprite._pattern = stream.readUint16();
-				sprite._castId = CastMemberID(0, 0);
 			} else {
 				sprite._pattern = 0;
-				sprite._castId = CastMemberID(stream.readUint16(), DEFAULT_CAST_LIB);
+				castId = CastMemberID(stream.readUint16(), DEFAULT_CAST_LIB);
 			}
+			// A D2/D3 score has no editable or moveable bit. The
+			// immediate scripts (editableText, moveableSprite) set
+			// them on this frame data, so they belong to the member
+			// shown. The Apartment's "Testing User" swaps its editable
+			// field for a plain copy in the "Watch how to do it" demo;
+			// keeping the flag left that copy focused and its widget
+			// hid the demo cursor.
+			if (castId != sprite._castId) {
+				sprite._editable = false;
+				sprite._moveable = false;
+			}
+			sprite._castId = castId;
 			sprite._copyBackMask |= kSCBCastId;
 			break;
+		}
 		case 8:
 			sprite._startPoint.y = (int16)stream.readUint16();
 			sprite._copyBackMask |= kSCBLocV;
