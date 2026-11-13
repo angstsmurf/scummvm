@@ -1142,6 +1142,12 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		if (Director::DT::isMouseInputIgnored()) {
 			d = 0;
 		} else {
+			// The original calls the StillDown trap, which looks at the
+			// event queue right now: a pending release makes it false.
+			// Read the events first, or a loop on the stillDown (The
+			// Apartment's Pattern Viewer) only sees the release when Lingo
+			// gets round to processing events.
+			_vm->processSysEvents();
 			d = _vm->_wm->_mouseDown;
 		}
 		break;
