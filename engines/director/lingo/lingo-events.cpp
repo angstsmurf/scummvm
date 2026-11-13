@@ -321,7 +321,7 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 						event.scriptType = kScoreScript;
 						event.scriptId = scriptId;
 					}
-					return; // FIXME: Do not execute the cast script if there is a D3-style sprite script
+					return;
 				}
 			}
 		}
@@ -777,6 +777,8 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 			continue;
 
 		// fetch the sprite ID, script ID to call, etc if not present.
+		// A D3-style sprite script turns the mouse event into a generic one.
+		LEvent inputEvent = el.event;
 		movie->resolveScriptEvent(el);
 
 		// if this is the first event in the handler chain,
@@ -807,6 +809,10 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 		);
 		bool completed = processEvent(el.event, el.scriptType, el.scriptId, el.channelId, el.scriptInstance);
 		movie->_lastEventId[el.event] = el.eventId;
+		// Record it under the mouse event too, so the cast script, which
+		// does not pass the event on in D2-3, is swallowed after it.
+		if (inputEvent != el.event)
+			movie->_lastEventId[inputEvent] = el.eventId;
 
 		if (_vm->getVersion() >= 600) {
 			// Reset it for further event processing
