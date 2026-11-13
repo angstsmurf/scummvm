@@ -1205,7 +1205,7 @@ bool MacWindowManager::processEvent(Common::Event &event) {
 		BaseMacWindow *w = *it;
 		if (_lockedWidget != nullptr && w != _lockedWidget)
 			continue;
-		if (w->hasAllFocus() || (event.type == Common::EVENT_KEYDOWN) ||
+		if (w->hasAllFocus() || (event.type == Common::EVENT_KEYDOWN && w->isVisible()) ||
 				(w->isVisible() && w->getDimensions().contains(event.mouse.x, event.mouse.y))) {
 			if ((event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP) && (!_backgroundWindow || w != _backgroundWindow))
 				setActiveWindow(w->getId());
@@ -1246,8 +1246,9 @@ void MacWindowManager::removeMarked() {
 		removeFromWindowList(*it);
 		if (_lockedWidget == *it)
 			_lockedWidget = nullptr;
+		if ((*it)->getId() == _activeWindow)
+			_activeWindow = -1;
 		delete *it;
-		_activeWindow = -1;
 		_fullRefresh = true;
 	}
 	_windowsToRemove.clear();
