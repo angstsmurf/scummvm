@@ -902,11 +902,17 @@ uint32 DirectorPlotData::preprocessColor(uint32 src) {
 		case kInkTypeMask:
 			src = (src == backColor ? foreColor : 0xff);
 			break;
+		// 8-bit reverse inks XOR the raw palette index, like CopyBits
+		// srcXor. Mapping the pixels here would turn every one of them
+		// into 0 (white), which XORs to nothing: The Apartment's
+		// "Testing User Entry" buttons and text vanished.
 		case kInkTypeReverse:
-			src = (src == foreColor ? 0 : colorWhite);
+			if (d->_wm->_pixelformat.bytesPerPixel != 1)
+				src = (src == foreColor ? 0 : colorWhite);
 			break;
 		case kInkTypeNotReverse:
-			src = (src == backColor ? colorWhite : 0);
+			if (d->_wm->_pixelformat.bytesPerPixel != 1)
+				src = (src == backColor ? colorWhite : 0);
 			break;
 			// looks like this part is wrong, maybe it's very same as reverse?
 			// check warlock/DATA/WARLOCKSHIP/ENG/ABOUT to see more detail.
