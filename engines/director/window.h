@@ -237,6 +237,7 @@ public:
 	void loadINIStream();
 	void loadXtrasFromPath();
 	void loadStartMovieXLibs();
+	void loadBuiltinXLibs();
 
 	// lingo/lingo-object.cpp
 	Common::String asString() override;
