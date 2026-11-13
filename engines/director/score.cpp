@@ -51,6 +51,8 @@
 #include "director/castmember/movie.h"
 #include "director/castmember/transition.h"
 #include "director/debugger/debugtools.h"
+#include "director/lingo/lingo-object.h"
+#include "director/lingo/xlibs/w/window.h"
 
 namespace Director {
 
@@ -376,6 +378,8 @@ void Score::step() {
 	bool hasJump = (_nextFrame != 0) || _window->hasPendingMovieSwitch();
 
 	if (_haveInteractivity && !hasJump) {
+		if (!_window->frozenLingoStateCount())
+			WindowXObj::processEvents();
 		if (!_movie->_inputEventQueue.empty() && !_window->frozenLingoStateCount()) {
 			_lingo->processEvents(_movie->_inputEventQueue, true);
 		}

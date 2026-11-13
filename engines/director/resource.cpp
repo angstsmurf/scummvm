@@ -664,6 +664,12 @@ void Window::loadBuiltinXLibs() {
 		g_lingo->openXLib("FileIO", kXObj, Common::Path());
 		g_lingo->openXLib("SerialPort", kXObj, Common::Path());
 	}
+	// The Director 3.1 application also carries Window and Panel (XCOD
+	// 2010/2011). Director 4.0 no longer has them.
+	if (g_director->getVersion() >= 300 && g_director->getVersion() < 400 && g_director->getPlatform() == Common::kPlatformMacintosh) {
+		g_lingo->openXLib("Window", kXObj, Common::Path());
+		g_lingo->openXLib("Panel", kXObj, Common::Path());
+	}
 }
 
 ProjectorArchive::ProjectorArchive(Common::Path path)

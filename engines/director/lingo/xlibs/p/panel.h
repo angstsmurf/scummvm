@@ -22,11 +22,40 @@
 #ifndef DIRECTOR_LINGO_XLIBS_PANEL_H
 #define DIRECTOR_LINGO_XLIBS_PANEL_H
 
+namespace Graphics {
+class MacWindow;
+class ManagedSurface;
+}
+
 namespace Director {
+
+class WindowXObject;
+
+enum PanelKind {
+	kPanelPushButton = 0,
+	kPanelCheckBox = 1,
+	kPanelRadioButton = 2,
+	kPanelStaticText = 8,
+	kPanelCastBitmap = -1,
+};
 
 class PanelXObject : public Object<PanelXObject> {
 public:
 	PanelXObject(ObjectType objType);
+
+	void draw(Graphics::ManagedSurface *surface);
+	void changed();
+
+	WindowXObject *_window = nullptr;
+	int _kind = kPanelPushButton;
+	Common::String _title;
+	Common::String _panelName;
+	Common::Rect _rect;
+	bool _visible = false;
+	int _value = 0;
+	int _hilite = 0;
+	bool _tracking = false;
+	Datum _cast;
 };
 
 namespace PanelXObj {
