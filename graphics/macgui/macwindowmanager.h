@@ -239,6 +239,11 @@ public:
 	int getActiveWindow() { return _activeWindow; }
 
 	/**
+	 * Return the window stack, from back to front.
+	 */
+	const Common::List<BaseMacWindow *> &getWindowStack() const { return _windowStack; }
+
+	/**
 	 * Return Top Window containing a point
 	 * @param x x coordinate of point
 	 * @param y y coordiante of point
