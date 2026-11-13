@@ -1188,6 +1188,8 @@ Common::U32String MacTextCanvas::getTextChunk(int startRow, int startCol, int en
 			}
 			if (newlines && _text[i].paragraphEnd)
 				res += '\n';
+			else if (!_text[i].paragraphEnd && !_text[i].wordContinuation)
+				res += ' ';	// the space the word wrap consumed
 		// We are at the end row, and it could be not completely requested
 		} else if (i == endRow) {
 			for (uint chunk = 0; chunk < _text[i].chunks.size(); chunk++) {
@@ -1230,6 +1232,8 @@ Common::U32String MacTextCanvas::getTextChunk(int startRow, int startCol, int en
 
 			if (newlines && _text[i].paragraphEnd)
 				res += '\n';
+			else if (!_text[i].paragraphEnd && !_text[i].wordContinuation)
+				res += ' ';	// the space the word wrap consumed
 		}
 	}
 
