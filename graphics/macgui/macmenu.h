@@ -46,14 +46,15 @@ struct MacMenuSubMenu {
 	int visStart; // Visible start
 	int visEnd; // Visible end
 	int scroll;
+	int itemHeight; // 0 = the menu's default item height
 
-	MacMenuSubMenu() : highlight(-1), visStart(0), visEnd(0), scroll(0) {}
+	MacMenuSubMenu() : highlight(-1), visStart(0), visEnd(0), scroll(0), itemHeight(0) {}
 
 	~MacMenuSubMenu();
 
 	void enableAllItems();
 
-	int ytoItem(int y, int itemHeight) { return MIN<int>((y - bbox.top) / itemHeight, items.size() - 1); }
+	int ytoItem(int y, int h) { return MIN<int>((y - bbox.top) / h, items.size() - 1); }
 };
 
 struct MacMenuItem {
@@ -67,21 +68,19 @@ struct MacMenuItem {
 	bool enabled;
 	bool checked;
 	int checkSymbol;
+	ManagedSurface *icon; // owned, CLUT8 with nonzero pixels set
 	Common::Rect bbox;
 
 	MacMenuSubMenu *submenu;
 
 	MacMenuItem(const Common::String &t, int a = -1, int s = 0, char sh = 0, int sp = -1, bool e = true, bool c = false, int cs = 0) :
 			text(t), unicode(false), action(a), style(s), shortcut(sh),
-			shortcutPos(sp), enabled(e), submenu(nullptr), checked(c), checkSymbol(cs) {}
+			shortcutPos(sp), enabled(e), checked(c), checkSymbol(cs), icon(nullptr), submenu(nullptr) {}
 	MacMenuItem(const Common::U32String &t, int a = -1, int s = 0, char sh = 0, int sp = -1, bool e = true, bool c = false, int cs = 0) :
 			unicodeText(t), unicode(true), action(a), style(s), shortcut(sh),
-			shortcutPos(sp), enabled(e), submenu(nullptr), checked(c), checkSymbol(cs) {}
+			shortcutPos(sp), enabled(e), checked(c), checkSymbol(cs), icon(nullptr), submenu(nullptr) {}
 
-	~MacMenuItem() {
-		if (submenu)
-			delete submenu;
-	}
+	~MacMenuItem();
 };
 
 struct MacMenuData {
@@ -175,6 +174,7 @@ public:
 
 	int getLastSelectedMenuItem() { return _lastActiveItem; };
 	int getLastSelectedSubmenuItem() { return _lastActiveSubItem; };
+	void clearLastSelectedSubmenuItem() { _lastActiveSubItem = -1; }
 	void getMenuShortCut(uint16 key, int &menuItem, int &submenuItem);
 
 	void renderSubmenu(MacMenuSubMenu *menu, bool recursive = true);
@@ -182,6 +182,12 @@ public:
 	int getScrollDirection() { return _scrollDirection; }
 
 	int getDropdownItemHeight() { return _menuDropdownItemHeight; }
+	int getItemHeight(const MacMenuSubMenu *submenu) const {
+		return submenu && submenu->itemHeight ? submenu->itemHeight : _menuDropdownItemHeight;
+	}
+	// Show a 1-bit icon left of the item text, taking ownership of it.
+	// The items of the submenu all grow to the icon's height.
+	void setItemIcon(MacMenuSubMenu *submenu, int item, ManagedSurface *icon);
 
 	void setOverlayDirty(bool dirty) { _overlayDirty = dirty; _contentIsDirty |= dirty; }
 

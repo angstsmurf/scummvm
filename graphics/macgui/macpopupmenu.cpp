@@ -74,28 +74,14 @@ void MacPopUp::closeMenu() {
 		}
 	}
 
-	if (_isSmart && activeSubItem != -1) {
-		// Smart menu, open menu at offset position (so selected item under cursor)
-		int yDisplace = -activeSubItem * _menuDropdownItemHeight;
-		_offsetY = _mouseY + yDisplace > 0 ? yDisplace : -_mouseY; // If offset sum gets out of window, then position menu to 0 (ie below top of window)
-
-		// Checkmark handling
-		setCheckMark(_items[0]->submenu->items[activeSubItem], true);
-
-		// // Uncheck previous item if checked
-		if (_prevCheckedItem != -1 && _prevCheckedItem != activeSubItem) {
-			setCheckMark(_items[0]->submenu->items[_prevCheckedItem], false);
-		}
-
-		_prevCheckedItem = activeSubItem;
-	}
-
 	_isModal = false;
 
 	// Close now
 	MacMenu::closeMenu();
 }
 
+// Like PopUpMenuSelect: item (1-based) is placed at y, so it opens under
+// the mouse, and is highlighted. Returns the chosen item, or 0 if none.
 uint32 MacPopUp::drawAndSelectMenu(int x, int y, int item) {
 	_mouseX = x;
 	_mouseY = y;
@@ -106,56 +92,71 @@ uint32 MacPopUp::drawAndSelectMenu(int x, int y, int item) {
 	setActive(true);
 
 	_contentIsDirty = true; // Set true to force refresh menu open changes
+	_dimensionsDirty = true;
 
 	_isModal = true;
 
+	MacMenuSubMenu *submenu = _items[0]->submenu;
+
 	// Push our submenu to stack
 	_menustack.clear();
-	_menustack.push_back(_items[0]->submenu);
+	_menustack.push_back(submenu);
 
-	_items[0]->submenu->visStart = 0;
-	_items[0]->submenu->visEnd = 0;
-	_items[0]->submenu->scroll = 0;
-	_offsetY = 0;
+	int numItems = submenu->items.size();
+	int itemHeight = getItemHeight(submenu);
+	int index = CLIP(item, 1, MAX(numItems, 1)) - 1;
 
-	if (_isSmart) {
-		int activeSubItem = getLastSelectedSubmenuItem();
+	submenu->visStart = 0;
+	submenu->visEnd = 0;
+	submenu->scroll = 0;
+	_offsetY = -index * itemHeight;
 
-		if (activeSubItem != -1)
-			_offsetY = -activeSubItem * _menuDropdownItemHeight;
-		else if (_prevCheckedItem != -1)
-			_offsetY = -_prevCheckedItem * _menuDropdownItemHeight;
+	// Items that would be above the screen are scrolled out of view
+	while (_offsetY + _mouseY < 0 && submenu->visStart < index) {
+		_offsetY += itemHeight;
+		submenu->visStart++;
+	}
+	if (_offsetY + _mouseY < 0)
+		_offsetY = -_mouseY;
 
-		while (_offsetY + _mouseY < 0) {
-			_offsetY += _menuDropdownItemHeight;
+	int itemsLeft = numItems - submenu->visStart;
+	int spaceLeft = _composeSurface->h - (_mouseY + _offsetY);
+	submenu->visEnd = MAX(0, itemsLeft - spaceLeft / itemHeight);
 
-			_items[0]->submenu->visStart++;
-		}
-
-		int itemsLeft = _items[0]->submenu->items.size() - _items[0]->submenu->visStart;
-		int spaceLeft = _composeSurface->h - MIN(_mouseY + _offsetY, _mouseY);
-		_items[0]->submenu->visEnd = MAX(0, itemsLeft - spaceLeft / _menuDropdownItemHeight);
+	// The submenu is the active one, so leaving it clears the selection
+	_activeItem = 0;
+	if (item > 0 && item <= numItems) {
+		_activeSubItem = index;
+		submenu->highlight = index;
 	}
 
-
-	// Highlight previous item if smart menu
-	if (_isSmart && getLastSelectedSubmenuItem() != -1) {
-		_activeItem = 0;
-		_activeSubItem = getLastSelectedSubmenuItem();
-		// Also select the item
-		_items[0]->submenu->highlight = getLastSelectedSubmenuItem();
-	}
+	clearLastSelectedSubmenuItem();
 
 	// Display menu and update according to events
 	this->draw(_wm->_screen);
 	eventLoop();
 
 	int activeSubItem = getLastSelectedSubmenuItem();
-	if (activeSubItem == -1)
-		return item;
+	if (activeSubItem == -1 || activeSubItem >= numItems || !submenu->items[activeSubItem]->enabled)
+		return 0;
 
 	// Return one indexed item!
 	return activeSubItem + 1;
+}
+
+void MacPopUp::setItemMark(int item, int markChar) {
+	MacMenuSubMenu *submenu = _items[0]->submenu;
+	if (!submenu || item < 1 || item > (int)submenu->items.size())
+		return;
+
+	MacMenuItem *menuItem = submenu->items[item - 1];
+	menuItem->checked = markChar != 0;
+	menuItem->checkSymbol = markChar == 0x12 ? 0 : markChar;
+	_contentIsDirty = true;
+}
+
+void MacPopUp::setItemIcon(int item, ManagedSurface *icon) {
+	MacMenu::setItemIcon(_items[0]->submenu, item - 1, icon);
 }
 
 Common::String MacPopUp::getItemText(int item) {

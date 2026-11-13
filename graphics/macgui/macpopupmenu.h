@@ -38,10 +38,10 @@ public:
 	bool draw(ManagedSurface *g, bool forceRedraw = false) override;
 	void closeMenu() override;
 
-	// Extra functions
-	void setSmart(bool smart) {
-		_isSmart = smart;
-	}
+	// Mark (0 = none) and icon of a 1-based item, like the Menu Manager's
+	// SetItemMark and SetItemIcon. A mark of 0x12 draws the check mark.
+	void setItemMark(int item, int markChar);
+	void setItemIcon(int item, ManagedSurface *icon);
 private:
 	int kBlinkDelay = 15; // Blink delay for closing animation
 	int kNumBlinks = 3; // Number of blinks
@@ -51,9 +51,7 @@ private:
 	int _menuItemId;
 	int _menuId;
 
-	bool _isSmart = false;
 	int _offsetY = 0;
-	int _prevCheckedItem = -1;
 
 	bool mouseClicked(int x, int y);
 };
