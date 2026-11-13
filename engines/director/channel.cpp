@@ -331,6 +331,13 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_moveable != nextSprite->_moveable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
 			_sprite->getDrawThickness() != nextSprite->getDrawThickness();
+		// A score frame may change only the sprite type, e.g. to show a
+		// sprite that was inactive (type 0) in the previous frame (Pingu
+		// KUZIRA.MMM, frames 2-3). Only a type the score wrote counts: a
+		// type set by Lingo (castNum) is kept until the score changes it.
+		if (nextSprite->_copyBackMask & kSCBSpriteType)
+			isDirtyFlag |= _sprite->_spriteType != nextSprite->_spriteType ||
+				_sprite->_enabled != nextSprite->_enabled;
 		if (g_director->getVersion() < 600) {
 			// A moveable sprite with a drag position stays there, see
 			// updateDragPosition(); otherwise it follows the score.
