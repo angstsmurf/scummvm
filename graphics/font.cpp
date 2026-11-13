@@ -574,6 +574,10 @@ int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array
 	return wordWrapTextImpl(*this, str, maxWidth, lines, lineContinuation, initWidth, mode);
 }
 
+int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, Common::Array<bool> &lineContinuation, int initWidth, uint32 mode) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines, lineContinuation, initWidth, mode);
+}
+
 TextAlign convertTextAlignH(TextAlign alignH, bool rtl) {
 	switch (alignH) {
 	case kTextAlignStart:
