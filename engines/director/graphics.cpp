@@ -743,15 +743,12 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 		break;
 	case kInkTypeReverse:
 		if (sizeof(T) == 1) {
-			// XOR dst palette index with src.
-			// Originally designed for 1-bit mode so that
-			// black pixels would appear white on a black
-			// background.
-			if (p->oneBitImage || p->ms || p->applyColor) {
-				*dst ^= src;
-			} else {
-				*dst = (src == p->backColor) ? *dst : src;
-			}
+			// XOR dst palette index with src, for 8-bit bitmaps
+			// too: the Mac player passes the ink to CopyBits as
+			// srcXor, and Windows D5 does the same (T_REVI01).
+			// Spaceship Warlock's prologue text relies on this:
+			// index ^ 255 gives a grey ramp on the black stage.
+			*dst ^= src;
 		} else {
 			// In 32-bit mode, this is the opposite??
 			*dst ^= ~(src);
