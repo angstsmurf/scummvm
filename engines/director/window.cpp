@@ -300,6 +300,10 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 	debugC(7, kDebugImages, "Window::render(): starting draw cycle for frame %d", score->getCurrentFrameNum());
 	uint32 renderStartTime = g_system->getMillis();
 
+	// D5 for Windows leaves a direct-to-stage video on the stage when the
+	// sprite moves or goes away.
+	bool keepVideo = g_director->getVersion() >= 500 && g_director->getVersion() < 600;
+
 	if (!forceRedraw) {
 		// D5 first collects the changed areas, replacing any two that
 		// overlap with their union, then redraws each
@@ -328,7 +332,7 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 				addMergedArea(areas, bbox);
 			chan->_needsDraw = false;
 			chan->_lastRenderedBbox = bbox;
-			chan->_lastTrail = chan->isTrail();
+			chan->_lastTrail = chan->isTrail() || (keepVideo && chan->isVideoDirectToStage());
 		}
 
 		for (auto &area : areas)
@@ -350,7 +354,7 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 			renderChannel(chan, bbox, blitTo, chan == hiliteChannel);
 			chan->_needsDraw = false;
 			chan->_lastRenderedBbox = bbox;
-			chan->_lastTrail = chan->isTrail();
+			chan->_lastTrail = chan->isTrail() || (keepVideo && chan->isVideoDirectToStage());
 		}
 	}
 
