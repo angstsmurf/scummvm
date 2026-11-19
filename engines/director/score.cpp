@@ -47,6 +47,7 @@
 #include "director/sprite.h"
 #include "director/window.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/digitalvideo.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
 #include "director/castmember/transition.h"
@@ -361,6 +362,25 @@ void Score::startPlay() {
 	if (_playState != kPlayStopped && _channels.size() == 0)
 		for (uint i = 0; i < _currentFrame->_sprites.size(); i++)
 			_channels.push_back(new Channel(this, _currentFrame->_sprites[i], i));
+
+	// The channels are created with the sprites of the first frame, so a
+	// video in that frame is never seen as a new member. Start it here.
+	for (uint i = 0; i < _channels.size() && i < _currentFrame->_sprites.size(); i++) {
+		Channel *channel = _channels[i];
+		CastMember *cast = channel->_sprite ? channel->_sprite->_cast : nullptr;
+		if (!cast || cast->_type != kCastDigitalVideo || channel->_sprite->_castId != _currentFrame->_sprites[i]->_castId)
+			continue;
+		DigitalVideoCastMember *video = (DigitalVideoCastMember *)cast;
+		if (!video->loadVideoFromCast())
+			continue;
+		channel->_movieTime = 0;
+		channel->_movieRate = 1.0;
+		channel->_startTime = 0;
+		video->setChannel(channel);
+		channel->_stopTime = video->getMovieTotalTime();
+		video->rewindVideo();
+		video->startVideo();
+	}
 
 	updateSprites(kRenderForceUpdate, true);
 
