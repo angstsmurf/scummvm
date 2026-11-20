@@ -194,6 +194,17 @@ static void addMergedArea(Common::Array<Common::Rect> &areas, Common::Rect rect)
 	areas.push_back(rect);
 }
 
+// A sprite that was drawn with trails is not erased where it was. Neither
+// is a digital video: never on Windows, and elsewhere not when it has
+// trails now.
+static bool keepsOldArea(Channel *chan) {
+	if (chan->_lastTrail)
+		return true;
+	if (!chan->_sprite->_cast || chan->_sprite->_cast->_type != kCastDigitalVideo)
+		return false;
+	return chan->isTrail() || g_director->getPlatform() == Common::kPlatformWindows;
+}
+
 void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo, bool invert) {
 	renderRect(rect, blitTo, (channel->isTrail() || channel->isVideoDirectToStage()) ? channel : nullptr, invert ? channel : nullptr);
 }
@@ -324,7 +335,7 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 
 			debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
 
-			if (!chan->_lastTrail)
+			if (!keepsOldArea(chan))
 				addMergedArea(areas, chan->_lastRenderedBbox);
 			if (chan->isTrail() || chan->isVideoDirectToStage())
 				trails.push_back(chan);
@@ -348,8 +359,8 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 
 			debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
 
-			if (!chan->_lastTrail) {
-				renderChannel(chan, chan->_lastRenderedBbox, blitTo, chan == hiliteChannel);
+			if (!keepsOldArea(chan)) {
+				renderRect(chan->_lastRenderedBbox, blitTo, nullptr, hiliteChannel);
 			}
 			renderChannel(chan, bbox, blitTo, chan == hiliteChannel);
 			chan->_needsDraw = false;
