@@ -109,7 +109,7 @@ public:
 	~Window();
 
 	bool render(bool forceRedraw = false, Graphics::ManagedSurface *blitTo = nullptr);
-	void renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo = nullptr, bool invert = false);
+	void renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo = nullptr, bool invert = false, bool erase = false);
 	void invertChannel(Channel *channel, const Common::Rect &destRect);
 
 	bool needsAppliedColor(DirectorPlotData *pd);

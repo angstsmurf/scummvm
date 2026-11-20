@@ -174,7 +174,7 @@ void Window::drawChannelBox(Director::Movie *currentMovie, Graphics::ManagedSurf
 	}
 }
 
-void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo, bool invert) {
+void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics::ManagedSurface *blitTo, bool invert, bool erase) {
 	Score *score = _currentMovie->getScore();
 	if (rect.isEmpty())
 		return;
@@ -198,7 +198,7 @@ void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics:
 	}
 
 	size_t startIdx = 0;
-	if (channel->isTrail() || channel->isVideoDirectToStage()) {
+	if (!erase && (channel->isTrail() || channel->isVideoDirectToStage())) {
 		// don't redraw anything stationary below the target
 		for (size_t i = 0; i < dirtyChannels.size(); i++) {
 			if (dirtyChannels[i] == channel) {
@@ -279,8 +279,14 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 
 		debugC(7, kDebugImages, "Window::render(): drawing channel %d", (int)i);
 
-		if (!chan->_lastTrail) {
-			renderChannel(chan, chan->_lastRenderedBbox, blitTo, chan == hiliteChannel);
+		// A sprite that was drawn with trails is not erased where it was.
+		// Neither is a digital video: never on Windows, and elsewhere not
+		// when it has trails now.
+		bool keepOld = chan->_lastTrail;
+		if (chan->_sprite->_cast && chan->_sprite->_cast->_type == kCastDigitalVideo)
+			keepOld |= chan->isTrail() || g_director->getPlatform() == Common::kPlatformWindows;
+		if (!keepOld) {
+			renderChannel(chan, chan->_lastRenderedBbox, blitTo, chan == hiliteChannel, true);
 		}
 		renderChannel(chan, bbox, blitTo, chan == hiliteChannel);
 		chan->_needsDraw = false;
