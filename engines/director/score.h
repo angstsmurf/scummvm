@@ -163,6 +163,8 @@ public:
 	// D4+: a key, or a click Lingo hasn't handled yet, ends a wait for a click
 	bool keyEndsClickWait() const { return _version >= kFileVer400; }
 
+	bool spriteRectsFollowLingo();
+
 private:
 	// How each projector version steps through frames, as measured in the
 	// projectors. The comments at the call sites hold the evidence.
@@ -272,6 +274,9 @@ public:
 	Common::Array<bool> _spriteDetailAccessed;
 
 	bool _disableGoPlayUpdateStage;
+
+	// D6: the current frame has been loaded, but not drawn yet
+	bool _frameLoadedNotDrawn;
 
 	bool _haveInteractivity;
 

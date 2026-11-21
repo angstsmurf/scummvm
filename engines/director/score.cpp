@@ -105,6 +105,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_currentFrame = nullptr;
 
 	_disableGoPlayUpdateStage = false;
+	_frameLoadedNotDrawn = false;
 }
 
 Score::~Score() {
@@ -882,6 +883,8 @@ void Score::update() {
 	CastMemberID oldSound2 = _currentFrame->_mainChannels.sound2;
 
 	// change current frame and load frame data, if required
+	// (beginSprite is sent from there, with the frame already loaded)
+	_frameLoadedNotDrawn = true;
 	updateCurrentFrame();
 
 	// set the delay time/condition until the next frame
@@ -1030,6 +1033,19 @@ void Score::update() {
 	// TODO Director 6 - another order
 }
 
+// Before D6, the left, top, right and bottom of a sprite that Lingo moves
+// or resizes will only return the new values once the sprite is drawn again.
+// In D6, they give the new values at once, between the loading of a frame
+// and its drawing, and in D7 while beginSprite, endSprite or prepareFrame
+// are sent.
+bool Score::spriteRectsFollowLingo() {
+	if (g_director->getVersion() >= 700)
+		return _disableGoPlayUpdateStage;
+	if (g_director->getVersion() >= 600)
+		return _frameLoadedNotDrawn;
+	return false;
+}
+
 void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, bool sound2Changed) {
 	// An embedded movie only refreshes its own channels for the host to
 	// composite via getSubChannels(); it must never touch the shared window.
@@ -1081,6 +1097,8 @@ void Score::renderFrame(uint16 frameId, RenderMode mode, bool sound1Changed, boo
 		renderCursor(_movie->getWindow()->getMousePos(), true);
 		_cursorDirty = false;
 	}
+	_frameLoadedNotDrawn = false;
+
 	uint32 end = g_system->getMillis(false);
 	debugC(5, kDebugEvents, "Score::renderFrame() finished in %d millis", end - start);
 }

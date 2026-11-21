@@ -3954,6 +3954,7 @@ void LB::b_updateStage(int nargs) {
 	// The sprites are drawn now: Lingo reads their new rects from here on
 	for (auto &it : score->_channels)
 		it->_hasLingoBbox = false;
+	score->_frameLoadedNotDrawn = false;
 	// updateStage draws even while "the updateLock" is set. Safecracker
 	// checks the lock itself before calling updateStage to keep the stage
 	// still.

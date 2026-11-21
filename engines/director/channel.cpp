@@ -484,7 +484,12 @@ void Channel::setBbox(int l, int t, int r, int b) {
 // bottom go on returning the rect that was drawn until the sprite is
 // drawn again.
 void Channel::keepLingoBbox() {
-	if (g_director->getVersion() < 600 && !_hasLingoBbox) {
+	if (_score && _score->spriteRectsFollowLingo()) {
+		_hasLingoBbox = false;
+		return;
+	}
+
+	if (!_hasLingoBbox) {
 		_lingoBbox = getBbox();
 		_hasLingoBbox = true;
 	}
