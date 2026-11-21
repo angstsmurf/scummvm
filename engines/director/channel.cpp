@@ -629,6 +629,13 @@ void Channel::setCast(CastMemberID memberID) {
 
 	bool hasChanged = _sprite->_castId != memberID;
 
+	// A video that leaves the channel must not go on changing it
+	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
+		DigitalVideoCastMember *old = (DigitalVideoCastMember *)_sprite->_cast;
+		if (old->_channel == this)
+			old->setChannel(nullptr);
+	}
+
 	// Replace the cast member in the sprite. The stored size stays:
 	// a stretched sprite keeps it, an unstretched one is drawn at the
 	// size of its new member.
