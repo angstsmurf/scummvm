@@ -2216,6 +2216,29 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		sprite->setAutoPuppet(kAPRect, true);
 
 		break;
+	case kTheBottom:
+	case kTheLeft:
+	case kTheRight:
+	case kTheTop:
+		// Before D7, setting an edge leaves the sprite as it is
+		if (g_director->getVersion() >= 700) {
+			// The other three edges are those last drawn
+			Common::Rect bbox = channel->getLingoBbox();
+			if (field == kTheBottom)
+				bbox.bottom = d.asInt();
+			else if (field == kTheLeft)
+				bbox.left = d.asInt();
+			else if (field == kTheRight)
+				bbox.right = d.asInt();
+			else
+				bbox.top = d.asInt();
+
+			channel->setBbox(bbox.left, bbox.top, bbox.right, bbox.bottom);
+			channel->setDirty();
+
+			sprite->setAutoPuppet(kAPRect, true);
+		}
+		break;
 	case kTheScriptInstanceList:
 		if (d.type == ARRAY) {
 			// Copy first: d may be this sprite's own list
