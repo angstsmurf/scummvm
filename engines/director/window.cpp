@@ -66,7 +66,8 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 	_newMovieFirstDraw = true;
 
 	_objType = kWindowObj;
-	_startFrame = _vm->getStartMovie().startFrame;
+	// The start frame of --start-movie is for the stage only
+	_startFrame = isStage ? _vm->getStartMovie().startFrame : -1;
 
 	_windowType = -1;
 	_isModal = false;
