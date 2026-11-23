@@ -340,6 +340,50 @@ static uint32 readMPEGDurationMs(const Common::Path &location) {
 	return result;
 }
 
+// QuickTime on the Mac played MPEG-1 files through a reference movie: a
+// moov whose only track has the 'MPEG' media handler and an alias data
+// reference to the .MPG (Egypt's .mhi files). QuickTimeDecoder has no MPEG
+// media, so play the referenced file directly. It is looked up next to the
+// reference movie, by the file name in the alias record.
+static Common::Path findMPEGReference(const Common::Path &location) {
+	Common::SeekableReadStream *stream = Common::MacResManager::openFileOrDataFork(location);
+	if (!stream)
+		return Common::Path();
+	int64 size = MIN<int64>(stream->size(), 65536);
+	Common::Array<byte> buf(size);
+	size = stream->read(buf.data(), size);
+	delete stream;
+
+	auto find = [&buf, size](const char *tag, int64 from) {
+		for (int64 i = from; i + 4 <= size; i++)
+			if (!memcmp(&buf[i], tag, 4))
+				return i;
+		return (int64)-1;
+	};
+
+	// hdlr: version/flags, component type 'mhlr', subtype 'MPEG'
+	int64 hdlr = find("mhlrMPEG", 0);
+	if (hdlr < 0)
+		return Common::Path();
+	// the data handler's subtype is 'alis' too, so look inside the dref
+	int64 dref = find("dref", hdlr);
+	int64 alis = dref < 0 ? -1 : find("alis", dref);
+	// dref entry 'alis' + version/flags, then the alias record: user type,
+	// record size, version, kind, volume name (Str27), volume date, FS type,
+	// drive type, parent dir ID, then the file name (Str63)
+	int64 nameOff = alis + 8 + 4 + 2 + 2 + 2 + 28 + 4 + 2 + 2 + 4;
+	if (alis < 0 || nameOff + 64 > size)
+		return Common::Path();
+	byte len = buf[nameOff];
+	if (len == 0 || len > 63)
+		return Common::Path();
+	Common::String name((const char *)&buf[nameOff + 1], len);
+	Common::Path target = location.getParent().appendComponent(name);
+	debugC(2, kDebugLoading, "findMPEGReference: '%s' refers to MPEG file '%s'",
+		location.toString().c_str(), name.c_str());
+	return target;
+}
+
 bool DigitalVideoCastMember::loadVideo(Common::String path) {
 	if (_filename == path) {
 		// we've already loaded this video, or not. no point trying again.
@@ -388,7 +432,15 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 		}
 
 	} else if (magic2 == MKTAG('m', 'o', 'o', 'v') || magic2 == MKTAG('m', 'd', 'a', 't')) {
-		tryQuickTime = true;
+		Common::Path mpeg;
+		if (magic2 == MKTAG('m', 'o', 'o', 'v'))
+			mpeg = findMPEGReference(location);
+		if (!mpeg.empty()) {
+			location = mpeg;
+			magic1 = 0x000001BA;
+		} else {
+			tryQuickTime = true;
+		}
 	} else if (magic1 == MKTAG('R', 'I', 'F', 'F') && (magic3 == MKTAG('A', 'V', 'I', ' '))) {
 		_video = new Video::AVIDecoder();
 		result = _video->loadFile(location);
@@ -400,7 +452,9 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 		} else {
 			_videoType = kDVVideoForWindows;
 		}
-	} else if (magic1 == 0x000001BA) {
+	}
+
+	if (magic1 == 0x000001BA && !tryQuickTime && !_video) {
 		// MPEG-1 system stream, played by an MPEG Xtra (Egypt's #MMVideo)
 #ifndef USE_MPEG2
 		warning("DigitalVideoCastMember::loadVideo(): '%s' is MPEG video, which needs libmpeg2; playing sound only", path.c_str());
@@ -415,7 +469,7 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 			return false;
 		}
 		_videoType = kDVVideoForWindows;
-	} else {
+	} else if (!_video && !tryQuickTime) {
 		// early QuickTime videos are a nightmare for magic ID detection,
 		// but let's be honest it's probably going to be QuickTime with Cinepak,
 		// the little postage-stamp-sized video format that could
