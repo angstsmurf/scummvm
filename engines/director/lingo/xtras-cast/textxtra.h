@@ -35,8 +35,26 @@ class XtraCastMember;
 
 namespace TextXtra {
 
+// One style run of the authored text: the style applies from offset
+// (in text bytes) up to the next run
+struct StyleRun {
+	uint32 offset = 0;
+	Common::String fontName;
+	uint16 fontSize = 12;
+	byte slant = 0;			// Mac style bits: bold 1, italic 2, underline 4...
+	uint16 r = 0, g = 0, b = 0;	// 16-bit components
+	uint16 bkR = 0xffff, bkG = 0xffff, bkB = 0xffff;
+};
+
+struct XMEDDocument {
+	Common::String text;
+	Common::Array<StyleRun> runs;
+	int justification = 0;	// Paige: left, center, right, full
+	uint16 bkR = 0xffff, bkG = 0xffff, bkB = 0xffff;	// member background
+};
+
 CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra);
-bool decodeXMED(const Common::Array<byte> &data, Common::String &text);
+bool decodeXMED(const Common::Array<byte> &data, XMEDDocument &doc);
 bool parseXtraData(const Common::Array<byte> &data, Common::Rect &rect);
 
 } // End of namespace TextXtra
@@ -56,6 +74,7 @@ public:
 
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 	bool hasOwnColors() override { return true; }
+	bool getOwnBackColor(uint32 &color) override;
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;
@@ -64,7 +83,14 @@ public:
 	Common::String formatInfo() override;
 
 	Common::U32String _text;
+	Common::Array<TextXtra::StyleRun> _runs;	// sorted by offset, first at 0
+	int _justification = 0;
+	uint16 _bkR = 0xffff, _bkG = 0xffff, _bkB = 0xffff;
 	Datum _color;	// COLORREF set by Lingo, VOID until then
+
+private:
+	TextXtra::StyleRun &firstRun();
+	Common::U32String getFormattedText(uint32 spriteColor);
 };
 
 } // End of namespace Director

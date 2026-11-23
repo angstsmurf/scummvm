@@ -187,6 +187,9 @@ DirectorPlotData Channel::getPlotData() {
 		pd.applyColor = false;
 	} else if (_sprite->_cast && _sprite->_cast->hasOwnColors()) {
 		pd.applyColor = false;
+		uint32 ownBack;
+		if (_sprite->_cast->getOwnBackColor(ownBack))
+			pd.backColor = ownBack;
 	} else {
 		pd.setApplyColor();
 	}

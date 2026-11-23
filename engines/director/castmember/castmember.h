@@ -76,6 +76,9 @@ public:
 	// The widget is drawn in the member's own colours: the sprite's fore/back
 	// colours must not colourize it
 	virtual bool hasOwnColors() { return false; }
+	// Background colour a member draws itself on, which Background
+	// Transparent ink keys out instead of the sprite's back colour
+	virtual bool getOwnBackColor(uint32 &color) { return false; }
 
 	virtual void setColors(uint32 *fgcolor, uint32 *bgcolor) { return; }
 	virtual uint32 getForeColor() { return 0; }
