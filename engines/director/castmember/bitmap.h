@@ -52,6 +52,10 @@ public:
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;
 
+private:
+	void redrawSprites();
+public:
+
 	Common::String formatInfo() override;
 
 	void load() override;
@@ -87,6 +91,7 @@ public:
 	uint32 _tag;
 	bool _noMatte;
 	bool _external;
+	bool _relinked = false;	// fileName set from Lingo: the linked file replaces the BITD
 
 	// D4 stucture:
 	// uint16 _pitch;

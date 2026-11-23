@@ -294,6 +294,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_matte = nullptr;
 	_noMatte = false;
 	_external = source._external;
+	_relinked = source._relinked;
 
 	_version = source._version;
 
@@ -709,7 +710,7 @@ void BitmapCastMember::load() {
 
 		Common::String imageFilename = _cast->getLinkedPath(_castId);
 
-		if ((pic == nullptr || pic->size() == 0)
+		if ((pic == nullptr || pic->size() == 0 || _relinked)
 				&& !imageFilename.empty()) {
 			// image file is linked, load from the filesystem
 			Common::Path location = findPath(imageFilename);
@@ -1106,19 +1107,25 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
 			_regX = (_picture->_surface.w + 1) / 2;
 			_regY = (_picture->_surface.h + 1) / 2;
-
-			// The castId is unchanged, so redraw the sprites showing this cast.
-			Movie *movie = g_director->getCurrentMovie();
-			Score *score = movie ? movie->getScore() : nullptr;
-			if (score) {
-				for (uint i = 0; i < score->_channels.size(); i++) {
-					Channel *ch = score->_channels[i];
-					if (ch && ch->_sprite && ch->_sprite->_cast == this && !ch->_sprite->_stretch)
-						ch->setDirty();
-				}
-			}
+			redrawSprites();
 		} else {
 			warning("BitmapCastMember::setField(): Wrong Datum type %d for kThePicture (or nullptr)", d.type);
+		}
+		return;
+	case kTheFileName:
+		// The new file is imported at once (Egypt reads the width of
+		// its preview member straight after setting the fileName) and
+		// replaces any image stored in the cast
+		CastMember::setField(field, d);
+		if (_needsReload) {
+			_relinked = true;
+			load();
+			if (_external && _picture) {
+				_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
+				_regX = (_picture->_surface.w + 1) / 2;
+				_regY = (_picture->_surface.h + 1) / 2;
+				redrawSprites();
+			}
 		}
 		return;
 	default:
@@ -1126,6 +1133,22 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 	}
 
 	CastMember::setField(field, d);
+}
+
+// The castId is unchanged, so redraw the sprites showing this cast.
+// An unstretched sprite is drawn at the size of the new picture,
+// but keeps the size stored for it.
+void BitmapCastMember::redrawSprites() {
+	Movie *movie = g_director->getCurrentMovie();
+	Score *score = movie ? movie->getScore() : nullptr;
+	if (!score)
+		return;
+	for (uint i = 0; i < score->_channels.size(); i++) {
+		Channel *ch = score->_channels[i];
+		if (ch && ch->_sprite && ch->_sprite->_cast == this && !ch->_sprite->_stretch) {
+			ch->setDirty();
+		}
+	}
 }
 
 uint32 BitmapCastMember::getCastDataSize() {
