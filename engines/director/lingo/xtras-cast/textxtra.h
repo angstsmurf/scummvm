@@ -55,6 +55,7 @@ public:
 	void load() override;
 
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
+	bool hasOwnColors() override { return true; }
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;

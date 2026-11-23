@@ -27,6 +27,7 @@
 
 #include "director/director.h"
 #include "director/cast.h"
+#include "director/channel.h"
 #include "director/castmember/xtra.h"
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/textxtra.h"
@@ -167,11 +168,19 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 	if (!bbox.width() || !bbox.height())
 		return nullptr;
 
-	// TODO: Parse the authored Paige style runs (font, size, colours)
+	// TODO: Parse the authored Paige style runs (font, size, colours).
+	// Until then draw in the sprite's colours: Background Transparent ink
+	// keeps the text pixels as they are (Bad Milk's grey "skip intro").
+	uint32 fgColor = g_director->_wm->_colorBlack;
+	uint32 bgColor = g_director->_wm->_colorWhite;
+	if (channel && channel->_sprite) {
+		fgColor = channel->_sprite->getForeColor();
+		bgColor = channel->_sprite->getBackColor();
+	}
 	Graphics::MacFont macFont(1, 12);
 	Graphics::MacText *widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(),
 			bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm, _text, &macFont,
-			g_director->_wm->_colorWhite, g_director->_wm->_colorBlack, _initialRect.width(),
+			fgColor, bgColor, _initialRect.width(),
 			Graphics::kTextAlignLeft);
 	widget->draw();
 	return widget;
