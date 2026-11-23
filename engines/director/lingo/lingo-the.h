@@ -185,6 +185,7 @@ enum TheEntityType {
 	kTheWindowList,
 	kTheWords,
 	kTheXtras,
+	kTheMouseLoc,
 	kTheMaxTheEntityType		// This must be always last
 };
 

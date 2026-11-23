@@ -202,6 +202,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheWindow,			"window",			true,  400, false },//			D4
 	{ kTheWindowList,		"windowList",		false, 400, false },//			D4 p
 	{ kTheXtras,			"xtras",			false, 500, false },//				D5 p
+	{ kTheMouseLoc,			"mouseLoc",			false, 600, true },	//				D6 f
 	{ kTheNOEntity, nullptr, false, 0, false }
 };
 
@@ -883,6 +884,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheMouseH:
 		d = g_director->getCurrentWindow()->getMousePos().x;
+		break;
+	case kTheMouseLoc:
+		d = Datum(g_director->getCurrentWindow()->getMousePos());
 		break;
 	case kTheMouseItem:
 		{
