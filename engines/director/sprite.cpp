@@ -280,8 +280,8 @@ MacShape *Sprite::getShape() {
 
 	shape->ink = _ink;
 	shape->spriteType = _spriteType;
-	shape->foreColor = _foreColor;
-	shape->backColor = _backColor;
+	shape->foreColor = getScoreForeColor();
+	shape->backColor = getScoreBackColor();
 	shape->lineSize = _thickness & kTThickness;
 	shape->pattern = getPattern();
 	shape->tile = nullptr;
@@ -324,9 +324,24 @@ MacShape *Sprite::getShape() {
 	return shape;
 }
 
+// D7 sprites may store a colour as RGB: colorcode bit 0x10 (fore) or 0x20
+// (back), R in the colour byte, G and B in extra bytes. Matched against the
+// palette at draw time, so a later palette change is followed.
+uint32 Sprite::getScoreForeColor() {
+	if ((_colorcode & kColorCodeForeRGB) && g_director->getVersion() >= 700)
+		return g_director->_wm->findBestColor(_foreColorIndex, _fgColorG, _fgColorB);
+	return _foreColor;
+}
+
+uint32 Sprite::getScoreBackColor() {
+	if ((_colorcode & kColorCodeBackRGB) && g_director->getVersion() >= 700)
+		return g_director->_wm->findBestColor(_backColorIndex, _bgColorG, _bgColorB);
+	return _backColor;
+}
+
 uint32 Sprite::getBackColor() {
 	if (!_cast)
-		return _backColor;
+		return getScoreBackColor();
 
 	switch (_cast->_type) {
 	case kCastText:
@@ -334,7 +349,7 @@ uint32 Sprite::getBackColor() {
 		return _cast->getBackColor();
 	}
 	default:
-		return _backColor;
+		return getScoreBackColor();
 	}
 }
 
@@ -361,7 +376,7 @@ bool Sprite::setBackColor(uint32 index) {
 
 uint32 Sprite::getForeColor() {
 	if (!_cast)
-		return _foreColor;
+		return getScoreForeColor();
 
 	switch (_cast->_type) {
 	case kCastText:
@@ -369,7 +384,7 @@ uint32 Sprite::getForeColor() {
 		return _cast->getForeColor();
 	}
 	default:
-		return _foreColor;
+		return getScoreForeColor();
 	}
 }
 

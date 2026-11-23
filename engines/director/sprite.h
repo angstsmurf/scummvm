@@ -56,6 +56,11 @@ enum AutoPuppetProperty {
 	kAPThickness,
 };
 
+enum ColorCodeFlags {
+	kColorCodeForeRGB = 0x10,	// D7: foreColor is R, G/B in _fgColorG/_fgColorB
+	kColorCodeBackRGB = 0x20
+};
+
 enum ThicknessFlags {
 	kTThickness = 0x0F,
 	kTHasBlend  = 0x10,
@@ -130,6 +135,8 @@ public:
 	void createQDMatte();
 	MacShape *getShape();
 	uint32 getForeColor();
+	uint32 getScoreForeColor();
+	uint32 getScoreBackColor();
 	uint32 getBackColor();
 	bool setForeColor(uint32 index);
 	bool setBackColor(uint32 index);
@@ -164,7 +171,7 @@ public:
 	uint32 _copyBackMask;
 
 	CastMemberID _scriptId;
-	byte _colorcode; // x40 editable, 0x80 moveable
+	byte _colorcode; // & 0x0f score colour, 0x10/0x20 fore/back RGB (D7), 0x40 editable, 0x80 moveable
 	byte _blendAmount;
 	uint32 _unk3;
 

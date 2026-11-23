@@ -1892,7 +1892,10 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 	switch (field) {
 	case kTheBackColor:
 		{
-			if (sprite->setBackColor(d.asInt())) {
+			// A palette index replaces an RGB colour from the score
+			bool wasRGB = sprite->_colorcode & kColorCodeBackRGB;
+			sprite->_colorcode &= ~kColorCodeBackRGB;
+			if (sprite->setBackColor(d.asInt()) || wasRGB) {
 				channel->setDirty();
 
 				// Based on Director in a Nutshell, page 15
@@ -2019,7 +2022,10 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		break;
 	case kTheForeColor:
 		{
-			if (sprite->setForeColor(d.asInt())) {
+			// A palette index replaces an RGB colour from the score
+			bool wasRGB = sprite->_colorcode & kColorCodeForeRGB;
+			sprite->_colorcode &= ~kColorCodeForeRGB;
+			if (sprite->setForeColor(d.asInt()) || wasRGB) {
 				channel->setDirty();
 			}
 

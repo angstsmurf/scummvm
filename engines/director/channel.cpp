@@ -373,6 +373,9 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			// the palette active when each frame was loaded.
 			_sprite->_backColorIndex != nextSprite->_backColorIndex ||
 			_sprite->_foreColorIndex != nextSprite->_foreColorIndex ||
+			(_sprite->_colorcode & (kColorCodeForeRGB | kColorCodeBackRGB)) != (nextSprite->_colorcode & (kColorCodeForeRGB | kColorCodeBackRGB)) ||
+			_sprite->_fgColorG != nextSprite->_fgColorG || _sprite->_fgColorB != nextSprite->_fgColorB ||
+			_sprite->_bgColorG != nextSprite->_bgColorG || _sprite->_bgColorB != nextSprite->_bgColorB ||
 			_sprite->_editable != nextSprite->_editable ||
 			// A score frame may make a sprite moveable without changing anything
 			// else about it (Alice: STONE.DIR, frames 44-47).
