@@ -96,6 +96,7 @@ public:
 	bool canWriteCastData() override;
 
 	Common::String _filename;
+	uint32 _mpegDurationMs = 0;	// MPEG system streams carry no duration
 	Common::String _xtraPath;	// file path stored in a QuickTime Asset Xtra member
 
 	uint32 _vflags;

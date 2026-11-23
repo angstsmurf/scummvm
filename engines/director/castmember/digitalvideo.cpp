@@ -30,6 +30,7 @@
 
 #include "video/video_decoder.h"
 #include "video/avi_decoder.h"
+#include "video/mpegps_decoder.h"
 #include "video/qt_decoder.h"
 
 #include "director/director.h"
@@ -302,6 +303,43 @@ bool DigitalVideoCastMember::loadVideoFromCast() {
 	return false;
 }
 
+// An MPEG-1 system stream has no duration field. Take it from the system
+// clock reference (90 kHz) in the first and last pack headers.
+static uint32 readMPEGDurationMs(const Common::Path &location) {
+	Common::SeekableReadStream *stream = Common::MacResManager::openFileOrDataFork(location);
+	if (!stream)
+		return 0;
+
+	auto findSCR = [stream](int64 start, int64 size, bool last, uint64 &scr) {
+		stream->seek(start);
+		Common::Array<byte> buf(size);
+		size = stream->read(buf.data(), size);
+		bool found = false;
+		for (int64 i = 0; i + 9 <= size; i++) {
+			if (buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 1 || buf[i + 3] != 0xBA)
+				continue;
+			const byte *b = &buf[i + 4];
+			if ((b[0] & 0xF0) != 0x20)	// MPEG-1 pack header
+				continue;
+			scr = ((uint64)((b[0] >> 1) & 7) << 30) | (b[1] << 22) | ((b[2] >> 1) << 15) | (b[3] << 7) | (b[4] >> 1);
+			found = true;
+			if (!last)
+				break;
+		}
+		return found;
+	};
+
+	const int64 window = 65536;
+	int64 size = stream->size();
+	uint64 first = 0, last = 0;
+	uint32 result = 0;
+	if (findSCR(0, MIN(size, window), false, first) &&
+			findSCR(MAX<int64>(0, size - window), MIN(size, window), true, last) && last > first)
+		result = (uint32)((last - first) / 90);
+	delete stream;
+	return result;
+}
+
 bool DigitalVideoCastMember::loadVideo(Common::String path) {
 	if (_filename == path) {
 		// we've already loaded this video, or not. no point trying again.
@@ -312,6 +350,7 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 		delete _video;
 		_video = nullptr;
 	}
+	_mpegDurationMs = 0;
 
 	_filename = path;
 
@@ -361,6 +400,21 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 		} else {
 			_videoType = kDVVideoForWindows;
 		}
+	} else if (magic1 == 0x000001BA) {
+		// MPEG-1 system stream, played by an MPEG Xtra (Egypt's #MMVideo)
+#ifndef USE_MPEG2
+		warning("DigitalVideoCastMember::loadVideo(): '%s' is MPEG video, which needs libmpeg2; playing sound only", path.c_str());
+#endif
+		_video = new Video::MPEGPSDecoder();
+		result = _video->loadFile(location);
+		_mpegDurationMs = readMPEGDurationMs(location);
+		if (!result) {
+			warning("DigitalVideoCastMember::loadVideo(): could not load MPEG video '%s'", path.c_str());
+			delete _video;
+			_video = nullptr;
+			return false;
+		}
+		_videoType = kDVVideoForWindows;
 	} else {
 		// early QuickTime videos are a nightmare for magic ID detection,
 		// but let's be honest it's probably going to be QuickTime with Cinepak,
@@ -659,7 +713,7 @@ uint DigitalVideoCastMember::getMovieTotalTime() {
 	if (!_video)
 		return 0;
 
-	int ticks = msToTicksCeil(_video->getDuration().msecs());
+	int ticks = msToTicksCeil(getMovieTotalTimeMillis());
 	return ticks;
 }
 
@@ -668,6 +722,8 @@ uint DigitalVideoCastMember::getMovieTotalTimeMillis() {
 		return 0;
 
 	int ticks = _video->getDuration().msecs();
+	if (ticks == 0)
+		ticks = _mpegDurationMs;
 	return ticks;
 }
 
