@@ -1,0 +1,16 @@
+-- D7 assignment without "set"
+global gFlag
+x = 5
+scummvmAssertEqual(x, 5)
+x = x + 1
+scummvmAssertEqual(x, 6)
+gFlag = true
+scummvmAssertEqual(gFlag, 1)
+do "gFlag = false"
+scummvmAssertEqual(gFlag, 0)
+the itemDelimiter = ";"
+scummvmAssertEqual(the itemDelimiter, ";")
+the itemDelimiter = ","
+-- a comparison still works in an expression
+if x = 6 then y = 1
+scummvmAssertEqual(y, 1)

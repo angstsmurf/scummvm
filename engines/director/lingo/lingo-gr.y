@@ -570,6 +570,12 @@ asgn: tPUT expr tINTO varorchunk '\n'	{ $$ = new PutIntoNode($expr, $varorchunk)
 	| tPUT expr tBEFORE varorchunk error '\n'	{ TRIM_GARBAGE($$, new PutBeforeNode($expr, $varorchunk)); }
 	| tSET varorthe to expr '\n'		{ $$ = new SetNode($varorthe, $expr); }
 	| tSET varorthe to expr error '\n'	{ TRIM_GARBAGE($$, new SetNode($varorthe, $expr)); }
+	// D7 assignment without "set", e.g. do "gFlag = true" in Bad Milk
+	// (only plain names: ID also covers keywords such as "end" and "on")
+	| CMDID tEQ expr '\n'				{ $$ = new SetNode(new VarNode($CMDID), $expr); }
+	| CMDID tEQ expr error '\n'			{ TRIM_GARBAGE($$, new SetNode(new VarNode($CMDID), $expr)); }
+	| writablethe tEQ expr '\n'			{ $$ = new SetNode($writablethe, $expr); }
+	| writablethe tEQ expr error '\n'	{ TRIM_GARBAGE($$, new SetNode($writablethe, $expr)); }
 	;
 
 to: tTO | tEQ ;
