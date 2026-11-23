@@ -147,6 +147,7 @@ const XlibFileDesc FileIO::fileNames[] = {
 	{ "FILE",		nullptr },
 	{ "FILEIO16",	nullptr },
 	{ "FileIOXtraFat",	nullptr },
+	{ "FileIO PPC Xtra",	nullptr },	// Egypt: Voyage to the Land of the Pharaohs (Mac)
 	{ nullptr,		nullptr },
 };
 

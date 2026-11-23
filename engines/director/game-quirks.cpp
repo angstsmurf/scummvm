@@ -340,6 +340,26 @@ static void quirkSafecrackerWin() {
 	g_director->_exeNameOverride = Common::String::format("sc_%s.exe", safecrackerLangCode(g_director->getLanguage()));
 }
 
+// Mounts the files inside an Installer VISE archive on a Mac CD, so that
+// the projector can run from there without installing the game
+static bool mountMacVISEInstaller(const char *installerName) {
+	Common::SeekableReadStream *installer = Common::MacResManager::openFileOrDataFork(installerName);
+	if (!installer) {
+		warning("mountMacVISEInstaller(): Cannot open installer \"%s\"", installerName);
+		return false;
+	}
+
+	Common::Archive *archive = Common::createMacVISEArchive(installer);
+	if (!archive) {
+		warning("mountMacVISEInstaller(): Failed to open installer \"%s\"", installerName);
+		delete installer;
+		return false;
+	}
+
+	SearchMan.add(installerName, createMacRomanPathArchive(archive, installer), 5);
+	return true;
+}
+
 // The European Mac release has the projectors for all languages in one
 // Installer VISE archive on the CD, each in a "SafeCracker (XXX)" folder
 static void quirkSafecrackerMac() {
@@ -347,25 +367,25 @@ static void quirkSafecrackerMac() {
 	if (g_director->getRawEXEName() != "xn--Install Safecracker-jo0l")
 		return;
 
-	const char *installerName = "Install Safecracker\xe2\x84\xa2";
-	Common::SeekableReadStream *installer = Common::MacResManager::openFileOrDataFork(installerName);
-	if (!installer) {
-		warning("quirkSafecrackerMac(): Cannot open installer \"%s\"", installerName);
+	if (!mountMacVISEInstaller("Install Safecracker\xe2\x84\xa2"))
 		return;
-	}
-
-	Common::Archive *archive = Common::createMacVISEArchive(installer);
-	if (!archive) {
-		warning("quirkSafecrackerMac(): Failed to open installer \"%s\"", installerName);
-		delete installer;
-		return;
-	}
 
 	Common::String lang = safecrackerLangCode(g_director->getLanguage());
 	lang.toUppercase();
 
-	SearchMan.add(installerName, createMacRomanPathArchive(archive, installer), 5);
 	g_director->_exeNameOverride = Common::String::format("SafeCracker\xe2\x84\xa2 (%s):SafeCracker\xe2\x84\xa2 PPC (%s)", lang.c_str(), lang.c_str());
+}
+
+// The Mac side of the hybrid CD has the projector, Main.dxr and the Xtras
+// only inside its Installer VISE archive; the movies are on the CD
+static void quirkEgyptMac() {
+	if (g_director->getRawEXEName() != "Install Egypt")
+		return;
+
+	if (!mountMacVISEInstaller("Install Egypt"))
+		return;
+
+	g_director->_exeNameOverride = "Montparnasse - La 5eme:Egypt:Egypt";
 }
 
 static void quirkTrekTechWin() {
@@ -450,6 +470,7 @@ const struct Quirk {
 	// Safecracker can run straight from the installers on its CDs
 	{ "safecracker", Common::kPlatformWindows, &quirkSafecrackerWin },
 	{ "safecracker", Common::kPlatformMacintosh, &quirkSafecrackerMac },
+	{ "egypt", Common::kPlatformMacintosh, &quirkEgyptMac },
 
 	// Star Trek titles install fonts into the system
 	{ "trektech", Common::kPlatformWindows, &quirkTrekTechWin },

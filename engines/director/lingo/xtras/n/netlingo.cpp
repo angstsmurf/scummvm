@@ -68,6 +68,7 @@ namespace Director {
 const char *NetLingoXtra::xlibName = "NetLingo";
 const XlibFileDesc NetLingoXtra::fileNames[] = {
 	{ "netlingo",   nullptr },
+	{ "NetLingo PPC Xtra",   nullptr },	// Egypt: Voyage to the Land of the Pharaohs (Mac)
 	{ nullptr,        nullptr },
 };
 

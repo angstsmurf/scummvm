@@ -198,6 +198,7 @@ const XlibFileDesc PrintOMaticXObj::fileNames[] = {
 	{ "PrintOMatic",   nullptr },
 	{ "PMATIC",   nullptr },
 	{ "POMLITE",   nullptr },
+	{ "PrintOMatic Xtra",   nullptr },	// Egypt: Voyage to the Land of the Pharaohs (Mac)
 	{ nullptr,        nullptr },
 };
 
