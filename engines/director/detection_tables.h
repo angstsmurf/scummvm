@@ -9663,12 +9663,13 @@ static const DirectorGameDescription gameDescriptions[] = {
 								 "INTRO.DXR", "209cd844f714140413eb58c3a69db454", 5179191, 700),
 
 	// Mac version requires installation
-	MACGAME1("egypt", "", "Egypt",			   "rt:2ebb1d55deb68cf386444c14a5e8137c", 113886, 702),
+	// "Thousands of colors" required
+	MACGAME1f("egypt", "", "Egypt",			   "rt:2ebb1d55deb68cf386444c14a5e8137c", 113886, 702, GF_TRUECOLOR),
 	// Win95/Mac hybrid CD, run straight from its Installer VISE archive on the CD
-	MACGAME2("egypt", "", "Install Egypt",	   "dt:34a696f3d96c508f3999ae4f9d6b9eb5", 14415160,
-						  "Data/Generiq.dxr",  "d:7551627746d609619bfbedd01aa12319", 1044985, 702),
-	WINGAME2("egypt", "", "Install/Egypt.exe", "t:d65e257cff7eaf984b556515459c2877", 1815452,
-				 		  "Data/Generiq.dxr",  "f:7551627746d609619bfbedd01aa12319", 1044985, 702),
+	MACGAME2f("egypt", "", "Install Egypt",	   "dt:34a696f3d96c508f3999ae4f9d6b9eb5", 14415160,
+						  "Data/Generiq.dxr",  "d:7551627746d609619bfbedd01aa12319", 1044985, 702, GF_TRUECOLOR),
+	WINGAME2f("egypt", "", "Install/Egypt.exe", "t:d65e257cff7eaf984b556515459c2877", 1815452,
+				 		  "Data/Generiq.dxr",  "f:7551627746d609619bfbedd01aa12319", 1044985, 702, GF_TRUECOLOR),
 
 	// PC "conversion" of the Jumbo Electro educational toys
 	// Multilanguage En-Fr-De-Nl
