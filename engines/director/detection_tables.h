@@ -672,6 +672,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "explorespace3",		"Explore Space: The Sun & Moon" },
 	{ "explorespace4",		"Explore Space: The Galaxy" },
 	{ "explorespace5",		"Explore Space: Space Missions" },
+	{ "f13",				"Stephen King's F13" },
 	{ "flw",				"The Ultimate Frank Lloyd Wright: America's Architect" },
 	{ "frequency",			"frEQuency" },
 	{ "fusion",				"Harnessing the Energy of the Stars" },
@@ -9580,6 +9581,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME1("atvrally", "", "ATVwin.exe", "7c18c9a6af2694156bf09ed195c1ab09", 1815336, 702),
 
 	MACGAME1("badmilk", "", "badmilk", "0944b962ebb00f4b5d5149d220f8449b", 111478, 702),
+	MACGAME1("badmilk", "", "badmilk", "0944b962ebb00f4b5d5149d220f8449b", 111222, 702),
 	WINGAME1("badmilk", "", "badmilk.exe", "7c18c9a6af2694156bf09ed195c1ab09", 2682776, 702),
 
 	WINGAME1("bbbighelpers", "", "BigHelpers.exe", "7c18c9a6af2694156bf09ed195c1ab09", 2843894, 702),
@@ -9662,6 +9664,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	// Mac version requires installation
 	MACGAME1("egypt", "", "Egypt",			   "rt:2ebb1d55deb68cf386444c14a5e8137c", 113886, 702),
+	// Win95/Mac hybrid CD, run straight from its Installer VISE archive on the CD
+	MACGAME2("egypt", "", "Install Egypt",	   "dt:34a696f3d96c508f3999ae4f9d6b9eb5", 14415160,
+						  "Data/Generiq.dxr",  "d:7551627746d609619bfbedd01aa12319", 1044985, 702),
 	WINGAME2("egypt", "", "Install/Egypt.exe", "t:d65e257cff7eaf984b556515459c2877", 1815452,
 				 		  "Data/Generiq.dxr",  "f:7551627746d609619bfbedd01aa12319", 1044985, 702),
 
@@ -9677,6 +9682,25 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	MACGAME1("erdisaster", "", "ER Disaster Strikes Start", "0944b962ebb00f4b5d5149d220f8449b", 114890, 702),
 	WINGAME1("erdisaster", "", "ER Disaster Strikes.exe", "7c18c9a6af2694156bf09ed195c1ab09", 2682526, 702),
+
+	// Win95/Mac hybrid CD
+	MACGAME1("f13", "", "F13 Main Menu",		"rt:abf484df16e68ac7e8f1347bc4c606c8",  118922, 702),
+	WINGAME1("f13", "", "F13 MAIN MENU.EXE",	"t:507b08f0187171ca17a3d47ff6fdfb3e", 1820900, 702),
+	// Standalone screensaver projectors in the ScreenSavers folder
+	MACGAME1("f13", "Creature in My Room Screensaver", "SK Creature in My Room", "dt:d206cafb956833dc3f9484ea6649b9b9", 32753037, 702),
+	WINGAME1("f13", "Creature in My Room Screensaver", "SKCreatureInMyRoom.exe", "t:d27dd2e88648647a0540e8767cc63e44", 32328344, 702),
+	MACGAME1("f13", "Evil Genius At Work Screensaver", "SK Evil Genius At Work", "dt:e3980d836807f9ee80f6237fe559b730", 7054883, 702),
+	WINGAME1("f13", "Evil Genius At Work Screensaver", "SKEvilGeniusAtWork.exe", "t:47881dfb3946fcf31ce9c86307a9e0ca", 5432524, 702),
+	MACGAME1("f13", "It's Just Lightning Screensaver", "SK Its Just Lightning", "dt:c458f9d9187050fa55fcca5ae077e946", 13003495, 702),
+	WINGAME1("f13", "It's Just Lightning Screensaver", "SKItsJustLightning.exe", "t:ff19a04270611728d09d72f42c5ed885", 12557013, 702),
+	MACGAME1("f13", "Murder and Mayhem Screensaver", "SK Murder and Mayhem", "dt:bdf677f6e130f21b565d7a9203197be8", 34454920, 702),
+	WINGAME1("f13", "Murder and Mayhem Screensaver", "SKMurderandMayhem.exe", "t:8a13d60fd9230e1b7230fedb1aaedcfb", 33984608, 702),
+	MACGAME1("f13", "Terror Eyes Screensaver", "SK Terror Eyes", "dt:1c2bd6ec11f192ec260cd6ddd842aeb8", 4472222, 702),
+	WINGAME1("f13", "Terror Eyes Screensaver", "SKTerrorEyes.exe", "t:b60b5805efb611fa9653e8582cec82b3", 3574855, 702),
+	MACGAME1("f13", "The Works Screensaver", "Sk The Works", "dt:1ca6ef06727d05175dd417943299c0c1", 7503289, 702),
+	WINGAME1("f13", "The Works Screensaver", "SKTheWorks.exe", "t:d438ee84be4c1aad10b1da9696607948", 7111475, 702),
+	MACGAME1("f13", "Trivia Screensaver", "SK Trivia", "dt:9ee17247148acaed4971258d80410efe", 11853880, 702),
+	WINGAME1("f13", "Trivia Screensaver", "SKTrivia.exe", "t:c5a76b69711a4c281d03fefb1ded913c", 11430690, 702),
 
 	MACGAME1_l("fg25ans", "", "FG25Ans", "dec72b4b6f8e97f1ea24361794bf0bdf", 114301, Common::FR_FRA, 702),
 	WINGAME1_l("fg25ans", "", "FG25Ans.exe", "88d4c24f6d4b78a73ce5b07693eddbc8", 2412706, Common::FR_FRA, 702),
@@ -10011,6 +10035,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	MACGAME1_l("tomlisaindiens", "", "Tom en Lisa", "19f92df0c7cb7a17b02ed5c73b1ee4c1", 33105, Common::NL_NLD, 702),
 	WINGAME1_l("tomlisaindiens", "", "TOM ET LISA.EXE", "7c18c9a6af2694156bf09ed195c1ab09", 783498, Common::NL_NLD, 702),
+
+	// "Star Trek: Deep Space Nine Companion", version 2.0 of the DS9 episode guide
+	WINGAME1("trekguideds9", "v2.0", "DS9program/DS999.exe", "t:ef4da0b8419e1196d573ae2a759e70be", 2909432, 702),
 
 	// Full game was never released
 	WINDEMO2("veniceglass", "Preview", "Start.exe",	  "c1a2e8b7e41fa204009324a9c7db1030", 2615108,

@@ -161,6 +161,37 @@ static char s_fallbacGameIdBuffer[256];
 static char s_fallbackFileNameBuffer[51];
 static char s_fallbackExtraBuf[256];
 
+// Whether a detection entry expects this exact projector (same size and
+// tail MD5) under a path such as "Install/Egypt.exe" whose folder name is
+// that of the folder holding the file.
+static bool isKnownProjectorInSubfolder(const Common::FSNode &file, const FileProperties &props) {
+	Common::String parentName = file.getParent().getName();
+
+	for (const Director::DirectorGameDescription *g = Director::gameDescriptions; g->desc.gameId; g++) {
+		for (const ADGameFileDescription *fd = g->desc.filesDescriptions; fd->fileName; fd++) {
+			if (!fd->md5 || strncmp(fd->md5, "t:", 2) || fd->fileSize != props.size)
+				continue;
+			if (props.md5 != fd->md5 + 2)
+				continue;
+
+			Common::String path(fd->fileName);
+			size_t slash = path.findLastOf('/');
+			if (slash == Common::String::npos)
+				continue;
+			if (!file.getName().equalsIgnoreCase(path.substr(slash + 1)))
+				continue;
+
+			Common::String dir = path.substr(0, slash);
+			size_t dirSlash = dir.findLastOf('/');
+			if (dirSlash != Common::String::npos)
+				dir = dir.substr(dirSlash + 1);
+			if (dir.equalsIgnoreCase(parentName))
+				return true;
+		}
+	}
+	return false;
+}
+
 ADDetectedGame DirectorMetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extraInfo) const {
 	// TODO: Handle Mac fallback
 
@@ -351,6 +382,13 @@ ADDetectedGame DirectorMetaEngineDetection::fallbackDetect(const FileMap &allFil
 		FileProperties tmp;
 		Common::Path filename(file->getPathInArchive());
 		if (getFileProperties(allFiles, kMD5Tail, filename, tmp)) {
+			// A known game's projector in the subfolder its entry expects,
+			// e.g. the "Install/Egypt.exe" of a hybrid CD seen by mass add
+			// while it walks the CD's folders: the game is detected one level
+			// up, so don't report this folder as an unknown game.
+			if (isKnownProjectorInSubfolder(*file, tmp))
+				return ADDetectedGame();
+
 			game.hasUnknownFiles = true;
 			game.matchedFiles[filename] = tmp;
 		}
