@@ -64,6 +64,7 @@ public:
 	Common::String formatInfo() override;
 
 	Common::U32String _text;
+	Datum _color;	// COLORREF set by Lingo, VOID until then
 };
 
 } // End of namespace Director

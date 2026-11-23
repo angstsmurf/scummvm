@@ -1051,6 +1051,61 @@ Datum::Datum(const Common::Rect &rect) {
 	ignoreGlobal = false;
 }
 
+Datum::Datum(const ColorRef &color) {
+	type = COLORREF;
+	u.color = new ColorRef(color);
+	refCount = new int;
+	*refCount = 1;
+	ignoreGlobal = false;
+}
+
+bool ColorRef::operator==(const ColorRef &c) const {
+	if (isRGB != c.isRGB)
+		return false;
+	if (isRGB)
+		return r == c.r && g == c.g && b == c.b;
+	return index == c.index;
+}
+
+void ColorRef::getRGB(byte &red, byte &green, byte &blue) const {
+	if (isRGB) {
+		red = r;
+		green = g;
+		blue = b;
+		return;
+	}
+	const byte *pal = g_director->getPalette();
+	int i = CLIP(index, 0, 255);
+	red = pal[i * 3];
+	green = pal[i * 3 + 1];
+	blue = pal[i * 3 + 2];
+}
+
+int ColorRef::getPaletteIndex() const {
+	if (!isRGB)
+		return index;
+	return g_director->reverseTransformColor(g_director->_wm->findBestColor(r, g, b));
+}
+
+// The colour to draw with in the current window manager format
+uint32 ColorRef::toWindowColor() const {
+	if (isRGB)
+		return g_director->_wm->findBestColor(r, g, b);
+	return g_director->transformColor(CLIP(index, 0, 255));
+}
+
+void ColorRef::setRGB(byte red, byte green, byte blue) {
+	isRGB = true;
+	r = red;
+	g = green;
+	b = blue;
+}
+
+void ColorRef::setPaletteIndex(int paletteIndex) {
+	isRGB = false;
+	index = paletteIndex;
+}
+
 void Datum::reset() {
 	if (!refCount)
 		return;
@@ -1112,6 +1167,9 @@ void Datum::reset() {
 			break;
 		case PICTUREREF:
 			delete u.picture;
+			break;
+		case COLORREF:
+			delete u.color;
 			break;
 		default:
 			warning("Datum::reset(): Unprocessed REF type %d", type);
@@ -1351,6 +1409,12 @@ Common::String Datum::asString(bool printonly) const {
 	case PICTUREREF:
 		s = Common::String::format("picture: %p", (void*)u.picture->_picture);
 		break;
+	case COLORREF:
+		if (u.color->isRGB)
+			s = Common::String::format("rgb( %d, %d, %d )", u.color->r, u.color->g, u.color->b);
+		else
+			s = Common::String::format("paletteIndex( %d )", u.color->index);
+		break;
 	default:
 		warning("Incorrect operation asString() for type: %s", type2str());
 	}
@@ -1392,6 +1456,9 @@ Datum Datum::clone() const {
 			result.u.parr->arr.push_back(PCell(it.p.clone(), it.v.clone()));
 		}
 		result.u.parr->_sorted = u.parr->_sorted;
+		break;
+	case COLORREF:
+		result = Datum(*u.color);
 		break;
 	default:
 		result = *this;
@@ -1436,6 +1503,8 @@ const char *Datum::type2str(bool ilk) const {
 		return "CASTLIBREF";
 	case CHUNKREF:
 		return "CHUNKREF";
+	case COLORREF:
+		return ilk ? "color" : "COLORREF";
 	case FIELDREF:
 		return "FIELDREF";
 	case FLOAT:
@@ -1485,6 +1554,9 @@ int Datum::equalTo(const Datum &d, bool ignoreCase) const {
 	} else if (d.type == VOID) {
 		return 0;
 	}
+	if (type == COLORREF || d.type == COLORREF)
+		return type == d.type && *u.color == *d.u.color;
+
 	int alignType = g_lingo->getAlignedType(*this, d, true);
 
 	switch (alignType) {

@@ -264,6 +264,7 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"cuePointTimes",kTheCuePointTimes,600 },//						D6 p
 	{ kTheCast,		"filename",		kTheFileName,	400 },//				D4 p
 	{ kTheCast,		"foreColor",	kTheForeColor,	400 },//				D4 p
+	{ kTheCast,		"color",		kTheColor,		700 },//							D7 p
 	{ kTheCast,		"height",		kTheHeight,		400 },//				D4 p
 	{ kTheCast,		"loaded",		kTheLoaded,		400 },//				D4 p
 	{ kTheCast,		"media",		kTheMedia,		500 },//					D5 p
@@ -2661,6 +2662,29 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		g_lingo->push(d);
 		g_debugger->propReadHook(propName);
 		return;
+	} else if (obj.type == COLORREF) {
+		byte r, g, b;
+		obj.u.color->getRGB(r, g, b);
+		if (propName.equalsIgnoreCase("red")) {
+			d = r;
+		} else if (propName.equalsIgnoreCase("green")) {
+			d = g;
+		} else if (propName.equalsIgnoreCase("blue")) {
+			d = b;
+		} else if (propName.equalsIgnoreCase("paletteIndex")) {
+			d = obj.u.color->getPaletteIndex();
+		} else if (propName.equalsIgnoreCase("colorType")) {
+			d = Datum(Common::String(obj.u.color->isRGB ? "rgb" : "paletteIndex"));
+			d.type = SYMBOL;
+		} else if (propName.equalsIgnoreCase("ilk")) {
+			d = Datum(Common::String("color"));
+			d.type = SYMBOL;
+		} else {
+			g_lingo->lingoError("Lingo::getObjectProp: Color <%s> has no property '%s'", obj.asString(true).c_str(), propName.c_str());
+		}
+		g_lingo->push(d);
+		g_debugger->propReadHook(propName);
+		return;
 	} else if (obj.type == CASTREF) {
 		Movie *movie = _vm->getCurrentMovie();
 		if (!movie) {
@@ -2805,6 +2829,32 @@ void Lingo::setObjectProp(Datum &obj, Common::String &propName, Datum &val) {
 			obj.u.parr->arr.push_back(cell);
 		}
 		g_debugger->propWriteHook(propName);
+	} else if (obj.type == COLORREF) {
+		// Setting a component turns a palette colour into an RGB one
+		ColorRef &color = *obj.u.color;
+		byte r, g, b;
+		color.getRGB(r, g, b);
+		if (propName.equalsIgnoreCase("red")) {
+			color.setRGB(CLIP(val.asInt(), 0, 255), g, b);
+		} else if (propName.equalsIgnoreCase("green")) {
+			color.setRGB(r, CLIP(val.asInt(), 0, 255), b);
+		} else if (propName.equalsIgnoreCase("blue")) {
+			color.setRGB(r, g, CLIP(val.asInt(), 0, 255));
+		} else if (propName.equalsIgnoreCase("paletteIndex")) {
+			color.setPaletteIndex(CLIP(val.asInt(), 0, 255));
+		} else if (propName.equalsIgnoreCase("colorType")) {
+			Common::String colorType = val.asString();
+			if (colorType.equalsIgnoreCase("rgb"))
+				color.setRGB(r, g, b);
+			else if (colorType.equalsIgnoreCase("paletteIndex"))
+				color.setPaletteIndex(color.getPaletteIndex());
+			else
+				g_lingo->lingoError("Lingo::setObjectProp: Invalid colorType #%s", colorType.c_str());
+		} else {
+			g_lingo->lingoError("Lingo::setObjectProp: Color <%s> has no property '%s'", obj.asString(true).c_str(), propName.c_str());
+		}
+		g_debugger->propWriteHook(propName);
+		return;
 	} else if (obj.type == POINT) {
 		if (propName.equalsIgnoreCase("locH")) {
 			obj.u.farr->arr[0] = val.asInt();

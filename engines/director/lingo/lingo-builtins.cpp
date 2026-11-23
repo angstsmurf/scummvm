@@ -221,6 +221,10 @@ static const BuiltinProto builtins[] = {
 	{ "duplicateFrame",	LB::b_duplicateFrame,0,0, 500, CBLTIN },	//				D5 c
 	{ "insertFrame",	LB::b_insertFrame,	0, 0, 500, CBLTIN },	//				D5 c
 	{ "updateFrame",	LB::b_updateFrame,	0, 0, 500, CBLTIN },	//				D5 c
+	// Color
+	{ "color",			LB::b_color,		2, 4, 700, FBLTIN },	//							D7 f
+	{ "paletteIndex",	LB::b_paletteIndex,	1, 1, 700, FBLTIN },	//							D7 f
+	{ "rgb",			LB::b_rgb,			1, 3, 700, FBLTIN },	//							D7 f
 	// Point
 	{ "point",			LB::b_point,		2, 2, 400, FBLTIN },	//			D4 f
 	// Rect
@@ -3955,6 +3959,73 @@ void LB::b_point(int nargs) {
 	d.type = POINT;
 
 	g_lingo->push(d);
+}
+
+// D7 colour objects. rgb() also takes a hex string, "#FF0000" or "FF0000".
+static bool parseHexColor(const Common::String &str, ColorRef &color) {
+	const char *s = str.c_str();
+	if (*s == '#')
+		s++;
+	if (strlen(s) != 6)
+		return false;
+	uint32 val = 0;
+	for (int i = 0; i < 6; i++) {
+		char c = s[i];
+		int v;
+		if (c >= '0' && c <= '9')
+			v = c - '0';
+		else if (c >= 'a' && c <= 'f')
+			v = c - 'a' + 10;
+		else if (c >= 'A' && c <= 'F')
+			v = c - 'A' + 10;
+		else
+			return false;
+		val = (val << 4) | v;
+	}
+	color.setRGB((val >> 16) & 0xff, (val >> 8) & 0xff, val & 0xff);
+	return true;
+}
+
+static Datum makeRGB(const Datum *args, int nargs) {
+	ColorRef color;
+	if (nargs == 3) {
+		color.setRGB(CLIP(args[0].asInt(), 0, 255), CLIP(args[1].asInt(), 0, 255), CLIP(args[2].asInt(), 0, 255));
+	} else if (nargs == 1 && args[0].type == STRING) {
+		if (!parseHexColor(args[0].asString(), color))
+			warning("LB::b_rgb: Invalid colour string \"%s\"", args[0].asString().c_str());
+	} else {
+		warning("LB::b_rgb: Unsupported arguments");
+	}
+	return Datum(color);
+}
+
+void LB::b_color(int nargs) {
+	Common::Array<Datum> args(nargs);
+	for (int i = nargs - 1; i >= 0; i--)
+		args[i] = g_lingo->pop();
+
+	Datum res;
+	Common::String colorType = args[0].asString();
+	if (colorType.equalsIgnoreCase("rgb")) {
+		res = makeRGB(&args[1], nargs - 1);
+	} else if (colorType.equalsIgnoreCase("paletteIndex") && nargs == 2) {
+		res = Datum(ColorRef(CLIP(args[1].asInt(), 0, 255)));
+	} else {
+		warning("LB::b_color: Unsupported colour type #%s with %d args", colorType.c_str(), nargs - 1);
+	}
+	g_lingo->push(res);
+}
+
+void LB::b_paletteIndex(int nargs) {
+	Datum d = g_lingo->pop();
+	g_lingo->push(Datum(ColorRef(CLIP(d.asInt(), 0, 255))));
+}
+
+void LB::b_rgb(int nargs) {
+	Common::Array<Datum> args(nargs);
+	for (int i = nargs - 1; i >= 0; i--)
+		args[i] = g_lingo->pop();
+	g_lingo->push(makeRGB(args.data(), nargs));
 }
 
 void LB::b_rect(int nargs) {

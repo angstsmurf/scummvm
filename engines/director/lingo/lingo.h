@@ -33,6 +33,7 @@ class SeekableReadStreamEndian;
 namespace Director {
 
 struct ChunkReference;
+struct ColorRef;
 struct MenuReference;
 struct PictureReference;
 struct TheEntity;
@@ -143,6 +144,7 @@ struct Datum {	/* interpreter stack type */
 		CastMemberID *cast;	/* CASTREF, FIELDREF */
 		MenuReference *menu; /* MENUREF	*/
 		PictureReference *picture; /* PICTUREREF */
+		ColorRef *color;	/* COLORREF */
 	} u;
 
 	int *refCount;
@@ -160,6 +162,7 @@ struct Datum {	/* interpreter stack type */
 	Datum(const CastMemberID &val);
 	Datum(const Common::Point &point);
 	Datum(const Common::Rect &rect);
+	Datum(const ColorRef &color);
 	void reset();
 
 	~Datum() {
@@ -212,6 +215,24 @@ struct MenuReference {
 	Common::String *menuItemIdStr;
 
 	MenuReference();
+};
+
+// A D7 colour object: color(#rgb, r, g, b) or color(#paletteIndex, n)
+struct ColorRef {
+	bool isRGB = true;
+	byte r = 0, g = 0, b = 0;
+	int index = 0;
+
+	ColorRef() {}
+	ColorRef(byte red, byte green, byte blue) : isRGB(true), r(red), g(green), b(blue) {}
+	explicit ColorRef(int paletteIndex) : isRGB(false), index(paletteIndex) {}
+
+	bool operator==(const ColorRef &c) const;
+	void getRGB(byte &red, byte &green, byte &blue) const;
+	int getPaletteIndex() const;
+	uint32 toWindowColor() const;
+	void setRGB(byte red, byte green, byte blue);
+	void setPaletteIndex(int paletteIndex);
 };
 
 struct PictureReference {

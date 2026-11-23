@@ -129,6 +129,7 @@ TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, TextXtraCastMe
 	_initialRect = source._initialRect;
 	_boundingRect = source._boundingRect;
 	_text = source._text;
+	_color = source._color.clone();
 	_loaded = source._loaded;
 	if (cast == source._cast)
 		_children = source._children;
@@ -177,6 +178,9 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 		fgColor = channel->_sprite->getForeColor();
 		bgColor = channel->_sprite->getBackColor();
 	}
+	// the color of member, set from Lingo, colours the whole text
+	if (_color.type == COLORREF)
+		fgColor = _color.u.color->toWindowColor();
 	Graphics::MacFont macFont(1, 12);
 	Graphics::MacText *widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(),
 			bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm, _text, &macFont,
@@ -188,6 +192,7 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 
 bool TextXtraCastMember::hasField(int field) {
 	switch (field) {
+	case kTheColor:
 	case kTheText:
 		return true;
 	default:
@@ -205,6 +210,10 @@ Datum TextXtraCastMember::getField(int field) {
 		d = Common::String("text");
 		d.type = SYMBOL;
 		break;
+	case kTheColor:
+		// TODO: Read the colour of the authored style runs
+		d = (_color.type == COLORREF) ? _color.clone() : Datum(ColorRef(0, 0, 0));
+		break;
 	case kTheText:
 		load();
 		d = _text.encode(Common::kUtf8);
@@ -219,6 +228,15 @@ Datum TextXtraCastMember::getField(int field) {
 
 void TextXtraCastMember::setField(int field, const Datum &d) {
 	switch (field) {
+	case kTheColor:
+		if (d.type == COLORREF) {
+			_color = d.clone();
+		} else {
+			// A plain number is a palette index
+			_color = Datum(ColorRef(CLIP(d.asInt(), 0, 255)));
+		}
+		setModified(true);
+		return;
 	case kTheText:
 		_text = Common::U32String(d.asString(), Common::kUtf8);
 		_loaded = true;
