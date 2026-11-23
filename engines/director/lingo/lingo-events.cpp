@@ -275,7 +275,10 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 				if (_vm->getVersion() >= 600) {
 					if (event.behaviorIndex >= 0) {
 						if (event.behaviorIndex >= (int)sprite->_behaviors.size()) {
-							warning("Movie::resolveScriptEvent: invalid behavior index %d, ignoring", event.behaviorIndex);
+							// An instance Lingo added to the scriptInstanceList
+							// has no score behavior entry
+							if (event.behaviorIndex >= (int)_score->_channels[event.channelId]->scriptInstances().size())
+								warning("Movie::resolveScriptEvent: invalid behavior index %d, ignoring", event.behaviorIndex);
 						} else {
 							scriptId = sprite->_behaviors[event.behaviorIndex].memberID;
 							initializerParams = sprite->_behaviors[event.behaviorIndex].initializerParams;

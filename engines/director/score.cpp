@@ -1923,7 +1923,11 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && _channels[i]->_sprite->respondsToMouse())
+		// D6+: script instances added by Lingo (add(the scriptInstanceList
+		// of sprite n, ...)) make the sprite respond like score behaviors
+		bool responds = _channels[i]->_sprite->respondsToMouse() ||
+			(g_director->getVersion() >= 600 && !_channels[i]->scriptInstances().empty());
+		if (test == kCollisionYes && responds)
 			return i;
 		else if (test == kCollisionHole)
 			break;
