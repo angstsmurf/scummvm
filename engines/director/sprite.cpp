@@ -410,9 +410,15 @@ bool Sprite::respondsToMouse() {
 		return ((MovieCastMember *)_cast)->_enableScripts;
 
 	// TODO: Check if we need to check against individual events like below
+	// A behavior counts only if its script exists: Egypt's image pages
+	// have a score behavior pointing at an empty cast slot on the
+	// selector sprite, which must not catch the clicks for the
+	// "Zoom" labels under it
 	if (g_director->getVersion() >= 600) {
-		if (_behaviors.size() > 0)
-			return true;
+		for (auto &behavior : _behaviors) {
+			if (_movie->getScriptContext(kScoreScript, behavior.memberID))
+				return true;
+		}
 	}
 
 	ScriptContext *spriteScript = _movie->getScriptContext(kScoreScript, _scriptId);
