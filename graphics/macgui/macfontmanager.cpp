@@ -713,7 +713,11 @@ int MacFontManager::registerFontName(Common::String name, int preferredId) {
 
 	FontInfo *info = new FontInfo;
 	info->name = name;
-	if (preferredId >= 0x4000) {
+	// Mac font IDs from 0x4000 belong to non-Roman scripts. IDs from 0x8000
+	// are not Mac script fonts: Windows movies number their font map from
+	// there (Egypt's Arial is 0x8001), so only a Japanese game gets Shift JIS
+	if ((preferredId >= 0x4000 && preferredId < 0x8000) ||
+			(preferredId >= 0x8000 && _language == Common::JA_JPN)) {
 		info->lang = Common::JA_JPN;
 		info->encoding = Common::kWindows932; // default to Shift JIS
 	} else {
