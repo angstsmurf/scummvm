@@ -166,6 +166,8 @@ DirectorPlotData Channel::getPlotData() {
 	// Disable custom fgColor/bgColor blits for videos
 	} else if (_sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
 		pd.applyColor = false;
+	} else if (_sprite->_cast && _sprite->_cast->hasOwnColors()) {
+		pd.applyColor = false;
 	} else {
 		pd.setApplyColor();
 	}

@@ -30,6 +30,7 @@
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/cursorxtra.h"
 #include "director/lingo/xtras-cast/textxtra.h"
+#include "director/lingo/xtras-cast/vectorshape.h"
 
 namespace Director {
 
@@ -42,6 +43,7 @@ static const XtraCastMemberProto xtraCastMemberProtos[] = {
 	{ "cursor", CursorXtra::createCastMember },
 	{ "quickTimeMedia", DigitalVideoCastMember::createFromXtra },
 	{ "text", TextXtra::createCastMember },
+	{ "vectorShape", VectorShape::createCastMember },
 	{ "font", nullptr },
 	{ nullptr, nullptr },
 };

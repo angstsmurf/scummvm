@@ -73,6 +73,9 @@ public:
 	virtual void updateWidget(Graphics::MacWidget *widget, Channel *channel) {}
 	virtual void updateFromWidget(Graphics::MacWidget *widget, bool spriteEditable) {}
 	virtual Common::Rect getInitialRect() { return _initialRect; }
+	// The widget is drawn in the member's own colours: the sprite's fore/back
+	// colours must not colourize it
+	virtual bool hasOwnColors() { return false; }
 
 	virtual void setColors(uint32 *fgcolor, uint32 *bgcolor) { return; }
 	virtual uint32 getForeColor() { return 0; }

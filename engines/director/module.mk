@@ -198,6 +198,7 @@ MODULE_OBJS = \
 	lingo/xlibs/y/yasix.o \
 	lingo/xtras-cast/cursorxtra.o \
 	lingo/xtras-cast/textxtra.o \
+	lingo/xtras-cast/vectorshape.o \
 	lingo/xtras/a/audio.o \
 	lingo/xtras/b/border.o \
 	lingo/xtras/b/budapi.o \
