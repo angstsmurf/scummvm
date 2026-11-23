@@ -199,6 +199,7 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 
 	_activeWidget = nullptr;
 	_lockedWidget = nullptr;
+	_mouseCaptureWindow = nullptr;
 	_backgroundWindow = nullptr;
 
 	_mouseDown = false;
@@ -1200,6 +1201,16 @@ bool MacWindowManager::processEvent(Common::Event &event) {
 		}
 	}
 
+	// The window that got the mouse down keeps the mouse until the button
+	// is released, also when the pointer leaves it
+	if (_mouseCaptureWindow && (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP)) {
+		BaseMacWindow *w = _mouseCaptureWindow;
+		if (event.type == Common::EVENT_LBUTTONUP)
+			_mouseCaptureWindow = nullptr;
+
+		return w->processEvent(event);
+	}
+
 	for (Common::List<BaseMacWindow *>::const_iterator it = _windowStack.end(); it != _windowStack.begin();) {
 		it--;
 		BaseMacWindow *w = *it;
@@ -1209,6 +1220,9 @@ bool MacWindowManager::processEvent(Common::Event &event) {
 				(w->isVisible() && w->getDimensions().contains(event.mouse.x, event.mouse.y))) {
 			if ((event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP) && (!_backgroundWindow || w != _backgroundWindow))
 				setActiveWindow(w->getId());
+
+			if (event.type == Common::EVENT_LBUTTONDOWN)
+				_mouseCaptureWindow = w;
 
 			return w->processEvent(event);
 		}
@@ -1246,6 +1260,8 @@ void MacWindowManager::removeMarked() {
 		removeFromWindowList(*it);
 		if (_lockedWidget == *it)
 			_lockedWidget = nullptr;
+		if (_mouseCaptureWindow == *it)
+			_mouseCaptureWindow = nullptr;
 		if ((*it)->getId() == _activeWindow)
 			_activeWindow = -1;
 		delete *it;

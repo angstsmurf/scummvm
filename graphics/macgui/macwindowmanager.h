@@ -500,6 +500,7 @@ private:
 
 	MacWidget *_activeWidget;
 	MacWidget *_lockedWidget;
+	BaseMacWindow *_mouseCaptureWindow;
 	MacWindow *_backgroundWindow;
 
 	PauseToken *_screenCopyPauseToken;
