@@ -975,9 +975,13 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 		return instance;
 
 	// Evaluate the params
+	// A behavior may be created while a handler runs (a go from Lingo):
+	// stop when value() returns, or the rest of that handler runs here and
+	// takes the result off the stack
+	int depth = g_lingo->_state->callstack.size();
 	g_lingo->push(behavior->initializerParams);
 	LB::b_value(1);
-	g_lingo->execute();
+	g_lingo->execute(depth);
 
 	if (debugChannelSet(5, kDebugLingoExec)) {
 		g_lingo->printStack("  Parsed behavior parameters: ", 0);
@@ -992,8 +996,8 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 	Datum proplist = _lingo->pop();
 
 	if (proplist.type != PARRAY) {
-		warning("Score::createScriptInstance(): Could not evaluate initializer params '%s' for behavior %s",
-			behavior->initializerParams.c_str(), behavior->toString().c_str());
+		warning("Score::createScriptInstance(): Initializer params '%s' for behavior %s gave %s, not a property list",
+			behavior->initializerParams.c_str(), behavior->toString().c_str(), proplist.asString(true).c_str());
 		return instance;
 	}
 
