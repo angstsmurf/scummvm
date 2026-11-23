@@ -1912,7 +1912,9 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 				channel->setDirty();
 			}
 
-			if (d.asInt() == 0)
+			// 100 is opaque; 0 is fully transparent, not "no blend" (Bad
+			// Milk hides its stage-sized mouse detection sprite with blend 0)
+			if (d.asInt() >= 100)
 				sprite->_thickness &= ~kTHasBlend;
 			else
 				sprite->_thickness |= kTHasBlend;
