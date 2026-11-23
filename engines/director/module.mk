@@ -213,6 +213,7 @@ MODULE_OBJS = \
 	lingo/xtras/k/keypoll.o \
 	lingo/xtras/m/masterapp.o \
 	lingo/xtras/m/mbox.o \
+	lingo/xtras/m/mmapi.o \
 	lingo/xtras/m/mui.o \
 	lingo/xtras/n/netlingo.o \
 	lingo/xtras/o/openurl.o \
@@ -230,7 +231,10 @@ MODULE_OBJS = \
 	lingo/xtras/s/staytoonedhigh.o \
 	lingo/xtras/s/staytoonedober.o \
 	lingo/xtras/s/staytoonedtoon.o \
+	lingo/xtras/t/table.o \
 	lingo/xtras/t/timextra.o \
+	lingo/xtras/v/v12dbe.o \
+	lingo/xtras/v/v12table.o \
 	lingo/xtras/x/xsound.o
 
 

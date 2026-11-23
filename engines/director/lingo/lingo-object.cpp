@@ -177,6 +177,7 @@
 #include "director/lingo/xtras/k/keypoll.h"
 #include "director/lingo/xtras/m/masterapp.h"
 #include "director/lingo/xtras/m/mbox.h"
+#include "director/lingo/xtras/m/mmapi.h"
 #include "director/lingo/xtras/m/mui.h"
 #include "director/lingo/xtras/n/netlingo.h"
 #include "director/lingo/xtras/o/openurl.h"
@@ -194,7 +195,10 @@
 #include "director/lingo/xtras/s/staytoonedober.h"
 #include "director/lingo/xtras/s/staytoonedtoon.h"
 #include "director/lingo/xtras/s/setmouse.h"
+#include "director/lingo/xtras/t/table.h"
 #include "director/lingo/xtras/t/timextra.h"
+#include "director/lingo/xtras/v/v12dbe.h"
+#include "director/lingo/xtras/v/v12table.h"
 #include "director/lingo/xtras/x/xsound.h"
 
 namespace Director {
@@ -345,6 +349,7 @@ static const struct XLibProto {
 	XLIBDEF(LabelDrvXObj,		kXObj,			400),	// D4
 	XLIBDEF(ListDevXObj,		kXObj,			500),	// D5
 	XLIBDEF(MBoxXtra,			kXtraObj,					500),	// D5
+	XLIBDEF(MMAPIXtra,			kXtraObj,					700),	// D7
 	XLIBDEF(MMovieXObj,			kXObj,			400),	// D4
 	XLIBDEF(ManiacBgXObj,		kXObj,			300),	// D3
 	XLIBDEF(MapNavigatorXObj,	kXObj,			400),	// D4
@@ -414,10 +419,13 @@ static const struct XLibProto {
 	XLIBDEF(StayToonedOberXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(StayToonedToonXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SysColorXObj,		kXObj,			400),	// D4
+	XLIBDEF(TableXtra,			kXtraObj,					700),	// D7
 	XLIBDEF(TemnotaXObj,			kXObj,					400),	// D4
 	XLIBDEF(TenguXObj,			kXObj,			400),	// D4
 	XLIBDEF(TimextraXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(UnitTestXObj,		kXObj,			400),	// D4
+	XLIBDEF(V12dbeXtra,			kXtraObj,					700),	// D7
+	XLIBDEF(V12tableXtra,			kXtraObj,					700),	// D7
 	XLIBDEF(VMPresentXObj,		kXObj,			400),	// D4
 	XLIBDEF(VMisOnXFCN,			kXObj,			400),	// D4
 	XLIBDEF(ValkyrieXObj,		kXObj,			400),	// D4
