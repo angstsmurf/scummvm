@@ -1762,7 +1762,7 @@ const byte equalityTableD6win[256] = {
 };
 
 //
-// Director 3, 4, 5 Mac MacRoman
+// Director 3, 4, 5, 6 Mac MacRoman (also used for D7-D8.5 Mac, see getCharEquality)
 //
 
 const byte equalityTableD3mac[256] = {
@@ -1785,7 +1785,7 @@ const byte equalityTableD3mac[256] = {
 };
 
 //
-// Director 3, 4, 5 Mac MacJapanese
+// Director 3, 4, 5, 6 Mac MacJapanese
 //
 
 const byte equalityTableD3macJa[256] = {
@@ -1875,10 +1875,12 @@ static int getCharEquality(Common::u32char_type_t ch) {
 	Common::Language lang = g_director->getLanguage();
 	int version = g_director->getVersion();
 
-	if (pl == Common::kPlatformMacintosh && lang != Common::JA_JPN && version < 600)
+	// The Mac order table is unchanged from D2 to D8.5 (orderTableD2mac ==
+	// orderTableD8mac), so the Mac equality table is assumed to hold up to D8.5 too.
+	if (pl == Common::kPlatformMacintosh && lang != Common::JA_JPN && version < 900)
 		return equalityTableD3mac[num];
 
-	if (pl == Common::kPlatformMacintosh && lang == Common::JA_JPN && version < 600)
+	if (pl == Common::kPlatformMacintosh && lang == Common::JA_JPN && version < 700)
 		return equalityTableD3macJa[num];
 
 	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 500)
