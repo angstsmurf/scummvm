@@ -862,6 +862,14 @@ Common::String DigitalVideoCastMember::formatInfo() {
 Common::Rect DigitalVideoCastMember::getInitialRect() {
 	// Sprites are sized from this rect, and the widget stretches the
 	// decoded frame to the sprite bbox, so scaling here scales rendering.
+	// A QuickTime Asset Xtra member keeps its size in the cast info's
+	// xtraRect (centred on the registration point): use it until the movie
+	// file is loaded, or a sprite set to this member gets no size.
+	if (_qtmovie && _initialRect.isEmpty()) {
+		CastMemberInfo *ci = getCast()->getCastMemberInfo(_castId);
+		if (ci && ci->xtraRect.right > ci->xtraRect.left && ci->xtraRect.bottom > ci->xtraRect.top)
+			_initialRect = Common::Rect(ci->xtraRect.right - ci->xtraRect.left, ci->xtraRect.bottom - ci->xtraRect.top);
+	}
 	Common::Rect rect = _initialRect;
 	if (_scaleX > 0 && _scaleX != 100)
 		rect.setWidth(_initialRect.width() * _scaleX / 100);
