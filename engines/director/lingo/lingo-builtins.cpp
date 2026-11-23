@@ -95,8 +95,9 @@ static const BuiltinProto builtins[] = {
 	{ "getLast",		LB::b_getLast,		1, 1, 400, FBLTIN_LIST },	//			D4 f
 	{ "getOne",			LB::b_getOne,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPos",			LB::b_getPos,		2, 2, 400, FBLTIN_LIST },	//			D4 f
-	{ "getProp",		LB::b_getProp,		2, 2, 400, FBLTIN_LIST },	//			D4 f
+	{ "getProp",		LB::b_getProp,		2, 4, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropAt",		LB::b_getPropAt,	2, 2, 400, FBLTIN_LIST },	//			D4 f
+	{ "getPropRef",		LB::b_getPropRef,	3, 4, 700, FBLTIN_LIST },	//					D7 (dot syntax)
 	{ "list",			LB::b_list,			-1,0, 400, FBLTIN_LIST },	//			D4 f
 	{ "listP",			LB::b_listP,		1, 1, 400, FBLTIN_LIST },	//			D4 f
 	{ "max",			LB::b_max,			-1,0, 400, FBLTIN_LIST },	//			D4 f
@@ -1233,7 +1234,102 @@ void LB::b_getPos(int nargs) {
 	}
 }
 
+// D7 compiles an assignment through an indexed dot property, e.g.
+// me.quad[1].locV = 5, to getPropRef(me, #quad, 1) followed by a field
+// assignment. Return the element itself (lists, points and rects share their
+// storage) so the assignment changes the stored value; chunks of a string
+// property become chunk references.
+void LB::b_getPropRef(int nargs) {
+	Datum indexTo = (nargs > 3) ? g_lingo->pop() : Datum(0);
+	Datum indexFrom = g_lingo->pop();
+	Datum prop = g_lingo->pop();
+	Datum src = g_lingo->pop();
+
+	if (prop.type != SYMBOL && prop.type != STRING) {
+		g_lingo->lingoError("b_getPropRef: symbol expected, got %s", prop.type2str());
+		g_lingo->push(Datum());
+		return;
+	}
+	Common::String propName = prop.asString();
+
+	if (src.type == STRING || src.isRef()) {
+		ChunkType chunkType;
+		bool isChunk = true;
+		if (propName.equalsIgnoreCase("char"))
+			chunkType = kChunkChar;
+		else if (propName.equalsIgnoreCase("word"))
+			chunkType = kChunkWord;
+		else if (propName.equalsIgnoreCase("line"))
+			chunkType = kChunkLine;
+		else if (propName.equalsIgnoreCase("item"))
+			chunkType = kChunkItem;
+		else
+			isChunk = false;
+		if (isChunk) {
+			g_lingo->push(LC::chunkRef(chunkType, indexFrom.asInt(), indexTo.asInt(), src));
+			return;
+		}
+	}
+
+	g_lingo->getObjectProp(src, propName);
+	Datum list = g_lingo->pop();
+
+	int index = indexFrom.asInt();
+	Datum result;
+	switch (list.type) {
+	case ARRAY:
+	case POINT:
+	case RECT:
+		if (index > 0 && index <= (int)list.u.farr->arr.size())
+			result = list.u.farr->arr[index - 1];
+		else
+			g_lingo->lingoError("b_getPropRef: index %d out of range for %s", index, list.type2str());
+		break;
+	case PARRAY:
+		if (index > 0 && index <= (int)list.u.parr->arr.size())
+			result = list.u.parr->arr[index - 1].v;
+		else
+			g_lingo->lingoError("b_getPropRef: index %d out of range for %s", index, list.type2str());
+		break;
+	default:
+		g_lingo->lingoError("BUILDBOT: b_getPropRef: unhandled %s.%s[%d]", list.type2str(), propName.c_str(), index);
+		break;
+	}
+	g_lingo->push(result);
+}
+
 void LB::b_getProp(int nargs) {
+	// D7 compiles dot syntax chunks, e.g. vText.line[1] or vText.char[2..4],
+	// to getProp(vText, #line, 1) and getProp(vText, #char, 2, 4)
+	if (nargs > 2) {
+		Datum indexTo = (nargs > 3) ? g_lingo->pop() : Datum(0);
+		Datum indexFrom = g_lingo->pop();
+		Datum prop = g_lingo->pop();
+		Datum src = g_lingo->pop();
+
+		ChunkType chunkType = kChunkChar;
+		bool isChunk = prop.type == SYMBOL && (src.type == STRING || src.isRef());
+		if (isChunk) {
+			if (prop.u.s->equalsIgnoreCase("char"))
+				chunkType = kChunkChar;
+			else if (prop.u.s->equalsIgnoreCase("word"))
+				chunkType = kChunkWord;
+			else if (prop.u.s->equalsIgnoreCase("line"))
+				chunkType = kChunkLine;
+			else if (prop.u.s->equalsIgnoreCase("item"))
+				chunkType = kChunkItem;
+			else
+				isChunk = false;
+		}
+		if (!isChunk) {
+			g_lingo->lingoError("BUILDBOT: b_getProp: Unhandled call with %d args on %s, %s", nargs, src.type2str(), prop.asString(true).c_str());
+			g_lingo->push(Datum());
+			return;
+		}
+		g_lingo->push(LC::chunkRef(chunkType, indexFrom.asInt(), indexTo.asInt(), src).eval());
+		return;
+	}
+
 	Datum prop = g_lingo->pop();
 	Datum list = g_lingo->pop();
 

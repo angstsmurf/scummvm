@@ -61,6 +61,7 @@ void b_duplicateList(int nargs);
 void b_findPos(int nargs);
 void b_findPosNear(int nargs);
 void b_getaProp(int nargs);
+void b_getPropRef(int nargs);
 void b_getAt(int nargs);
 void b_getLast(int nargs);
 void b_getOne(int nargs);
