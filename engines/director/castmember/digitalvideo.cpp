@@ -240,11 +240,36 @@ enum {
 	kQTflag_Stream      = 0x10000
 };
 
+// The flags of the QuickTime 3 Asset Xtra (serialization version 0x1007
+// and below), stored as a BE16 word after the version.
+enum {
+	kQT3flag_Controller = 0x1,
+	kQT3flag_Crop       = 0x2,
+	kQT3flag_Center     = 0x4,
+	kQT3flag_DTS        = 0x10,
+	kQT3flag_Loop       = 0x80,
+	kQT3flag_PAS        = 0x100,
+	kQT3flag_Sound      = 0x200,
+	kQT3flag_Video      = 0x2000
+};
+
 CastMember *DigitalVideoCastMember::createFromXtra(Cast *cast, uint16 castId, XtraCastMember *xtra) {
 	DigitalVideoCastMember *dv = new DigitalVideoCastMember(cast, castId);
 	dv->_qtmovie = true;
 	const Common::Array<byte> &data = xtra->getXtraData();
-	if (data.size() >= 8) {
+	if (data.size() >= 8 && READ_BE_UINT16(&data[2]) <= 0x1007) {
+		// The QuickTime 3 Asset Xtra of Director 6 keeps its flags in
+		// 16-bit words, with some other bits than the later versions
+		uint16 flags = READ_BE_UINT16(&data[4]);
+		dv->_showControls = (flags & kQT3flag_Controller) != 0;
+		dv->_crop = (flags & kQT3flag_Crop) != 0;
+		dv->_center = (flags & kQT3flag_Center) != 0;
+		dv->_directToStage = (flags & kQT3flag_DTS) != 0;
+		dv->_looping = (flags & kQT3flag_Loop) != 0;
+		dv->_pausedAtStart = (flags & kQT3flag_PAS) != 0;
+		dv->_enableSound = (flags & kQT3flag_Sound) != 0;
+		dv->_enableVideo = (flags & kQT3flag_Video) != 0;
+	} else if (data.size() >= 8) {
 		uint32 flags = READ_BE_UINT32(&data[4]);
 		dv->_showControls = (flags & kQTflag_Controller) != 0;
 		dv->_crop = (flags & kQTflag_Crop) != 0;
