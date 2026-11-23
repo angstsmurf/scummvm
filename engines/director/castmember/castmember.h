@@ -87,6 +87,9 @@ public:
 	virtual void setBackColor(uint32 bgCol) { return; }
 	// The colors come from the sprite; Lingo reads the member's as 0 and 255
 	virtual bool colorsLiveOnSprite() { return false; }
+	// Sprite methods of asset Xtras, e.g. sprite(n).MMSetOrg(x, y); args
+	// exclude the sprite. Returns false if the member has no such method.
+	virtual bool callSpriteMethod(const Common::String &name, const Common::Array<Datum> &args, Datum &result) { return false; }
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;

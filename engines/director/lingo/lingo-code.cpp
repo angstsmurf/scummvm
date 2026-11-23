@@ -1701,6 +1701,28 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 		}
 	}
 
+	// Asset Xtra sprite method: sprite(n).MMSetOrg(x, y)
+	if (nargs > 0 && g_director->getVersion() >= 600) {
+		Datum firstArg = g_lingo->_state->stack[g_lingo->_state->stack.size() - nargs];
+		if (firstArg.type == SPRITEREF) {
+			Movie *movie = g_director->getCurrentMovie();
+			Channel *channel = movie ? movie->getScore()->getChannelById(firstArg.u.i) : nullptr;
+			CastMember *member = (channel && channel->_sprite) ? movie->getCastMember(channel->_sprite->_castId) : nullptr;
+			if (member && member->_type == kCastXtra) {
+				Common::Array<Datum> args;
+				for (int i = 1; i < nargs; i++)
+					args.push_back(g_lingo->_state->stack[g_lingo->_state->stack.size() - nargs + i]);
+				Datum result;
+				if (member->callSpriteMethod(name, args, result)) {
+					g_lingo->dropStack(nargs);
+					if (allowRetVal)
+						g_lingo->push(result);
+					return;
+				}
+			}
+		}
+	}
+
 	bool useListBuiltin = false;
 	if (g_lingo->_builtinListHandlers.contains(name) && nargs >= 1) {
 		Datum firstArg = g_lingo->peek(nargs - 1);

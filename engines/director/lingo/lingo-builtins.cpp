@@ -46,6 +46,7 @@
 #include "director/castmember/sound.h"
 #include "director/castmember/text.h"
 #include "director/castmember/transition.h"
+#include "director/lingo/xtras-cast/mmbigimg.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-code.h"
 #include "director/lingo/lingo-codegen.h"
@@ -2940,6 +2941,9 @@ void LB::b_new(int nargs) {
 		member = new DigitalVideoCastMember(cast, id.member);
 	} else if (name.equalsIgnoreCase("sound")) {
 		member = new SoundCastMember(cast, id.member);
+	} else if (name.equalsIgnoreCase("MMBigImg")) {
+		// Egypt's magnifier: set gBI to new(#MMBigImg)
+		member = new MMBigImgCastMember(cast, id.member);
 	} else {
 		warning("STUB: b_new(): cannot create #%s members", name.c_str());
 		g_lingo->pushVoid();

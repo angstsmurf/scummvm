@@ -197,6 +197,7 @@ MODULE_OBJS = \
 	lingo/xlibs/x/xwin.o \
 	lingo/xlibs/y/yasix.o \
 	lingo/xtras-cast/cursorxtra.o \
+	lingo/xtras-cast/mmbigimg.o \
 	lingo/xtras-cast/mmdith.o \
 	lingo/xtras-cast/textxtra.o \
 	lingo/xtras-cast/vectorshape.o \

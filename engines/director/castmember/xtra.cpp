@@ -29,6 +29,7 @@
 #include "director/castmember/digitalvideo.h"
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/cursorxtra.h"
+#include "director/lingo/xtras-cast/mmbigimg.h"
 #include "director/lingo/xtras-cast/mmdith.h"
 #include "director/lingo/xtras-cast/textxtra.h"
 #include "director/lingo/xtras-cast/vectorshape.h"
@@ -42,6 +43,7 @@ struct XtraCastMemberProto {
 
 static const XtraCastMemberProto xtraCastMemberProtos[] = {
 	{ "cursor", CursorXtra::createCastMember },
+	{ "MMBigImg", MMBigImg::createCastMember },
 	{ "MMDith", MMDith::createCastMember },
 	{ "quickTimeMedia", DigitalVideoCastMember::createFromXtra },
 	{ "text", TextXtra::createCastMember },
