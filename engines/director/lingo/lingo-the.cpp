@@ -233,6 +233,7 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"name",			kTheName,		600 },//						D6 p
 	{ kTheSprite,	"pattern",		kThePattern,	200 },// D2 p
 	{ kTheSprite,	"puppet",		kThePuppet,		200 },// D2 p
+	{ kTheSprite,	"quad",			kTheQuad,		700 },//							D7 p
 	{ kTheSprite,	"rect",			kTheRect,		400 },//				D4 p ???
 	{ kTheSprite,	"right",		kTheRight,		200 },// D2 p
 	{ kTheSprite,	"scoreColor",	kTheScoreColor,	400 },//				D4 p
@@ -1784,6 +1785,30 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kThePuppet:
 		d = sprite->_puppet;
 		break;
+	case kTheQuad:
+		{
+			d.type = ARRAY;
+			d.u.farr = new FArray;
+			Common::Rect bbox = channel->getBbox();
+			const int corners[4][2] = {
+				{ bbox.left, bbox.top }, { bbox.right, bbox.top },
+				{ bbox.right, bbox.bottom }, { bbox.left, bbox.bottom }
+			};
+			for (int i = 0; i < 4; i++) {
+				Datum p;
+				p.type = POINT;
+				p.u.farr = new FArray;
+				if (sprite->_hasQuad) {
+					p.u.farr->arr.push_back(Datum((double)sprite->_quad[i][0]));
+					p.u.farr->arr.push_back(Datum((double)sprite->_quad[i][1]));
+				} else {
+					p.u.farr->arr.push_back(Datum(corners[i][0]));
+					p.u.farr->arr.push_back(Datum(corners[i][1]));
+				}
+				d.u.farr->arr.push_back(p);
+			}
+		}
+		break;
 	case kTheRect:
 		// let compiler to optimize this
 		{
@@ -2036,6 +2061,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		}
 		break;
 	case kTheHeight:
+		sprite->_hasQuad = false;
 		if (d.asInt() != channel->getHeight() || !sprite->_stretch) {
 			channel->setHeight(d.asInt());
 		}
@@ -2128,7 +2154,39 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			sprite->_moveable = false;
 		}
 		break;
+	case kTheQuad:
+		{
+			float q[4][2];
+			bool valid = d.type == ARRAY && d.u.farr->arr.size() == 4;
+			for (int i = 0; valid && i < 4; i++) {
+				Datum &p = d.u.farr->arr[i];
+				if ((p.type != POINT && p.type != ARRAY) || p.u.farr->arr.size() < 2) {
+					valid = false;
+					break;
+				}
+				q[i][0] = (float)p.u.farr->arr[0].asFloat();
+				q[i][1] = (float)p.u.farr->arr[1].asFloat();
+			}
+			if (!valid) {
+				g_lingo->lingoError("Lingo::setTheSprite(): quad needs a list of four points, got %s", d.asString(true).c_str());
+				break;
+			}
+			float minX = q[0][0], maxX = q[0][0], minY = q[0][1], maxY = q[0][1];
+			for (int i = 1; i < 4; i++) {
+				minX = MIN(minX, q[i][0]);
+				maxX = MAX(maxX, q[i][0]);
+				minY = MIN(minY, q[i][1]);
+				maxY = MAX(maxY, q[i][1]);
+			}
+			// Set first: a quad sprite keeps its bitmap at the member's own size
+			memcpy(sprite->_quad, q, sizeof(q));
+			sprite->_hasQuad = true;
+			channel->setBbox((int)floorf(minX), (int)floorf(minY), (int)ceilf(maxX), (int)ceilf(maxY));
+			channel->setDirty();
+		}
+		break;
 	case kTheRect:
+		sprite->_hasQuad = false;
 		if (d.type == RECT || (d.type == ARRAY && d.u.farr->arr.size() >= 4)) {
 			channel->setBbox(
 				d.u.farr->arr[0].u.i, d.u.farr->arr[1].u.i,
@@ -2192,6 +2250,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		sprite->_volume = d.asInt();
 		break;
 	case kTheWidth:
+		sprite->_hasQuad = false;
 		if (d.asInt() != channel->getWidth() || !sprite->_stretch) {
 			channel->setWidth(d.asInt());
 		}

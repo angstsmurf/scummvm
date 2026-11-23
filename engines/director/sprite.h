@@ -175,6 +175,12 @@ public:
 	byte _blendAmount;
 	uint32 _unk3;
 
+	// D7 'the quad of sprite': the corners (top left, top right, bottom
+	// right, bottom left) the member is warped to. The bbox is their
+	// bounding box. Dropped when the rect is set again.
+	bool _hasQuad = false;
+	float _quad[4][2];
+
 	bool _enabled;
 	SpriteType _spriteType;
 	byte _inkData;

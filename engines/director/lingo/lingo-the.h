@@ -269,6 +269,7 @@ enum TheFieldType {
 	kThePreLoadMode,
 	kThePuppet,
 	kThePurgePriority,
+	kTheQuad,
 	kTheRect,
 	kTheRegPoint,
 	kTheRight,

@@ -157,6 +157,8 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_bgColorB = sprite._bgColorB;
 	_angleRot = sprite._angleRot;
 	_angleSkew = sprite._angleSkew;
+	_hasQuad = sprite._hasQuad;
+	memcpy(_quad, sprite._quad, sizeof(_quad));
 
 	_behaviors = sprite._behaviors;
 
@@ -624,6 +626,13 @@ Common::Point Sprite::getPosition() {
 }
 
 void Sprite::setPosition(int x, int y) {
+	// A warped sprite moves with its corners
+	if (_hasQuad) {
+		for (int i = 0; i < 4; i++) {
+			_quad[i][0] += x - _startPoint.x;
+			_quad[i][1] += y - _startPoint.y;
+		}
+	}
 	_startPoint = Common::Point(x, y);
 
 	// Based on Director in a Nutshell, page 15
@@ -708,6 +717,10 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		// The only thing we want to copy over is the script ID.
 		return;
 	}
+
+	// The score's rect replaces a quad set from Lingo
+	if (!getAutoPuppet(kAPBbox))
+		_hasQuad = false;
 
 	bool editable = nextSprite->_editable;
 

@@ -88,6 +88,10 @@ Channel& Channel::operator=(const Channel &channel) {
 	_widget = nullptr;
 	_constraint = channel._constraint;
 	_mask = nullptr;
+	_quadSurface = nullptr;
+	_quadMask = nullptr;
+	_quadValid = false;
+	_quadKeySrf = nullptr;
 
 	_priority = channel._priority;
 
@@ -128,6 +132,8 @@ Channel::~Channel() {
 
 	if (_mask)
 		delete _mask;
+	delete _quadSurface;
+	delete _quadMask;
 	if (_sprite)
 		delete _sprite;
 }
@@ -148,6 +154,10 @@ DirectorPlotData Channel::getPlotData() {
 	pd.dst = nullptr;
 
 	pd.srf = getSurface();
+	if (_sprite->_hasQuad && pd.srf) {
+		buildQuad(pd.srf, false);
+		pd.srf = _quadSurface;
+	}
 	if (_sprite->_spriteType == kBitmapSprite &&
 		_sprite->_cast && _sprite->_cast->_type == kCastBitmap &&
 		((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 1) {
@@ -211,6 +221,101 @@ Graphics::ManagedSurface *Channel::getSurface() {
 }
 
 const Graphics::Surface *Channel::getMask(bool forceMatte) {
+	if (_sprite->_hasQuad && _sprite->_cast && _sprite->_spriteType != kTextSprite) {
+		Graphics::ManagedSurface *srf = getSurface();
+		if (!srf)
+			return getSourceMask(forceMatte);
+		buildQuad(srf, forceMatte);
+		return _quadMask ? &_quadMask->rawSurface() : nullptr;
+	}
+	return getSourceMask(forceMatte);
+}
+
+// Warps the sprite's surface, drawn at the bbox, to its quad: each pixel of
+// the bbox is mapped back through the projective transform of the unit
+// square onto the quad. Pixels outside the quad, or outside the ink's own
+// matte, are left out of the mask.
+void Channel::buildQuad(Graphics::ManagedSurface *srf, bool forceMatte) {
+	Common::Rect bbox = getBbox();
+	int w = bbox.width(), h = bbox.height();
+
+	// getPlotData and getMask both ask for it on every draw
+	if (_quadValid && _quadKeySrf == srf && _quadKeyBbox == bbox && _quadKeyInk == _sprite->_ink &&
+			_quadKeyMatte == forceMatte && !memcmp(_quadKeyQuad, _sprite->_quad, sizeof(_quadKeyQuad)))
+		return;
+	_quadValid = true;
+	_quadKeySrf = srf;
+	_quadKeyBbox = bbox;
+	_quadKeyInk = _sprite->_ink;
+	_quadKeyMatte = forceMatte;
+	memcpy(_quadKeyQuad, _sprite->_quad, sizeof(_quadKeyQuad));
+
+	if (!_quadSurface || _quadSurface->w != w || _quadSurface->h != h || _quadSurface->format != srf->format) {
+		delete _quadSurface;
+		_quadSurface = new Graphics::ManagedSurface(MAX(w, 1), MAX(h, 1), srf->format);
+	}
+	if (!_quadMask || _quadMask->w != _quadSurface->w || _quadMask->h != _quadSurface->h) {
+		delete _quadMask;
+		_quadMask = new Graphics::ManagedSurface(_quadSurface->w, _quadSurface->h, Graphics::PixelFormat::createFormatCLUT8());
+	}
+	_quadSurface->clear();
+	_quadMask->clear(0);
+
+	// The widget keeps its size while the quad changes, so take the mask at
+	// the source's size: it then stays cached and lines up with the pixels.
+	const Graphics::Surface *srcMask = getSourceMask(forceMatte, srf->w, srf->h);
+
+	// Square to quad (Heckbert): x = (a u + b v + c) / (g u + h v + 1)
+	const float (*q)[2] = _sprite->_quad;
+	double x0 = q[0][0], y0 = q[0][1], x1 = q[1][0], y1 = q[1][1];
+	double x2 = q[2][0], y2 = q[2][1], x3 = q[3][0], y3 = q[3][1];
+	double sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+	double a, b, c, d, e, f, g = 0.0, hh = 0.0;
+	if (fabs(sx) < 1e-9 && fabs(sy) < 1e-9) {
+		a = x1 - x0; b = x3 - x0; d = y1 - y0; e = y3 - y0;
+	} else {
+		double dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+		double den = dx1 * dy2 - dx2 * dy1;
+		if (fabs(den) < 1e-9)
+			return;
+		g = (sx * dy2 - dx2 * sy) / den;
+		hh = (dx1 * sy - sx * dy1) / den;
+		a = x1 - x0 + g * x1; b = x3 - x0 + hh * x3;
+		d = y1 - y0 + g * y1; e = y3 - y0 + hh * y3;
+	}
+	c = x0;
+	f = y0;
+
+	// Inverse through the adjugate; the scale cancels out
+	double A = e - f * hh, B = c * hh - b, C = b * f - c * e;
+	double D = f * g - d, E = a - c * g, F = c * d - a * f;
+	double G = d * hh - e * g, H = b * g - a * hh, I = a * e - b * d;
+	if (fabs(I) < 1e-9 && fabs(G) < 1e-9 && fabs(H) < 1e-9)
+		return;
+
+	int bpp = srf->format.bytesPerPixel;
+	for (int y = 0; y < h; y++) {
+		double py = bbox.top + y + 0.5;
+		for (int x = 0; x < w; x++) {
+			double px = bbox.left + x + 0.5;
+			double ww = G * px + H * py + I;
+			if (fabs(ww) < 1e-12)
+				continue;
+			double u = (A * px + B * py + C) / ww;
+			double v = (D * px + E * py + F) / ww;
+			if (u < 0.0 || u >= 1.0 || v < 0.0 || v >= 1.0)
+				continue;
+			int su = CLIP<int>((int)(u * srf->w), 0, srf->w - 1);
+			int sv = CLIP<int>((int)(v * srf->h), 0, srf->h - 1);
+			if (srcMask && (su >= srcMask->w || sv >= srcMask->h || !*(const byte *)srcMask->getBasePtr(su, sv)))
+				continue;
+			memcpy(_quadSurface->getBasePtr(x, y), srf->getBasePtr(su, sv), bpp);
+			*(byte *)_quadMask->getBasePtr(x, y) = 0xff;
+		}
+	}
+}
+
+const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
 	if (!_sprite->_cast || _sprite->_spriteType == kTextSprite)
 		return nullptr;
 
@@ -232,6 +337,10 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		needsMatte = true;
 
 	Common::Rect bbox(getBbox());
+	if (w > 0 && h > 0) {
+		bbox.setWidth(w);
+		bbox.setHeight(h);
+	}
 
 	if (needsMatte || forceMatte) {
 		// Mattes are only supported in bitmaps for now. Shapes don't need mattes,
@@ -933,6 +1042,16 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 		return;
 	}
 
+	// A bitmap drawn through a quad is warped from the member at its own
+	// size, so moving the corners needs no new widget
+	bool quadBitmap = _sprite && _sprite->_hasQuad && _sprite->_cast && _sprite->_cast->_type == kCastBitmap;
+	if (!force && quadBitmap && _widget && _widgetCastId == _sprite->_castId && !_sprite->_cast->isModified()) {
+		Common::Rect native = _sprite->_cast->getInitialRect();
+		Graphics::ManagedSurface *srf = _widget->getSurface();
+		if (srf && srf->w == native.width() && srf->h == native.height())
+			return;
+	}
+
 	// if the castmember is the same, and we are not modifying anything which cannot be handle by channel. Then we don't replace the widget
 	if (!force && canKeepWidget(previousCastId)) {
 		debug(5, "Channel::replaceWidget(): skip deleting %s", _sprite->_castId.asString().c_str());
@@ -943,6 +1062,7 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 		delete _widget;
 		_widget = nullptr;
 	}
+	_quadValid = false;
 
 	if (_sprite && _sprite->_cast) {
 		// use sprite type to guide us how to draw the cast
@@ -958,7 +1078,13 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 		// we need the original image to scale the sprite.
 		// for the scaled bitmap castmember, it has scaled dims on sprite size, so we don't have to worry about it.
 		Common::Rect bbox(getBbox(true));
+		if (quadBitmap) {
+			Common::Rect native = _sprite->_cast->getInitialRect();
+			if (native.width() > 0 && native.height() > 0)
+				bbox = Common::Rect(bbox.left, bbox.top, bbox.left + native.width(), bbox.top + native.height());
+		}
 		_sprite->_cast->setModified(false);
+		_widgetCastId = _sprite->_castId;
 
 		_widget = _sprite->_cast->createWidget(bbox, this, _sprite->_spriteType);
 		if (_widget) {

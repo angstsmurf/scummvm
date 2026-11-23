@@ -162,6 +162,21 @@ public:
 private:
 	Graphics::MacText *mouseTextWidget(const char *query);
 	Graphics::ManagedSurface *getSurface();
+	const Graphics::Surface *getSourceMask(bool forceMatte, int w = 0, int h = 0);
+	void buildQuad(Graphics::ManagedSurface *srf, bool forceMatte);
+
+	// The member warped to 'the quad of sprite' (D7), in the bbox, with
+	// a mask of the pixels inside the quad
+	Graphics::ManagedSurface *_quadSurface = nullptr;
+	Graphics::ManagedSurface *_quadMask = nullptr;
+	// What _quadSurface/_quadMask were last built from
+	bool _quadValid = false;
+	CastMemberID _widgetCastId;	// member the widget was built from
+	float _quadKeyQuad[4][2];
+	Common::Rect _quadKeyBbox;
+	const Graphics::ManagedSurface *_quadKeySrf = nullptr;
+	int _quadKeyInk = 0;
+	bool _quadKeyMatte = false;
 	Score *_score;
 };
 
