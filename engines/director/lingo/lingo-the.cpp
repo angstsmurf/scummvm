@@ -286,6 +286,8 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"duration",		kTheDuration,	300 },//		D3.1 p
 	{ kTheCast,		"frameRate",	kTheFrameRate,	400 },//				D4 p
 	{ kTheCast,		"loop",			kTheLoop,		300 },//		D3.1 p
+	{ kTheSprite,	"mRate",		kTheMovieRate,	600 },//					QuickTime 3 Xtra p
+	{ kTheSprite,	"mTime",		kTheMovieTime,	600 },//					QuickTime 3 Xtra p
 	{ kTheSprite,	"movieRate",	kTheMovieRate,	300 },//		D3.1 P
 	{ kTheSprite,	"movieTime",	kTheMovieTime,	300 },//		D3.1 P
 	{ kTheCast,		"pausedAtStart",kThePausedAtStart,400 },//				D4 p
