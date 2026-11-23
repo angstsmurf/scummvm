@@ -578,7 +578,8 @@ void BitmapCastMember::createMatte(const Common::Rect &bbox) {
 				}
 
 				// Skip entirety of image, scan only the corners
-				if (y > 0 && y < tmp.h - 1 && x == 0)
+				// (not when 1 or 2 pixels wide: x would go back to 0 for ever)
+				if (y > 0 && y < tmp.h - 1 && x == 0 && tmp.w > 2)
 					x = tmp.w - 2;
 			}
 		}
