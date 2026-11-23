@@ -68,6 +68,7 @@ namespace Director {
 const char *QTSupport::xlibName = "QuickTimeSupport";
 const XlibFileDesc QTSupport::fileNames[] = {
 	{ "QuickTime Asset",	nullptr },
+	{ "QuickTime Asset PPC", nullptr },	// Mean City: Learn Spanish or Die! (Mac)
 	{ "QTASSET",			nullptr },
 	{ "QT3Asset",			nullptr },	// QuickTime 3 Asset Xtra
 	{ nullptr,		nullptr },

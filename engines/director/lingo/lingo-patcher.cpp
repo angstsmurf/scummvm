@@ -567,6 +567,48 @@ on hCorrectCD lNeedCD 	\r\
 end \r\
 ";
 
+/*
+ * Mean City: Learn Spanish or Die! asks for the other disc when a scene is not on the
+ * disc whose marker file is in MeanCity\DSKCHECK. Both discs are merged into one
+ * folder, so every scene is available.
+ */
+const char *const meancityCDCheck = "\
+on checkLoadedDisk whichdisk\r\
+  return 1\r\
+end\r\
+";
+
+/*
+ * The Mac version looks for the disc as the volume "Mean_City:". Look in the game
+ * root instead.
+ */
+const char *const meancityMacDriveCheck = "\
+on CheckMacDrive volume, folderName\r\
+  global gvolumeName\r\
+  if voidp(volume) then\r\
+    set theVolume to \"@:\"\r\
+  else\r\
+    set theVolume to volume\r\
+    if the last char in theVolume <> \":\" then\r\
+      put \":\" after theVolume\r\
+    end if\r\
+  end if\r\
+  if voidp(folderName) then\r\
+    set theFolder to \"MeanCity:\"\r\
+  else\r\
+    set theFolder to folderName\r\
+    if the last char in theFolder <> \":\" then\r\
+      put \":\" after theFolder\r\
+    end if\r\
+  end if\r\
+  set diskNumber to getLoadedDisk(theVolume & theFolder & \"DSKCHECK:\")\r\
+  if diskNumber > 0 then\r\
+    set gvolumeName to theVolume & theFolder\r\
+  end if\r\
+  return diskNumber\r\
+end\r\
+";
+
 struct ScriptHandlerPatch {
 	const char *gameId;
 	const char *extra;
@@ -614,6 +656,9 @@ struct ScriptHandlerPatch {
 	{"getaheadmath", nullptr, kPlatformWindows, "HDFILES\\CHANNELS\\BASE.CST", kParentScript, 69, 2, &getaheadmathDiskFix},
 	{"jman", "v1.2", kPlatformMacintosh, "Support Files:Mars ESG Upper 03", kMovieScript, 322, DEFAULT_CAST_LIB, &jmanInventory},
 	{"noir", nullptr, kPlatformWindows, "SHARED.CST", kMovieScript, 9, 2, &noirCDCheck},
+	{"meancityspanish", nullptr, kPlatformWindows, "DKCODE\\Meancity.dir", kMovieScript, 583, DEFAULT_CAST_LIB, &meancityCDCheck},
+	{"meancityspanish", nullptr, kPlatformMacintosh, "Copy folder to desktop:MEANCITY.DIR", kMovieScript, 583, DEFAULT_CAST_LIB, &meancityCDCheck},
+	{"meancityspanish", nullptr, kPlatformMacintosh, "Copy folder to desktop:mcres.cst", kMovieScript, 1, 2, &meancityMacDriveCheck},
 	{nullptr, nullptr, kPlatformUnknown, nullptr, kNoneScript, 0, 0, nullptr},
 
 };

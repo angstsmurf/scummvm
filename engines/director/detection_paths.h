@@ -58,6 +58,10 @@ const char *const directoryGlobs[] = {
 	"adam resources",				// ADAM Software Products
 	"NAV",
 	"Daedalus Max",					// The Daedalus Encounter
+	"DKCODE",						// Mean City
+	"Copy folder to desktop",
+	"MeanCity",
+	"DSKCHECK",
 	0
 };
 

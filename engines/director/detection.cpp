@@ -452,6 +452,11 @@ DetectedGame DirectorMetaEngineDetection::toDetectedGame(const ADDetectedGame &a
 	if (!(desc->desc.flags & Director::GF_TRUECOLOR))
 		game.appendGUIOptions(Common::getGameGUIOptionsDescription(GAMEOPTION_TRUE_COLOR));
 
+	// Recognised only so that it does not show up as an unknown variant
+	// of another game, or as a generic Director game
+	if (desc->desc.flags & Director::GF_PART_ONLY)
+		game.canBeAdded = false;
+
 	return game;
 }
 

@@ -103,6 +103,7 @@ enum {
 	GF_640x480   = 1 << 1,
 	GF_TRUECOLOR = 1 << 2,
 	GF_GAMMA     = 1 << 3,
+	GF_PART_ONLY = 1 << 4,	// A folder of a game that is detected from its parent; never offered
 };
 
 struct MovieReference {

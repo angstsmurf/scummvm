@@ -344,6 +344,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "mcluhan",			"Understanding McLuhan" },
 	{ "mcmillennium",		"Mission Code: Millennium" },
 	{ "meancity",			"Mean City: Learn English or Die!" },
+	{ "meancityspanish",	"Mean City: Learn Spanish or Die!" },
 	{ "mediaband",			"Meet MediaBand" },
 	{ "meetchuck",			"Meet Chuck" },
 	{ "megapuzzlepack",		"Mega Puzzle Pack" },
@@ -8967,6 +8968,22 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	WINGAME2("meancity", "", "mc32.exe",	"t:746d26c4e79cf5c81f8aaf09709d8488", 1527265,
 							 "mcstart.dir", "f:a001723e6395e3b4557bdaa141dbf1d7",   28662, 602),
+
+	// Hybrid Mac/Windows release on two discs. Copy the MeanCity/MEANCITY folder of
+	// disc 2 into the MeanCity folder of disc 1, without replacing files. The disc 2
+	// marker in MeanCity/DSKCHECK is required, so a disc 1 dump alone is not detected.
+	GENGAME3_("meancityspanish", "", "Copy folder to desktop/Mean City", "rt:73d7e14f8a4d77f8a8e4ed3bce7a12c9", 453801,
+								"Copy folder to desktop/Mcstart.dir", "d:656806052238b7af1f66296d1620407e", 22326,
+								"MeanCity/DSKCHECK/0MCDISK2.000",	  "d:32ced893eea9b02dec34abf6bb71e704", 4,
+								Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK, 602),
+	GENGAME3_("meancityspanish", "", "DKCODE/mc32.exe",			"t:746d26c4e79cf5c81f8aaf09709d8488", 1527265,
+								"DKCODE/Mcstart.dir",				"f:656806052238b7af1f66296d1620407e", 22326,
+								"MeanCity/DSKCHECK/0MCDISK2.000",	"f:32ced893eea9b02dec34abf6bb71e704", 4,
+								Common::EN_ANY, Common::kPlatformWindows, ADGF_NO_FLAGS, 602),
+	// Its DKCODE folder alone, which shares mc32.exe with meancity. Never offered.
+	GENGAME2_("meancityspanish", "", "mc32.exe",	"t:746d26c4e79cf5c81f8aaf09709d8488", 1527265,
+								"Mcstart.dir",	"f:656806052238b7af1f66296d1620407e", 22326,
+								Common::EN_ANY, Common::kPlatformWindows, GF_PART_ONLY, 602),
 
 	// Masters of the Elements
 	// Original Dutch game Meesters van Macht released in 1997
