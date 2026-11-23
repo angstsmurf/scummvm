@@ -179,6 +179,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 		_children = source._children;
 
 	_filename = source._filename;
+	_xtraPath = source._xtraPath;
 
 	_vflags = source._vflags;
 	_looping = source._looping;
@@ -255,6 +256,13 @@ CastMember *DigitalVideoCastMember::createFromXtra(Cast *cast, uint16 castId, Xt
 		dv->_pausedAtStart = (flags & kQTflag_PAS) != 0;
 		dv->_enableSound = (flags & kQTflag_Sound) != 0;
 	}
+	// The movie file path follows as a length-prefixed string, e.g. "@\10001.MOV"
+	// (Mean City: Learn Spanish or Die!)
+	if (data.size() >= 20) {
+		uint32 len = READ_BE_UINT32(&data[16]);
+		if (len > 0 && 20 + len <= data.size())
+			dv->_xtraPath = Common::String((const char *)&data[20], len);
+	}
 	return dv;
 }
 
@@ -262,6 +270,8 @@ bool DigitalVideoCastMember::loadVideoFromCast() {
 	// Once Lingo has set the fileName, it takes precedence over any
 	// alias stored in the embedded MooV resource
 	Common::String path = _useLinkedPath ? getCast()->getLinkedPath(_castId) : getCast()->getVideoPath(_castId);
+	if (path.empty() && !_useLinkedPath)
+		path = _xtraPath;
 	if (!path.empty())
 		return loadVideo(path);
 	return false;
@@ -928,6 +938,16 @@ Datum DigitalVideoCastMember::getField(int field) {
 		break;
 	case kTheVideo:
 		d = _enableVideo;
+		break;
+	case kTheFileName:
+		// A QuickTime Asset Xtra member keeps its path in the xtra data, not
+		// in the cast info. Mean City swaps a video into a sprite only when
+		// its fileName differs from the current member's.
+		if (!_xtraPath.empty() && !_useLinkedPath) {
+			d = _xtraPath;
+			break;
+		}
+		d = CastMember::getField(field);
 		break;
 	default:
 		d = CastMember::getField(field);

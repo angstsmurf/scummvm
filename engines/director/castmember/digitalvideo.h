@@ -96,6 +96,7 @@ public:
 	bool canWriteCastData() override;
 
 	Common::String _filename;
+	Common::String _xtraPath;	// file path stored in a QuickTime Asset Xtra member
 
 	uint32 _vflags;
 	bool _looping;
