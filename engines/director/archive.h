@@ -24,6 +24,7 @@
 
 #include "common/hash-str.h"
 #include "common/file.h"
+#include "common/str-array.h"
 
 namespace Common {
 class MacResManager;
@@ -289,6 +290,7 @@ public:
 	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override;
 	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 	bool isLoaded() { return _isLoaded; }
+	const Common::StringArray &getXtraNames() const { return _xtraNames; }
 private:
 	Common::SeekableReadStream *createBufferedReadStream();
 	bool loadArchive(Common::SeekableReadStream *stream);
@@ -300,6 +302,7 @@ private:
 	typedef Common::HashMap<Common::Path, Entry, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> FileMap;
 	FileMap _files;
 	Common::Path _path;
+	Common::StringArray _xtraNames; // embedded Xtras ('RIFF' blocks)
 
 	bool _isLoaded;
 };

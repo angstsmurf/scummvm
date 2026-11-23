@@ -83,6 +83,15 @@ Common::Error Window::loadInitialMovie() {
 		// A valid projector archive, add to SearchMan
 		SearchMan.add(_vm->getRawEXEName(), multiArchive);
 
+		// Xtras bundled into the projector are loaded like those in the
+		// Xtras folder (Bad Milk carries QuickTime Asset this way)
+		if (g_director->getVersion() >= 500) {
+			for (auto &name : multiArchive->getXtraNames()) {
+				debugC(5, kDebugLingoExec, "Window::loadInitialMovie(): opening embedded Xtra %s", name.c_str());
+				g_lingo->openXLib(name, kXtraObj, Common::Path(name));
+			}
+		}
+
 		if (ConfMan.getBool("dump_scripts"))
 			multiArchive->dumpArchive(Common::Path("./dumps").join(encodePathForDump(movie)));
 
@@ -639,6 +648,10 @@ void Window::loadXtrasFromPath() {
 	Common::ArchiveMemberList targets;
 	SearchMan.listMatchingMembers(targets, Common::Path("xtras/*"), true);
 	SearchMan.listMatchingMembers(targets, Common::Path("*/xtras/*"), false);
+	// The projector may sit deeper, e.g. inside an installer archive
+	Common::Path exeDir = Common::Path(g_director->getRawEXEName(), g_director->_dirSeparator).getParent();
+	if (!exeDir.empty())
+		SearchMan.listMatchingMembers(targets, exeDir.appendComponent("xtras").appendComponent("*"), true);
 	for (auto &it : targets) {
 		if (it->isDirectory())
 			continue;
@@ -707,6 +720,36 @@ Common::SeekableReadStream *ProjectorArchive::createBufferedReadStream() {
 
 ProjectorArchive::~ProjectorArchive() {
 	_files.clear();
+}
+
+static bool readDictNamesFromPairs(Common::SeekableReadStream *stream, uint32 dictOff, uint32 dictSize, uint32 cnt, bool bigEndian, Common::StringArray &arr) {
+	uint32 dictEnd = dictOff + 8 + dictSize;
+	if (dictEnd > stream->size() || 0x2c + cnt * 8 > dictSize + 8)
+		return false;
+
+	stream->seek(dictOff + 8);
+	uint32 heap = dictOff + 0x10 + (bigEndian ? stream->readUint32BE() : stream->readUint32LE());
+	if (heap >= dictEnd)
+		return false;
+
+	Common::Array<bool> seen(cnt, false);
+	for (uint32 k = 0; k < cnt; k++) {
+		stream->seek(dictOff + 0x2c + k * 8);
+		uint32 nameOff = bigEndian ? stream->readUint32BE() : stream->readUint32LE();
+		uint32 index = bigEndian ? stream->readUint32BE() : stream->readUint32LE();
+		if (index >= cnt || seen[index] || nameOff > dictEnd - heap || dictEnd - heap - nameOff < 4)
+			return false;
+
+		stream->seek(heap + nameOff);
+		uint32 namelen = bigEndian ? stream->readUint32BE() : stream->readUint32LE();
+		if (namelen > dictEnd - heap - nameOff - 4)
+			return false;
+
+		arr[index] = stream->readString(0, namelen);
+		seen[index] = true;
+		debugC(1, kDebugLoading, "Key[%d] = %s", index, arr[index].c_str());
+	}
+	return true;
 }
 
 bool ProjectorArchive::loadArchive(Common::SeekableReadStream *stream) {
@@ -792,9 +835,18 @@ bool ProjectorArchive::loadArchive(Common::SeekableReadStream *stream) {
 	uint32 pt = (cnt * 8) + (64 - offsetDict);
 	Common::StringArray arr(cnt);
 
-	for (uint32 i = 0; i < cnt; i++) {
+	// The dict holds a table of (name offset, index) pairs at +0x2c, and
+	// the long at +8 points to the name heap, relative to +0x10. Reading
+	// the names through it needs no guess at the layout; the guess below
+	// lands 2 bytes off in D7 Mac projectors (Bad Milk).
+	if (oBigEndian == bigEndian && readDictNamesFromPairs(stream, dictOff, size, cnt, bigEndian, arr))
+		pt = 0;
+	else
+		arr = Common::StringArray(cnt);
+
+	for (uint32 i = 0; pt && i < cnt; i++) {
 		// if this fails it likely means that the dict was invalid.
-		if (!stream->seek(dictOff + pt, SEEK_SET)) {
+		if (dictOff + pt + 4 > stream->size() || !stream->seek(dictOff + pt, SEEK_SET)) {
 			warning("ProjectorArchive::loadArchive(): Incorrect entry name offset (0x%x)", dictOff + pt);
 			return false;
 		}
@@ -817,7 +869,14 @@ bool ProjectorArchive::loadArchive(Common::SeekableReadStream *stream) {
 
 	for (uint32 i = 0; i < cnt; i++) {
 		tag = stream->readUint32BE();
-		size = bigEndian ? stream->readUint32BE() : stream->readUint32LE();
+		// Embedded Xtras are 'RIFF' blocks with a big-endian size, also in
+		// Windows projectors (Bad Milk); movies follow their own tag.
+		bool blockBigEndian = bigEndian;
+		if (tag == MKTAG('R', 'I', 'F', 'X') || tag == MKTAG('R', 'I', 'F', 'F'))
+			blockBigEndian = true;
+		else if (tag == MKTAG('X', 'F', 'I', 'R'))
+			blockBigEndian = false;
+		size = blockBigEndian ? stream->readUint32BE() : stream->readUint32LE();
 
 		Common::Path path = toSafePath(arr[i]).getLastComponent();
 
@@ -829,12 +888,14 @@ bool ProjectorArchive::loadArchive(Common::SeekableReadStream *stream) {
 		entry.offset = static_cast<uint32>(stream->pos() - 8);
 		entry.size = size + 8;
 		_files[path] = entry;
+		if (tag == MKTAG('R', 'I', 'F', 'F'))
+			_xtraNames.push_back(path.toString());
 
 		// Align size for the next seek.
 		size += (size % 2);
 
 		// if this fails it suggests something is either wrong with the dict or the file itself.
-		if (!stream->seek(size, SEEK_CUR)) {
+		if (size > stream->size() - stream->pos() || !stream->seek(size, SEEK_CUR)) {
 			warning("ProjectorArchive::loadArchive(): Could not read next block (0x%x) Prev Block(0x%x : %d)",
 			        entry.offset + entry.size, entry.offset, entry.size);
 			return false;
