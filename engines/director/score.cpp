@@ -1908,6 +1908,19 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 }
 
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
+	// A sprite that is being dragged keeps the mouse, also when it is
+	// dragged under a sprite in a higher channel
+	Channel *dragged = _movie->getDraggedChannel();
+	if (dragged) {
+		for (uint i = 0; i < _channels.size(); i++) {
+			if (_channels[i] == dragged) {
+				if (_channels[i]->isMouseIn(pos) == kCollisionYes)
+					return i;
+				break;
+			}
+		}
+	}
+
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
 		if (test == kCollisionYes && _channels[i]->_sprite->respondsToMouse())

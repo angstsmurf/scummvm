@@ -202,8 +202,6 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			}
 			g_director->_wm->_hilitingWidget = false;
 
-			_currentDraggedChannel = nullptr;
-
 			// If this is a button cast member, and the last mouse down event was in a button
 			// (any button), flip this button's hilite flag.
 			// Now you might think, "Wait, we don't flip this flag in the mouseDown event.

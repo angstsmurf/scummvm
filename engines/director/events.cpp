@@ -360,6 +360,9 @@ bool Movie::processSysEvent(Common::Event &event) {
 
 			result = processInputEvent(ev, 0, pos);
 
+			// The drag ends once the dragged sprite got its mouseUp
+			_currentDraggedChannel = nullptr;
+
 			// D5 has special behavior here
 			if (g_director->getVersion() >= 500 && g_director->getVersion() < 600) {
 				if (spriteId)
