@@ -138,6 +138,7 @@ static const BuiltinProto builtins[] = {
 	{ "pass",			LB::b_pass,			0, 0, 400, CBLTIN },	//			D4 c
 	{ "pause",			LB::b_pause,		0, 0, 200, CBLTIN },	// D2 c
 	{ "play",			LB::b_play,			0, 2, 200, CBLTIN },	// D2 c
+	{ "rewind",			LB::b_rewind,		1, 1, 600, CBLTIN },	// D6 c, Flash sprites
 	{ "playAccel",		LB::b_playAccel,	-1,0, 200, CBLTIN },	// D2
 		// play done												// D2
 	{ "preLoad",		LB::b_preLoad,		-1,0, 300, CBLTIN },	//		D3.1 c
@@ -2136,6 +2137,11 @@ void LB::b_play(int nargs) {
 		// fall through
 	case 1:
 		frame = g_lingo->pop();
+		if (frame.type == SPRITEREF && nargs == 1) {
+			// play(sprite n): start a Flash sprite. Flash is not played.
+			warning("STUB: b_play: Flash sprite %d not played", frame.u.i);
+			return;
+		}
 		if (!(frame.type == INT && frame.u.i == 0 && nargs == 1))
 			break;
 		// fall through
@@ -2151,6 +2157,12 @@ void LB::b_play(int nargs) {
 	}
 
 	g_lingo->func_play(frame, movie);
+}
+
+void LB::b_rewind(int nargs) {
+	// rewind(sprite n): rewind a Flash sprite. Flash is not played.
+	Datum d = g_lingo->pop();
+	warning("STUB: b_rewind: %s", d.asString(true).c_str());
 }
 
 void LB::b_playAccel(int nargs) {

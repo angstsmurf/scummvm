@@ -38,6 +38,8 @@ public:
 
 	static CastMember *promote(Cast *cast, uint16 castId, XtraCastMember *xtra);
 
+	bool hasProp(const Common::String &propName) override;
+	Datum getProp(const Common::String &propName) override;
 	bool hasField(int field) override;
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;

@@ -39,6 +39,7 @@
 #include "director/castmember/castmember.h"
 #include "director/castmember/digitalvideo.h"
 #include "director/castmember/text.h"
+#include "director/castmember/xtra.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-code.h"
 #include "director/lingo/lingo-the.h"
@@ -2697,6 +2698,15 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		Common::String key = Common::String::format("%d%s", kTheSprite, propName.c_str());
 		if (_theEntityFields.contains(key)) {
 			d = getTheSprite(obj, _theEntityFields[key]->field);
+		} else if (propName.equalsIgnoreCase("frame")) {
+			// Flash sprite frame. Flash is not played, so report the
+			// member's last frame as reached.
+			Channel *channel = _vm->getCurrentMovie()->getScore()->getChannelById(obj.u.i);
+			CastMember *member = channel && channel->_sprite ? _vm->getCurrentMovie()->getCastMember(channel->_sprite->_castId) : nullptr;
+			if (member && member->_type == kCastXtra && member->hasProp("frameCount"))
+				d = member->getProp("frameCount");
+			else
+				d = Datum(0);
 		}
 		g_lingo->push(d);
 		return;

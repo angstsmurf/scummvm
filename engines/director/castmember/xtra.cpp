@@ -107,6 +107,23 @@ CastMember *XtraCastMember::promote(Cast *cast, uint16 castId, XtraCastMember *x
 	return promoted;
 }
 
+// Flash members are not played. They report a single frame, and their
+// sprites report that frame as reached, so movies that wait for the end
+// of a Flash animation move on (Egypt Generiq.dxr).
+bool XtraCastMember::hasProp(const Common::String &propName) {
+	if (_xtraSymbol.equalsIgnoreCase("flash") && propName.equalsIgnoreCase("frameCount"))
+		return true;
+	return CastMember::hasProp(propName);
+}
+
+Datum XtraCastMember::getProp(const Common::String &propName) {
+	if (_xtraSymbol.equalsIgnoreCase("flash") && propName.equalsIgnoreCase("frameCount")) {
+		warning("STUB: XtraCastMember::getProp(): Flash member %d is not played, reporting 1 frame", _castId);
+		return Datum(1);
+	}
+	return CastMember::getProp(propName);
+}
+
 bool XtraCastMember::hasField(int field) {
 	switch (field) {
 	case kTheCuePointNames:		// D6
