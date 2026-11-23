@@ -1379,10 +1379,11 @@ Datum LC::compareArrays(Datum (*compareFunc)(Datum, Datum), Datum d1, Datum d2, 
 	// At least one of d1 and d2 must be an array
 	bool d1isArr = d1.isArray() || d1.type == PARRAY;
 	bool d2isArr = d2.isArray() || d2.type == PARRAY;
-	// In D6 and higher, direct relational comparison no longer does partial array or
-	// element-to-array coercion. However, location mode still needs
-	// scalar-to-element checks while scanning array entries.
-	if ((g_director->getVersion() >= 600) && !location && (!(d1isArr && d2isArr))) {
+	// In D6 and higher, an array never equals a value that is not an array.
+	// The other comparisons still check the value against every element,
+	// and location mode still needs scalar-to-element checks while scanning
+	// array entries.
+	if ((g_director->getVersion() >= 600) && !location && (!(d1isArr && d2isArr)) && compareFunc == LC::eqData) {
 		return Datum(0);
 	}
 

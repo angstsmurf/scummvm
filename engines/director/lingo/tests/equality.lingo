@@ -152,6 +152,13 @@ scummvmAssert(not("" = []))
 scummvmAssert(not("sausages" = []))
 scummvmAssert(not("" = ["sausages"]))
 scummvmAssert(not("sausages" = ["sausages"]))
+scummvmAssert(not([1, 1] = 1))
+scummvmAssert([1, 1] <> 1)
+scummvmAssert([38, 235, 43] > 0)
+scummvmAssert(0 < [38, 235, 43])
+scummvmAssert(not([1, 2] > 1))
+scummvmAssert([1, 2] >= 1)
+scummvmAssert([] > 0)
 
 -- D4 has a quirk where only the left side list elements are checked
 set the scummvmVersion to 400
