@@ -2622,6 +2622,16 @@ void Lingo::setTheChunk(Datum &chunk, int field, Datum &d) {
 	((TextCastMember *)member)->setChunkField(field, start, end, d);
 }
 
+// The Xtra member shown by a sprite: asset Xtras add sprite properties
+static CastMember *spriteXtraMember(const Datum &sprite) {
+	Movie *movie = g_director->getCurrentMovie();
+	Channel *channel = movie ? movie->getScore()->getChannelById(sprite.u.i) : nullptr;
+	if (!channel || !channel->_sprite)
+		return nullptr;
+	CastMember *member = movie->getCastMember(channel->_sprite->_castId);
+	return member && member->_type == kCastXtra ? member : nullptr;
+}
+
 void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 	Datum d;
 	if (obj.type == OBJECT) {
@@ -2796,8 +2806,12 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		return;
 	} else if (obj.type == SPRITEREF) {
 		Common::String key = Common::String::format("%d%s", kTheSprite, propName.c_str());
+		CastMember *spriteMember = spriteXtraMember(obj);
 		if (_theEntityFields.contains(key)) {
 			d = getTheSprite(obj, _theEntityFields[key]->field);
+		} else if (spriteMember && spriteMember->hasProp(propName)) {
+			// A sprite property of an asset Xtra (Egypt's mmDithFileName)
+			d = spriteMember->getProp(propName);
 		} else if (propName.equalsIgnoreCase("frame")) {
 			// Flash sprite frame. Flash is not played, so report the
 			// member's last frame as reached.
@@ -2958,8 +2972,13 @@ void Lingo::setObjectProp(Datum &obj, Common::String &propName, Datum &val) {
 		}
 	} else if (obj.type == SPRITEREF) {
 		Common::String key = Common::String::format("%d%s", kTheSprite, propName.c_str());
+		CastMember *spriteMember = spriteXtraMember(obj);
 		if (_theEntityFields.contains(key)) {
 			setTheSprite(obj, _theEntityFields[key]->field, val);
+		} else if (spriteMember && spriteMember->hasProp(propName)) {
+			spriteMember->setProp(propName, val);
+		} else {
+			g_lingo->lingoError("Lingo::setObjectProp(): sprite has no property '%s'", propName.c_str());
 		}
 	} else {
 		g_lingo->lingoError("Lingo::setObjectProp: Invalid object: %s", obj.asString(true).c_str());
