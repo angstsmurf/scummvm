@@ -225,6 +225,8 @@ public:
 	Common::HashMap<uint32, Datum> _objArray;
 	MethodHash _methodNames;
 	Common::SharedPtr<Node> _assemblyAST;	// Optionally contains AST when we compile Lingo
+	// Channel of the sprite a behavior instance is attached to (D6+), 0 if none
+	int _spriteNum = 0;
 
 private:
 	friend class Cast;	// clears _cast directly in ~Cast

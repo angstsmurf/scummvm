@@ -726,6 +726,11 @@ Datum ScriptContext::getProp(const Common::String &propName) {
 		return _properties[propName];
 	}
 	if (_objType == kScriptObj) {
+		// A behavior keeps the channel it was attached to; a handler that
+		// runs a nested event must not see that event's sprite
+		if (_spriteNum && propName.equalsIgnoreCase("spriteNum"))
+			return Datum(_spriteNum);
+
 		if (_properties.contains("ancestor") && _properties["ancestor"].type == OBJECT
 				&& (_properties["ancestor"].u.obj->getObjType() & (kScriptObj | kXtraObj))) {
 			debugC(3, kDebugLingoExec, "Getting prop '%s' from ancestor: <%s>", propName.c_str(), _properties["ancestor"].asString(true).c_str());

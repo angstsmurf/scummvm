@@ -1061,6 +1061,18 @@ void Score::createScriptInstances(int frameNum) {
 				continue;
 			}
 
+			if (instance.u.obj->getObjType() == kScriptObj) {
+				ScriptContext *ctx = static_cast<ScriptContext *>(instance.u.obj);
+				ctx->_spriteNum = i;
+				// "property spriteNum" is filled in by Director
+				for (auto &name : ctx->getPropertyNames()) {
+					if (name.equalsIgnoreCase("spriteNum")) {
+						ctx->setProp(name, Datum(i));
+						break;
+					}
+				}
+			}
+
 			channel->_scriptInstanceList.push_back(instance);
 		}
 
