@@ -697,7 +697,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheKeyPressed:
 		{
 			Common::U32String buf;
-			buf.insertChar(_vm->_key, 0);
+			// Empty until a key has been pressed
+			if (_vm->_key)
+				buf.insertChar(_vm->_key, 0);
 			d = buf.encode();
 		}
 		break;
