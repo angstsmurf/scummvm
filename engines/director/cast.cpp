@@ -268,6 +268,17 @@ CastMember *Cast::setCastMember(int castId, CastMember *cast) {
 	return cast;
 }
 
+// A member made at runtime by new(): it has no cast info yet, which the
+// name and fileName setters need
+CastMember *Cast::createCastMember(int castId, CastMember *cast) {
+	setCastMember(castId, cast);
+	if (_castsInfo.contains(castId))
+		delete _castsInfo[castId];
+	_castsInfo[castId] = new CastMemberInfo();
+	cast->setModified(true);
+	return cast;
+}
+
 bool Cast::duplicateCastMember(CastMember *source, CastMemberInfo *info, int targetId) {
 	if (_loadedCast->contains(targetId)) {
 		eraseCastMember(targetId);

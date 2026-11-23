@@ -43,6 +43,7 @@
 #include "director/castmember/bitmap.h"
 #include "director/castmember/digitalvideo.h"
 #include "director/castmember/palette.h"
+#include "director/castmember/sound.h"
 #include "director/castmember/text.h"
 #include "director/castmember/transition.h"
 #include "director/lingo/lingo-builtins.h"
@@ -196,6 +197,7 @@ static const BuiltinProto builtins[] = {
 	{ "label",			LB::b_label,		1, 1, 200, FBLTIN },	// D2 f
 	{ "marker",			LB::b_marker,		1, 1, 200, FBLTIN },	// D2 f
 	{ "move",			LB::b_move,			1, 2, 400, CBLTIN },	//			D4 c
+	{ "new",			LB::b_new,			1, 2, 500, FBLTIN },	//				D5 f
 	{ "moveableSprite",	LB::b_moveableSprite,0, 0, 200, CBLTIN },	// D2, FIXME: the field in D4+
 	{ "pasteClipBoardInto",LB::b_pasteClipBoardInto,1,1,400,CBLTIN },//			D4 c
 	{ "puppetPalette",	LB::b_puppetPalette, -1,0, 200, CBLTIN },	// D2 c
@@ -2892,6 +2894,62 @@ void LB::b_duplicate(int nargs) {
 	score->refreshPointersForCastMemberID(*to.u.cast);
 	b_updateStage(0);
 	g_lingo->push(Datum(to.u.cast->member));
+}
+
+// new(#type [, member n | castLib n]) makes an empty cast member. Without
+// a slot, it goes to the first free one of castLib 1. new() on a script
+// or object is caught as a method call in LC::call before it gets here.
+void LB::b_new(int nargs) {
+	Datum target;
+	if (nargs >= 2) {
+		g_lingo->dropStack(nargs - 2);
+		target = g_lingo->pop();
+	}
+	Datum type = g_lingo->pop();
+	Movie *movie = g_director->getCurrentMovie();
+
+	if (type.type != SYMBOL && type.type != STRING) {
+		g_lingo->lingoError("b_new(): expected a member type, got %s", type.type2str());
+		g_lingo->pushVoid();
+		return;
+	}
+
+	CastMemberID id(0, DEFAULT_CAST_LIB);
+	if (target.type == CASTREF) {
+		id = *target.u.cast;
+	} else if (target.type == CASTLIBREF) {
+		id.castLib = target.u.i;
+	} else if (target.type == INT) {
+		id.member = target.u.i;
+	}
+	Cast *cast = movie->getCasts()->getValOrDefault(id.castLib, nullptr);
+	if (!cast) {
+		g_lingo->lingoError("b_new(): castLib %d not found", id.castLib);
+		g_lingo->pushVoid();
+		return;
+	}
+	if (id.member <= 0)
+		id.member = cast->getNextUnusedID();
+
+	// Egypt makes an #MMVideo member on Windows (an MPEG player Xtra) and
+	// a #quickTimeMedia one on the Mac, then plays it by fileName
+	Common::String name = *type.u.s;
+	CastMember *member = nullptr;
+	if (name.equalsIgnoreCase("digitalVideo") || name.equalsIgnoreCase("quickTimeMedia") ||
+			name.equalsIgnoreCase("MMVideo")) {
+		member = new DigitalVideoCastMember(cast, id.member);
+	} else if (name.equalsIgnoreCase("sound")) {
+		member = new SoundCastMember(cast, id.member);
+	} else {
+		warning("STUB: b_new(): cannot create #%s members", name.c_str());
+		g_lingo->pushVoid();
+		return;
+	}
+
+	cast->createCastMember(id.member, member);
+	movie->getScore()->refreshPointersForCastMemberID(id);
+	debugC(3, kDebugLingoExec, "b_new(): created #%s as %s", name.c_str(), id.asString().c_str());
+	g_lingo->push(Datum(id));
 }
 
 void LB::b_editableText(int nargs) {
