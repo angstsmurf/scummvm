@@ -471,7 +471,7 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 	if (g_director->getVersion() >= 600) {
 		if (targetId != 0) {
 			pointedSpriteId = targetId;
-		} else if (event != kEventPrepareFrame) {
+		} else if (event != kEventPrepareFrame && event != kEventEnterFrame && event != kEventExitFrame) {
 			pointedSpriteId = _score->getMouseSpriteIDFromPos(pos);
 		}
 	}
@@ -652,6 +652,17 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		case kEventEnterFrame:
 		case kEventExitFrame:
 		case kEventTimeout:
+			// D6+ broadcasts enterFrame and exitFrame: each sprite's
+			// behaviors get them, then the frame and movie scripts.
+			if (_vm->getVersion() >= 600 && pointedSpriteId != 0 &&
+					(event == kEventEnterFrame || event == kEventExitFrame)) {
+				Channel *channel = _score->getChannelById(pointedSpriteId);
+				for (uint i = 0; channel && i < channel->_scriptInstanceList.size(); i++) {
+					bool passThrough = (i != channel->_scriptInstanceList.size() - 1);
+					queue.push(LingoEvent(event, eventId, kSpriteHandler, passThrough, pos, pointedSpriteId, i));
+				}
+				break;
+			}
 			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos, channelId));
 			// fall through
 
@@ -727,6 +738,12 @@ bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
 
 
 void Movie::processEvent(LEvent event, int targetId) {
+	if (_vm->getVersion() >= 600 && targetId == 0 &&
+			(event == kEventEnterFrame || event == kEventExitFrame)) {
+		broadcastEvent(event);
+		return;
+	}
+
 	Common::Queue<LingoEvent> queue;
 	queueEvent(queue, event, targetId);
 
