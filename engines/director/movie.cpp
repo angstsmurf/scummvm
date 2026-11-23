@@ -257,6 +257,17 @@ void Movie::loadCastLibMapping(Common::SeekableReadStreamEndian &stream) {
 	return;
 }
 
+// D7+ keeps the stage colour as an RGB flag plus R, G, B bytes; the raw
+// 16-bit _stageColor (e.g. 0x0100 for RGB black) is not a palette index.
+uint32 Movie::getConfigStageColor() {
+	if (_cast->_version >= kFileVer700) {
+		if (_cast->_D7stageColorIsRGB)
+			return _vm->_wm->findBestColor(_cast->_D7stageColorR, _cast->_D7stageColorG, _cast->_D7stageColorB);
+		return _vm->transformColor(_cast->_D7stageColorR);
+	}
+	return _vm->transformColor(_cast->_stageColor);
+}
+
 bool Movie::loadArchive() {
 	Common::SeekableReadStreamEndian *r = nullptr;
 
@@ -268,7 +279,7 @@ bool Movie::loadArchive() {
 	_platform = _cast->_platform;
 	_movieRect = _cast->_movieRect;
 	_score->_currentFrameRate = _cast->_frameRate;
-	_stageColor = _vm->transformColor(_cast->_stageColor);
+	_stageColor = getConfigStageColor();
 	// Wait to handle _stageColor until palette is loaded in loadCast...
 
 	// File Info
@@ -283,7 +294,7 @@ bool Movie::loadArchive() {
 			it._value->loadConfig();
 		it._value->loadCast();
 	}
-	_stageColor = _vm->transformColor(_cast->_stageColor);
+	_stageColor = getConfigStageColor();
 	// Need to check if the default palette is valid; if not, assume it's the Mac one.
 	if (g_director->hasPalette(_cast->_defaultPalette)) {
 		_defaultPalette = _cast->_defaultPalette;

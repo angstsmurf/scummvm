@@ -98,6 +98,7 @@ public:
 
 	void loadCastLibMapping(Common::SeekableReadStreamEndian &stream);
 	bool loadArchive();
+	uint32 getConfigStageColor();
 	void setArchive(Common::SharedPtr<Archive> archive);
 	Common::SharedPtr<Archive> getArchive() const { return _movieArchive; };
 	Common::String getMacName() const { return _macName; }
