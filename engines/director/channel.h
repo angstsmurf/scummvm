@@ -157,7 +157,10 @@ public:
 
 	int _startFrame;
 	int _endFrame;
-	Common::Array<Datum> _scriptInstanceList;
+	// the scriptInstanceList of the sprite: a Lingo list, so a script can
+	// add(the scriptInstanceList of sprite n, obj) to the live list
+	Datum _scriptInstanceList;
+	Common::Array<Datum> &scriptInstances() { return _scriptInstanceList.u.farr->arr; }
 
 private:
 	Graphics::MacText *mouseTextWidget(const char *query);

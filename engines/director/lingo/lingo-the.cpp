@@ -1830,9 +1830,8 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = (int)(sprite->_colorcode & 0x7);
 		break;
 	case kTheScriptInstanceList:
-		warning("STUB: Getting the scriptInstanceList");
-		d.type = PARRAY;
-		d.u.parr = new PArray;
+		// The live list: add() on it attaches a behavior to the sprite
+		d = channel->_scriptInstanceList;
 		break;
 	case kTheScriptNum:
 		if (g_director->getVersion() >= 600) {
@@ -2201,7 +2200,13 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 
 		break;
 	case kTheScriptInstanceList:
-		warning("STUB: Setting the scriptInstanceList");
+		if (d.type == ARRAY) {
+			// Copy first: d may be this sprite's own list
+			Common::Array<Datum> instances = d.u.farr->arr;
+			channel->scriptInstances() = instances;
+		} else {
+			g_lingo->lingoError("Lingo::setTheSprite(): scriptInstanceList must be a list, not %s", d.type2str());
+		}
 		break;
 	case kTheStartTime:
 		channel->_startTime = d.asInt();

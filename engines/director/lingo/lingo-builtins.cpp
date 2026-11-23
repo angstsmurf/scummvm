@@ -3652,8 +3652,8 @@ void LB::b_sendAllSprites(int nargs) {
 			Channel *channel = score->_channels[ch];
 			if (!channel)
 				continue;
-			for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-				Datum instance = channel->_scriptInstanceList[i];
+			for (uint i = 0; i < channel->scriptInstances().size(); i++) {
+				Datum instance = channel->scriptInstances()[i];
 				if (instance.type != OBJECT)
 					continue;
 				Symbol sym = instance.u.obj->getMethod(msgName);
@@ -3707,13 +3707,13 @@ void LB::b_sendSprite(int nargs) {
 	Score *score = movie ? movie->getScore() : nullptr;
 	Channel *channel = score ? score->getChannelById((uint16)spriteNum) : nullptr;
 	if (channel) {
-		if (channel->_scriptInstanceList.empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
+		if (channel->scriptInstances().empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
 			score->createScriptInstances(score->getCurrentFrameNum());
 
 		bool handled = false;
 		uint savedSpriteNum = movie->_currentSpriteNum;
-		for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-			Datum instance = channel->_scriptInstanceList[i];
+		for (uint i = 0; i < channel->scriptInstances().size(); i++) {
+			Datum instance = channel->scriptInstances()[i];
 			if (instance.type != OBJECT)
 				continue;
 			Symbol sym = instance.u.obj->getMethod(msgName);

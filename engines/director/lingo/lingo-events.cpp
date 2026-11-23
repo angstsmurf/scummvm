@@ -297,8 +297,8 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			if (_vm->getVersion() >= 600) {
 				event.scriptType = kScoreScript;
 				event.scriptId = scriptId;
-				if (event.behaviorIndex >= 0 && event.behaviorIndex < (int)_score->_channels[event.channelId]->_scriptInstanceList.size())
-					event.scriptInstance = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
+				if (event.behaviorIndex >= 0 && event.behaviorIndex < (int)_score->_channels[event.channelId]->scriptInstances().size())
+					event.scriptInstance = _score->_channels[event.channelId]->scriptInstances()[event.behaviorIndex].u.obj;
 				else
 					warning("resolveScriptEvent: behaviorIndex %d out of range", event.behaviorIndex);
 				return;
@@ -629,8 +629,8 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 					// Generate event for each behavior, and pass through for all but the last one.
 					// This is to allow multiple behaviors on a single sprite to each have a
 					// chance to handle the event.
-					for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-						bool passThrough = (i != channel->_scriptInstanceList.size() - 1);
+					for (uint i = 0; i < channel->scriptInstances().size(); i++) {
+						bool passThrough = (i != channel->scriptInstances().size() - 1);
 						queue.push(LingoEvent(event, eventId, kSpriteHandler, passThrough, pos, pointedSpriteId, i));
 					}
 
@@ -657,8 +657,8 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 			if (_vm->getVersion() >= 600 && pointedSpriteId != 0 &&
 					(event == kEventEnterFrame || event == kEventExitFrame)) {
 				Channel *channel = _score->getChannelById(pointedSpriteId);
-				for (uint i = 0; channel && i < channel->_scriptInstanceList.size(); i++) {
-					bool passThrough = (i != channel->_scriptInstanceList.size() - 1);
+				for (uint i = 0; channel && i < channel->scriptInstances().size(); i++) {
+					bool passThrough = (i != channel->scriptInstances().size() - 1);
 					queue.push(LingoEvent(event, eventId, kSpriteHandler, passThrough, pos, pointedSpriteId, i));
 				}
 				break;
@@ -930,7 +930,7 @@ void Score::killScriptInstances(int frameNum) {
 	for (int i = 0; i < (int)_channels.size(); i++) {
 		Channel *channel = _channels[i];
 
-		if (channel->_scriptInstanceList.size() == 0)
+		if (channel->scriptInstances().size() == 0)
 			continue;
 
 		if (frameNum < channel->_startFrame || frameNum > channel->_endFrame) {
@@ -939,7 +939,7 @@ void Score::killScriptInstances(int frameNum) {
 			_movie->processEvent(kEventEndSprite, i);
 			_disableGoPlayUpdateStage = prevDis;
 
-			channel->_scriptInstanceList.clear();
+			channel->scriptInstances().clear();
 			channel->_sprite->_behaviors.clear();
 			debugC(1, kDebugLingoExec, "Score::killScriptInstances(): Killed script instances for channel %d. frame %d [%d-%d]",
 					i + 1, frameNum, channel->_startFrame, channel->_endFrame);
@@ -1041,7 +1041,7 @@ void Score::createScriptInstances(int frameNum) {
 			continue;
 
 		// We create scriptInstance only for new sprites
-		if (channel->_scriptInstanceList.size() != 0)
+		if (channel->scriptInstances().size() != 0)
 			continue;
 
 		// No behaviors, nothing to do
@@ -1073,7 +1073,7 @@ void Score::createScriptInstances(int frameNum) {
 				}
 			}
 
-			channel->_scriptInstanceList.push_back(instance);
+			channel->scriptInstances().push_back(instance);
 		}
 
 		bool prevDis = _disableGoPlayUpdateStage;

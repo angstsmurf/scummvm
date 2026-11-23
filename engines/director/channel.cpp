@@ -68,6 +68,9 @@ Channel::Channel(Score *sc, Sprite *sp, int priority) {
 	_hasDragPosition = false;
 	_hasLingoBbox = false;
 
+	_scriptInstanceList.type = ARRAY;
+	_scriptInstanceList.u.farr = new FArray;
+
 	if (sp) {
 		_startFrame = sp->_spriteInfo.startFrame;
 		_endFrame = sp->_spriteInfo.endFrame;
@@ -112,6 +115,12 @@ Channel& Channel::operator=(const Channel &channel) {
 
 	_startFrame = channel._startFrame;
 	_endFrame = channel._endFrame;
+
+	// Script instances are not copied; each channel owns its list
+	if (_scriptInstanceList.type != ARRAY) {
+		_scriptInstanceList.type = ARRAY;
+		_scriptInstanceList.u.farr = new FArray;
+	}
 
 	return *this;
 }
