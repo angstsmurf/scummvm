@@ -145,6 +145,7 @@ public:
 	void resolveScriptEvent(LingoEvent &event);
 	void processEvent(LEvent event, int targetId = 0);
 	void queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
+	bool clickedSpriteIsGone();
 	void queueInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	bool processInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	Channel *getDraggedChannel() const { return _currentDraggedChannel; }
@@ -166,6 +167,7 @@ public:
 	uint16 _currentHoveredSpriteId;
 	uint _currentSpriteNum;
 	CastMemberID _currentMouseDownCastID;
+	uint16 _currentMouseDownChannelId;
 	CastMemberID _currentMouseDownSpriteScriptID;
 	bool _currentMouseDownSpriteImmediate;
 	CastMemberID _currentKeyDownCastID;

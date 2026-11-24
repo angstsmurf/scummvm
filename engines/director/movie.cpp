@@ -65,6 +65,7 @@ Movie::Movie(Window *window) {
 
 	_currentDraggedChannel = nullptr;
 	_currentHiliteChannelId = 0;
+	_currentMouseDownChannelId = 0;
 	_mouseDownWasInButton = false;
 	_lastEnteredChannelId = 0;
 	_currentHoveredSpriteId = 0;

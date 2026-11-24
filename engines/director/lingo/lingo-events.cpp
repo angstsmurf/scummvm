@@ -183,6 +183,7 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 				// change the cast member underneath. on mouseUp should always load the cast
 				// script for the original cast member, not the new one.
 				_currentMouseDownCastID = _score->_channels[event.channelId]->_sprite->_castId;
+				_currentMouseDownChannelId = event.channelId;
 				_currentMouseDownSpriteScriptID = _score->_channels[event.channelId]->_sprite->_scriptId;
 				_currentMouseDownSpriteImmediate = _score->_channels[event.channelId]->_sprite->_immediate;
 			} else {
@@ -191,6 +192,7 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 				_draggingSpriteOffset = Common::Point(0, 0);
 				_currentDraggedChannel = nullptr;
 				_currentMouseDownCastID = CastMemberID();
+				_currentMouseDownChannelId = 0;
 				_currentMouseDownSpriteScriptID = CastMemberID();
 				_currentMouseDownSpriteImmediate = false;
 			}
@@ -711,6 +713,15 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 	}
 }
 
+bool Movie::clickedSpriteIsGone() {
+	if (_vm->getVersion() < 700 || !_currentMouseDownChannelId)
+		return false;
+
+	Sprite *sprite = _score->getSpriteById(_currentMouseDownChannelId);
+	_currentMouseDownChannelId = 0;
+	return !sprite || (!sprite->_castId.member && !sprite->isQDShape());
+}
+
 void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
 	// D6+ look for the sprite under the mouse and its behaviors when the
 	// event is sent, which can be frames after the click
@@ -839,6 +850,11 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 
 		if (el.eventHandlerSourceType == kUnresolvedHandler) {
 			movie->queueEvent(chain, el.event, 0, el.mousePos);
+			// Director 7 sends mouseUp a second time when the channel
+			// that was clicked has no sprite any more, e.g. after the
+			// mouseDown handler went to another frame
+			if (el.event == kEventMouseUp && movie->clickedSpriteIsGone())
+				movie->queueEvent(chain, el.event, 0, el.mousePos);
 			continue;
 		}
 
