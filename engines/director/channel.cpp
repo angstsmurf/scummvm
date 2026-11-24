@@ -382,16 +382,30 @@ const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
 				return nullptr;
 			}
 			BitmapCastMember *bitmap = (BitmapCastMember *)member;
-			if (bitmap->_bitsPerPixel != 1) {
-				warning("Channel::getMask(): Requested cast mask %s, but bitmap isn't 1bpp", maskID.asString().c_str());
-				return nullptr;
-			}
-
 			if (_mask) {
 				delete _mask;
 				_mask = nullptr;
 			}
 			if (bitmap->_picture) {
+				// D7 movies can use a 32-bit (JPEG) mask: dark pixels let the
+				// sprite through, like the black pixels of a 1-bit mask.
+				// Bad Milk's portal (scrunch.dxr invertPortalmask).
+				const Graphics::Surface *maskSrc = &bitmap->_picture->_surface;
+				Graphics::Surface converted;
+				if (bitmap->_bitsPerPixel != 1 && maskSrc->format.bytesPerPixel > 1) {
+					converted.create(maskSrc->w, maskSrc->h, Graphics::PixelFormat::createFormatCLUT8());
+					for (int y = 0; y < maskSrc->h; y++) {
+						for (int x = 0; x < maskSrc->w; x++) {
+							uint8 r, g, b;
+							maskSrc->format.colorToRGB(maskSrc->getPixel(x, y), r, g, b);
+							*(byte *)converted.getBasePtr(x, y) = (r * 30 + g * 59 + b * 11) / 100 < 128 ? 0xff : 0;
+						}
+					}
+					maskSrc = &converted;
+				} else if (bitmap->_bitsPerPixel != 1) {
+					warning("Channel::getMask(): Requested cast mask %s, but bitmap isn't 1bpp", maskID.asString().c_str());
+					return nullptr;
+				}
 				// reposition channel bounding box, so origin is at registration offset
 				Common::Point originPos = getPosition();
 				bbox.translate(-originPos.x, -originPos.y);
@@ -410,7 +424,8 @@ const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
 				Common::Rect srcRect = destRect;
 				srcRect.translate(-destOrigin.x, -destOrigin.y);
 				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
-				_mask->copyRectToSurface(bitmap->_picture->_surface, destRect.left, destRect.top, srcRect);
+				_mask->copyRectToSurface(*maskSrc, destRect.left, destRect.top, srcRect);
+				converted.free();
 				return &_mask->rawSurface();
 			} else {
 				warning("Channel::getMask(): Requested cast mask %s, but no picture found", maskID.asString().c_str());
