@@ -779,10 +779,11 @@ void Score::updateNextFrameTime() {
 				_waitForChannelCue = tempoCuePoint;
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): waiting for sound channel 2, cue point %d before next frame", _waitForChannelCue);
 				_nextFrameTime = g_system->getMillis();
-			} else if (tempo == 248 && keyEndsClickWait() && _movie->hasQueuedClickOrKey()) {
+			} else if (tempo == 248 && _version < kFileVer700 && keyEndsClickWait() && _movie->hasQueuedClickOrKey()) {
 				// Same as tempo 128 above. D6 and D7 end the wait in their
 				// event dispatchers on the next mouseDown or keyDown, which
-				// is still sent to Lingo.
+				// is still sent to Lingo. In Director 7 a click from before
+				// the wait began does not end it.
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): a queued click or key ends the wait for a mouse click");
 				_nextFrameTime = g_system->getMillis();
 			} else if (tempo == 248) {
