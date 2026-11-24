@@ -2622,14 +2622,23 @@ void Lingo::setTheChunk(Datum &chunk, int field, Datum &d) {
 	((TextCastMember *)member)->setChunkField(field, start, end, d);
 }
 
-// The Xtra member shown by a sprite: asset Xtras add sprite properties
+// The Xtra member shown by a sprite: asset Xtras add sprite properties.
+// From D6 on, QuickTime members are the "QuickTime 3" asset Xtra, loaded
+// as digital video, so their member properties work on sprites too
+// (Bad Milk's intro waits for "the duration of sprite 1").
 static CastMember *spriteXtraMember(const Datum &sprite) {
 	Movie *movie = g_director->getCurrentMovie();
 	Channel *channel = movie ? movie->getScore()->getChannelById(sprite.u.i) : nullptr;
 	if (!channel || !channel->_sprite)
 		return nullptr;
 	CastMember *member = movie->getCastMember(channel->_sprite->_castId);
-	return member && member->_type == kCastXtra ? member : nullptr;
+	if (!member)
+		return nullptr;
+	if (member->_type == kCastXtra)
+		return member;
+	if (member->_type == kCastDigitalVideo && g_director->getVersion() >= 600)
+		return member;
+	return nullptr;
 }
 
 void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
