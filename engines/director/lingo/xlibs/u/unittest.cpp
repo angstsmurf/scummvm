@@ -180,6 +180,10 @@ void UnitTestXObj::m_moveMouse(int nargs) {
 	ev.mouse = Common::Point(x, y);
 	me->_mousePos = ev.mouse;
 	g_director->_injectedEvents.push_back(ev);
+	// the mouseH and the mouseV read the position the event manager tracks
+	const Common::Rect &dims = g_director->getCurrentWindow()->getMacWindow()->getInnerDimensions();
+	ev.mouse += Common::Point(dims.left, dims.top);
+	g_system->getEventManager()->pushEvent(ev);
 	g_lingo->push(0);
 }
 
