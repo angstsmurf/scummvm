@@ -2054,6 +2054,20 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			error("readSpriteDataD7(): Miscomputed field position: %" PRId64, stream.pos() - startPosition);
 		}
 	}
+
+	// As before, the member of a QuickDraw shape is its pattern
+	// (T_SPRT15/T_SPRT17 converted to D7)
+	if (sprite.isQDShape()) {
+		if (sprite._castId.member) {
+			sprite._pattern = sprite._castId.member;
+			sprite._castId = CastMemberID(0, 0);
+			sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+		}
+	} else if (sprite._pattern) {
+		sprite._castId = CastMemberID(sprite._pattern, sprite._castId.castLib ? sprite._castId.castLib : DEFAULT_CAST_LIB);
+		sprite._pattern = 0;
+		sprite._copyBackMask |= kSCBPattern | kSCBCastId;
+	}
 }
 
 void writeSpriteDataD7(Common::SeekableWriteStream *writeStream, Sprite &sprite) {

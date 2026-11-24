@@ -631,11 +631,21 @@ bool Sprite::usesMemberSize() {
 	}
 }
 
+// D7 gives an unstretched QuickDraw shape the size of its member too,
+// and it has none
+bool Sprite::isUnsizedQDShape() {
+	return g_director->getVersion() >= 700 && !_cast && !_stretch && isQDShape();
+}
+
 int Sprite::getDrawnWidth() {
+	if (isUnsizedQDShape())
+		return 0;
 	return usesMemberSize() ? _cast->getInitialRect().width() : _width;
 }
 
 int Sprite::getDrawnHeight() {
+	if (isUnsizedQDShape())
+		return 0;
 	return usesMemberSize() ? _cast->getInitialRect().height() : _height;
 }
 

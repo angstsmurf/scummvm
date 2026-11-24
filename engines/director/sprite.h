@@ -157,6 +157,7 @@ public:
 	void setHeight(int h);
 
 	bool usesMemberSize();
+	bool isUnsizedQDShape();
 	int getDrawnWidth();
 	int getDrawnHeight();
 	Common::Rect getBbox(bool unstretched);
