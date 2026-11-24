@@ -1324,16 +1324,16 @@ Common::String Datum::asString(bool printonly) const {
 		s = Common::String::format("property: #%s", u.s->c_str());
 		break;
 	case CASTREF:
-		s = Common::String::format("member %d of castLib %d", u.cast->member, u.cast->castLib);
+		s = Common::String::format("(member %d of castLib %d)", u.cast->member, u.cast->castLib);
 		break;
 	case CASTLIBREF:
-		s = Common::String::format("castLib %d", u.i);
+		s = Common::String::format("(castLib %d)", u.i);
 		break;
 	case FIELDREF:
 		s = Common::String::format("field %d of castLib %d", u.cast->member, u.cast->castLib);
 		break;
 	case SPRITEREF:
-		s = Common::String::format("sprite %d", u.i);
+		s = Common::String::format("(sprite %d)", u.i);
 		break;
 	case CHUNKREF:
 		{
