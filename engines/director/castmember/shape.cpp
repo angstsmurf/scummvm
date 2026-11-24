@@ -109,6 +109,7 @@ void ShapeCastMember::setForeColor(uint32 fgCol) {
 bool ShapeCastMember::hasField(int field) {
 	switch (field) {
 	case kTheFilled:
+	case kTheLineDirection:
 	case kTheLineSize:
 	case kThePattern:
 	case kTheShapeType:
@@ -125,6 +126,10 @@ Datum ShapeCastMember::getField(int field) {
 	switch (field) {
 	case kTheFilled:
 		d = Datum((bool)_fillType);
+		break;
+	case kTheLineDirection:
+		// 0: from the top left, 1: from the bottom left
+		d = Datum(_lineDirection == 6 ? 1 : 0);
 		break;
 	case kTheLineSize:
 		d = Datum(_lineThickness);
@@ -166,6 +171,13 @@ void ShapeCastMember::setField(int field, const Datum &d) {
 	switch (field) {
 	case kTheFilled:
 		_fillType = d.asInt() ? 1 : 0;
+		return;
+	case kTheLineDirection:
+		// Director 7 only sets it for a member that is a line already
+		if ((_lineDirection == 5 || _lineDirection == 6) && (d.asInt() == 0 || d.asInt() == 1)) {
+			_lineDirection = 5 + d.asInt();
+			_modified = true;
+		}
 		return;
 	case kTheLineSize:
 		_lineThickness = d.asInt();

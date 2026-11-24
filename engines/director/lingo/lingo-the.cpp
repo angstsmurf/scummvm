@@ -355,6 +355,7 @@ const TheEntityField fields[] = {
 
 	// ShapeCastMember fields
 	{ kTheCast,		"filled",		kTheFilled,		500 },//					D5 p
+	{ kTheCast,		"lineDirection",kTheLineDirection,700 },//							D7 p
 	{ kTheCast,		"lineSize",		kTheLineSize,	500 },//					D5 p
 	{ kTheCast,		"pattern",		kThePattern,	500 },//					D5 p
 	{ kTheCast,		"shapeType",	kTheShapeType,	500 },//					D5 p

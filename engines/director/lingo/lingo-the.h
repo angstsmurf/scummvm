@@ -239,6 +239,7 @@ enum TheFieldType {
 	kTheLast,
 	kTheLeft,
 	kTheLineCount,
+	kTheLineDirection,
 	kTheLineSize,
 	kTheLoaded,
 	kTheLoc,
