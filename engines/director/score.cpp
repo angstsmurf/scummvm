@@ -445,8 +445,9 @@ void Score::step() {
 			_idleWentToFrame = false;
 			// In D7, the frame step returns at once while a "delay" runs, before
 			// it sends idle (checked in DIRAPI.DLL 7.0.2).
-			bool delayed = delayBlocksIdle() && _nextFrameDelay &&
-				g_system->getMillis() < _nextFrameDelay;
+			// The pass that finds the delay over goes on to the next frame,
+			// so no idle is sent then either.
+			bool delayed = delayBlocksIdle() && _nextFrameDelay;
 			if (!_skipIdle && !_window->frozenLingoStateCount() && !pollFirst && !delayed) {
 				_movie->processEvent(kEventIdle);
 				_idleWentToFrame = goFromIdleRestartsTimer() && _nextFrame != 0 && !_window->hasPendingMovieSwitch();
