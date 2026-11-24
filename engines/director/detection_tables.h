@@ -9927,13 +9927,13 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME1_l("pettsonjs", "", "Julstart.exe", "7c18c9a6af2694156bf09ed195c1ab09", 2610931, Common::SV_SWE, 702),
 
 	// German title is Physikus - Das Abenteuer aus der Welt der Naturwissenschaften
-	MACGAME1("physicus", "",   "Physicus", "r:5d3f89e052320f8ce140451c730e232b", 114389, 702),
-	MACGAME1_l("physicus", "", "Physikus", "r:5d3f89e052320f8ce140451c730e232b", 114389, Common::DE_DEU, 702),
-	MACGAME1_l("physicus", "", "Physikus", "5d3f89e052320f8ce140451c730e232b", 114645, Common::FR_FRA, 702),
-	WINGAME1("physicus", "",   "Physicus.exe", "t:d2a772b412a278bda68bd64a00af9b04", 2298279, 702),
-	WINGAME1_l("physicus", "", "Physikus.exe", "t:89be052460986358d7e4724ebc940af6", 1816828, Common::DE_DEU, 702),
+	MACGAME1f("physicus", "",   "Physicus", "r:5d3f89e052320f8ce140451c730e232b", 114389, 702, GF_TRUECOLOR),
+	MACGAME1f_l("physicus", "", "Physikus", "r:5d3f89e052320f8ce140451c730e232b", 114389, Common::DE_DEU, 702, GF_TRUECOLOR),
+	MACGAME1f_l("physicus", "", "Physikus", "5d3f89e052320f8ce140451c730e232b", 114645, Common::FR_FRA, 702, GF_TRUECOLOR),
+	WINGAME1f("physicus", "",   "Physicus.exe", "t:d2a772b412a278bda68bd64a00af9b04", 2298279, 702, GF_TRUECOLOR),
+	WINGAME1f_l("physicus", "", "Physikus.exe", "t:89be052460986358d7e4724ebc940af6", 1816828, Common::DE_DEU, 702, GF_TRUECOLOR),
 	// Italian edition "Físicus", published by l'Espresso
-	WINGAME1_l("physicus", "", "Physikus.exe", "t:026868d136e559a3eca5445221d123f1", 1816876, Common::IT_ITA, 702),
+	WINGAME1f_l("physicus", "", "Physikus.exe", "t:026868d136e559a3eca5445221d123f1", 1816876, Common::IT_ITA, 702, GF_TRUECOLOR),
 
 	WINDEMO2("planetstrass", "Demo", "Planet.exe", "t:a053c117847a545ef72aecb425fed9e7", 15434606,
 									 "strass.jpg", "d:d76c7387399626e7a3daef54cbcd6451",	39135, 702),
@@ -11225,7 +11225,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 								 "Game/Filofax.dxr", "d:4cac84340cc5e642af8ddf3a66bc015b", 1323126, Common::DE_DEU, 1010),
 
 	//Physicus Rerelease
-	WINGAME1_l("physicus", "", "Physikus.exe", "t:116fff983036c75a80a7f061940de65a", 2751837, Common::DE_DEU, 1010),
+	WINGAME1f_l("physicus", "", "Physikus.exe", "t:116fff983036c75a80a7f061940de65a", 2751837, Common::DE_DEU, 1010, GF_TRUECOLOR),
 
 	WINGAME1_l("physicus2", "", "PhysicusII.exe", "t:e927a31cf9f3e1b8467d106915efcf39", 2896453, Common::DE_DEU, 1010),
 
