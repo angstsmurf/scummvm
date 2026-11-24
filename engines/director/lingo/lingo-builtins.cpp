@@ -2074,6 +2074,30 @@ void LB::b_call(int nargs) {
 		g_lingo->push(result);
 }
 
+// A message no behavior took goes on to the movie's handlers. From D6 on,
+// a handler in a behavior (score) script is not among them: it only runs
+// for an instance, and calling it without one leaves 'me' void (Bad Milk
+// nav.dxr: sendSprite(n, #rotateAndFlyIn) to Dan's panel, which has no
+// fly-in behavior).
+static Datum callUnhandledMessage(const Common::String &msgName, Common::Array<Datum> &extraArgs) {
+	Symbol h = g_lingo->getHandler(msgName);
+	if (h.type == VOIDSYM)
+		return Datum();
+	if (g_director->getVersion() >= 600 && h.ctx && h.ctx->_scriptType == kScoreScript)
+		return Datum();
+
+	uint stackSize = g_lingo->_state->stack.size();
+	for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
+		g_lingo->push(extraArgs[j]);
+	int frame = g_lingo->_state->callstack.size();
+	LC::call(h, (int)extraArgs.size(), true);
+	g_lingo->execute(frame);
+	// A handler aborted by a Lingo error leaves no return value
+	if (g_lingo->_state->stack.size() > stackSize)
+		return g_lingo->pop();
+	return Datum();
+}
+
 void LB::b_callAncestor(int nargs) {
 	g_lingo->printSTUBWithArglist("b_callAncestor", nargs);
 	g_lingo->dropStack(nargs);
@@ -3733,15 +3757,7 @@ void LB::b_sendAllSprites(int nargs) {
 		}
 
 		if (!anyHandled) {
-			Symbol h = g_lingo->getHandler(msgName);
-			if (h.type != VOIDSYM) {
-				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
-					g_lingo->push(extraArgs[j]);
-				int frame = g_lingo->_state->callstack.size();
-				LC::call(h, numExtraArgs, true);
-				g_lingo->execute(frame);
-				result = g_lingo->pop();
-			}
+			result = callUnhandledMessage(msgName, extraArgs);
 		}
 	}
 
@@ -3792,15 +3808,7 @@ void LB::b_sendSprite(int nargs) {
 		}
 
 		if (!handled) {
-			Symbol h = g_lingo->getHandler(msgName);
-			if (h.type != VOIDSYM) {
-				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
-					g_lingo->push(extraArgs[j]);
-				int frame = g_lingo->_state->callstack.size();
-				LC::call(h, numExtraArgs, true);
-				g_lingo->execute(frame);
-				result = g_lingo->pop();
-			}
+			result = callUnhandledMessage(msgName, extraArgs);
 		}
 	}
 
