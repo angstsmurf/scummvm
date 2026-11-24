@@ -121,6 +121,9 @@ public:
 	bool getEditable();
 
 	bool respondsToMouse();
+	static bool scriptTakesClicks(ScriptContext *ctx);
+	bool respondsToRollover();
+	static bool scriptTakesRollover(ScriptContext *ctx);
 	// The tweened flag is score authoring data and doesn't affect drawing
 	byte getDrawThickness() const { return _thickness & ~kTTweened; }
 	bool isActive();

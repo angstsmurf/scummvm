@@ -124,6 +124,7 @@ public:
 	uint16 getSpriteIDFromPos(Common::Point pos);
 	uint16 getMouseSpriteIDFromPos(Common::Point pos);
 	uint16 getActiveSpriteIDFromPos(Common::Point pos);
+	uint16 getRolloverSpriteIDFromPos(Common::Point pos);
 	bool checkSpriteRollOver(uint16 spriteId, Common::Point pos);
 	uint16 getRollOverSpriteIDFromPos(Common::Point pos);
 	Common::Array<Channel *> getSpriteIntersections(const Common::Rect &r);

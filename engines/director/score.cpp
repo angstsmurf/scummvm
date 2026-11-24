@@ -1911,6 +1911,20 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 	return 0;
 }
 
+// D7 asks the same of a sprite's instances as of its behaviors: one of
+// them must handle a click event (see Sprite::scriptTakesClicks)
+static bool instancesTakeClicks(Channel *channel) {
+	if (g_director->getVersion() < 700)
+		return !channel->scriptInstances().empty();
+
+	for (auto &instance : channel->scriptInstances()) {
+		if (instance.type == OBJECT && instance.u.obj->getObjType() == kScriptObj &&
+				Sprite::scriptTakesClicks(static_cast<ScriptContext *>(instance.u.obj)))
+			return true;
+	}
+	return false;
+}
+
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 	// A sprite that is being dragged keeps the mouse, also when it is
 	// dragged under a sprite in a higher channel
@@ -1932,13 +1946,34 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 		// D6+: script instances added by Lingo (add(the scriptInstanceList
 		// of sprite n, ...)) make the sprite respond like score behaviors
 		bool responds = _channels[i]->_sprite->respondsToMouse() ||
-			(g_director->getVersion() >= 600 && !_channels[i]->scriptInstances().empty());
+			(g_director->getVersion() >= 600 && instancesTakeClicks(_channels[i]));
 		if (test == kCollisionYes && responds)
 			return i;
 		else if (test == kCollisionHole)
 			break;
 	}
 
+	return 0;
+}
+
+// D7: the sprite that gets mouseEnter, mouseLeave and mouseWithin
+uint16 Score::getRolloverSpriteIDFromPos(Common::Point pos) {
+	Common::Array<uint> order = getLayerOrder();
+	for (int n = (int)order.size() - 1; n >= 0; n--) {
+		int i = order[n];
+		CollisionTest test = _channels[i]->isMouseIn(pos);
+		if (test == kCollisionHole)
+			break;
+		if (test != kCollisionYes)
+			continue;
+		if (_channels[i]->_sprite->respondsToRollover())
+			return i;
+		for (auto &instance : _channels[i]->scriptInstances()) {
+			if (instance.type == OBJECT && instance.u.obj->getObjType() == kScriptObj &&
+					Sprite::scriptTakesRollover(static_cast<ScriptContext *>(instance.u.obj)))
+				return i;
+		}
+	}
 	return 0;
 }
 

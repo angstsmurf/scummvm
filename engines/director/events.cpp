@@ -202,7 +202,13 @@ bool Movie::processSysEvent(Common::Event &event) {
 		else
 			spriteId = _score->getMouseSpriteIDFromPos(event.mouse);
 
-		_currentHoveredSpriteId = spriteId;
+		// D7 picks the rollover sprite separately from the click target
+		// (Bad Milk: the carousel turns from mouseWithin on a full-stage
+		// sprite that takes no clicks)
+		if (g_director->getVersion() >= 700)
+			_currentHoveredSpriteId = _score->getRolloverSpriteIDFromPos(event.mouse);
+		else
+			_currentHoveredSpriteId = spriteId;
 		_lastMousePos = event.mouse;
 	}
 
@@ -261,14 +267,15 @@ bool Movie::processSysEvent(Common::Event &event) {
 				if (g_system->getEventManager()->getButtonState() == 0)
 					return true;
 
-			if (spriteId > 0) {
-				if (spriteId != _lastEnteredChannelId) {
+			uint16 enteredId = g_director->getVersion() >= 700 ? _currentHoveredSpriteId : spriteId;
+			if (enteredId > 0) {
+				if (enteredId != _lastEnteredChannelId) {
 					if (_lastEnteredChannelId) {
 						processEvent(kEventMouseLeave, _lastEnteredChannelId);
 					}
 
-					_lastEnteredChannelId = spriteId;
-					processEvent(kEventMouseEnter, spriteId);
+					_lastEnteredChannelId = enteredId;
+					processEvent(kEventMouseEnter, enteredId);
 				}
 			} else {
 				if (_lastEnteredChannelId) {

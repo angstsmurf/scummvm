@@ -401,6 +401,34 @@ bool Sprite::getEditable() {
 	return _editable || _cast->isEditable();
 }
 
+// D7: a script makes its sprite a click target only if it handles one of
+// the click events (DIRAPI handler mask & 0x1800003). Sprites without one
+// are passed over by the mouseDown hit test (FUN_6804fc38).
+bool Sprite::scriptTakesClicks(ScriptContext *ctx) {
+	return ctx && (ctx->_eventHandlers.contains(kEventMouseDown)
+				|| ctx->_eventHandlers.contains(kEventMouseUp)
+				|| ctx->_eventHandlers.contains(kEventRightMouseDown)
+				|| ctx->_eventHandlers.contains(kEventRightMouseUp));
+}
+
+// D7: mouseEnter, mouseLeave and mouseWithin go to the topmost sprite with
+// a script that handles one of them (FUN_6804fc38 mask 2), which need not
+// be the click target
+bool Sprite::scriptTakesRollover(ScriptContext *ctx) {
+	return ctx && (ctx->_eventHandlers.contains(kEventMouseEnter)
+				|| ctx->_eventHandlers.contains(kEventMouseLeave)
+				|| ctx->_eventHandlers.contains(kEventMouseWithin));
+}
+
+bool Sprite::respondsToRollover() {
+	for (auto &behavior : _behaviors) {
+		if (scriptTakesRollover(_movie->getScriptContext(kScoreScript, behavior.memberID)))
+			return true;
+	}
+	return scriptTakesRollover(_movie->getScriptContext(kScoreScript, _scriptId)) ||
+		scriptTakesRollover(_movie->getScriptContext(kCastScript, _castId));
+}
+
 bool Sprite::respondsToMouse() {
 	if (_moveable)
 		return true;
@@ -418,9 +446,13 @@ bool Sprite::respondsToMouse() {
 	// have a score behavior pointing at an empty cast slot on the
 	// selector sprite, which must not catch the clicks for the
 	// "Zoom" labels under it
+	// D7 (DIRAPI FUN_6800ac9e) counts only behaviors with a click handler:
+	// a full-stage mouseWithin sprite must not catch the clicks for the
+	// sprites under it (Bad Milk phone carousel)
 	if (g_director->getVersion() >= 600) {
 		for (auto &behavior : _behaviors) {
-			if (_movie->getScriptContext(kScoreScript, behavior.memberID))
+			ScriptContext *ctx = _movie->getScriptContext(kScoreScript, behavior.memberID);
+			if (ctx && (g_director->getVersion() < 700 || scriptTakesClicks(ctx)))
 				return true;
 		}
 	}
