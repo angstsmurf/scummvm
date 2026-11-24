@@ -1184,6 +1184,9 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		Sprite *currentSprite = channel->_sprite;
 		Sprite *nextSprite = _currentFrame->_sprites[i];
 
+		if (currentSprite->_cast && currentSprite->_cast->_type == kCastDigitalVideo)
+			((DigitalVideoCastMember *)currentSprite->_cast)->startPendingVideo();
+
 		// The sprite is drawn now: Lingo reads its new rect from here on
 		channel->_hasLingoBbox = false;
 

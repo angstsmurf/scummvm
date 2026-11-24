@@ -60,6 +60,7 @@ public:
 	bool loadVideo(Common::String path);
 	void setChannel(Channel *channel) { _channel = channel; }
 	void startVideo();
+	void startPendingVideo();
 	void stopVideo();
 	void rewindVideo();
 	bool endOfVideo();
@@ -119,6 +120,7 @@ public:
 	uint16 _frameRate;
 	bool _getFirstFrame;
 	bool _frameStale;	// the last rendered frame doesn't match the current movie position
+	bool _startPending;
 
 	Video::VideoDecoder *_video;
 	Graphics::Surface *_lastFrame;

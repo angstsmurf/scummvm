@@ -89,6 +89,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId)
 
 	_getFirstFrame = false;
 	_frameStale = false;
+	_startPending = false;
 
 	_vflags = 0;
 	_frameRate = 0;
@@ -125,6 +126,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 
 	_getFirstFrame = false;
 	_frameStale = false;
+	_startPending = false;
 
 	_initialRect = Movie::readRect(stream);
 	_vflags = stream.readUint32();
@@ -200,6 +202,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 	_frameRate = source._frameRate;
 	_getFirstFrame = source._getFirstFrame;
 	_frameStale = source._frameStale;
+	_startPending = source._startPending;
 
 	_video = nullptr;
 	_lastFrame = nullptr;
@@ -416,6 +419,13 @@ bool DigitalVideoCastMember::isModified() {
 		return false;
 
 	return _video->needsUpdate();
+}
+
+void DigitalVideoCastMember::startPendingVideo() {
+	if (!_startPending)
+		return;
+	_startPending = false;
+	startVideo();
 }
 
 void DigitalVideoCastMember::startVideo() {
@@ -747,6 +757,7 @@ void DigitalVideoCastMember::setMovieRate(double rate) {
 	}
 
 	_channel->_movieRate = rate;
+	_startPending = false;
 
 	if (_channel->_stopTime == 0)
 		_channel->_stopTime = getMovieTotalTime();
@@ -1021,7 +1032,11 @@ void DigitalVideoCastMember::reloadVideo() {
 		_channel->_movieTime = 0;
 		_channel->_startTime = 0;
 		_channel->_stopTime = 0;
-		startVideo();
+		// The new video starts with the next update of the stage, unless
+		// a script sets the movieRate first. Until then the rate reads 0.
+		_channel->_movieRate = 0.0;
+		_startPending = true;
+		_getFirstFrame = true;
 	}
 
 	_dirty = true;
