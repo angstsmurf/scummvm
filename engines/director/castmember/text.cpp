@@ -320,6 +320,9 @@ Graphics::MacWidget *TextCastMember::createWindowOrWidget(Common::Rect &bbox, Co
 
 	widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(), bbox.left, bbox.top, dims.width(), dims.height(), g_director->_wm, _ftext, macFont, getForeColor(), getBackColor(), maxWidth, getAlignment(), _lineSpacing, _borderSize, _gutterSize, _boxShadow, _textShadow, _textType != kTextTypeAdjustToFit, _textType == kTextTypeScrolling);
 	widget->setSelRange(g_director->getCurrentMovie()->_selStart, g_director->getCurrentMovie()->_selEnd);
+	// The default border colour is a palette index
+	if (g_director->_wm->_pixelformat.bytesPerPixel != 1)
+		widget->setBorderColor(g_director->_wm->_colorBlack);
 	widget->draw();
 
 	return widget;
