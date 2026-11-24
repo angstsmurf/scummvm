@@ -658,15 +658,14 @@ bool Channel::isMatteIntersect(Channel *channel) {
 	if (channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastBitmap)
 		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox);
 
-	if (myMatte && yourMatte) {
-		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
-			const byte *my = (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top);
-			const byte *your = (const byte *)yourMatte->getBasePtr(intersectRect.left - yourBbox.left, i - yourBbox.top);
+	// A bitmap without white pixels has no matte: all of its box is solid
+	for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
+		const byte *my = myMatte ? (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top) : nullptr;
+		const byte *your = yourMatte ? (const byte *)yourMatte->getBasePtr(intersectRect.left - yourBbox.left, i - yourBbox.top) : nullptr;
 
-			for (int j = intersectRect.left; j < intersectRect.right; j++, my++, your++)
-				if (*my && *your)
-					return true;
-		}
+		for (int j = 0; j < intersectRect.width(); j++)
+			if ((!my || my[j]) && (!your || your[j]))
+				return true;
 	}
 
 	return false;
@@ -684,14 +683,15 @@ bool Channel::isMatteBoxIntersect(Channel *channel) {
 	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
 		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
 
-	if (myMatte) {
-		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
-			const byte *my = (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top);
+	if (!myMatte)
+		return true;
 
-			for (int j = intersectRect.left; j < intersectRect.right; j++, my++)
-				if (*my)
-					return true;
-		}
+	for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
+		const byte *my = (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top);
+
+		for (int j = intersectRect.left; j < intersectRect.right; j++, my++)
+			if (*my)
+				return true;
 	}
 
 	return false;
@@ -703,7 +703,11 @@ bool Channel::isMatteBoxWithin(Channel *channel) {
 	Common::Rect myBbox = getBbox();
 	Common::Rect yourBbox = channel->getBbox();
 
-	if (!myBbox.contains(yourBbox))
+	// D7 only looks at the part of the box that overlaps mine
+	if (g_director->getVersion() >= 700)
+		yourBbox = myBbox.findIntersectingRect(yourBbox);
+
+	if (yourBbox.isEmpty() || !myBbox.contains(yourBbox))
 		return false;
 	Graphics::Surface *myMatte = nullptr;
 
@@ -711,7 +715,7 @@ bool Channel::isMatteBoxWithin(Channel *channel) {
 		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
 
 	if (!myMatte)
-		return false;
+		return true;
 
 	for (int i = yourBbox.top; i < yourBbox.bottom; i++) {
 		const byte *my = (const byte *)myMatte->getBasePtr(yourBbox.left - myBbox.left, i - myBbox.top);
@@ -740,20 +744,16 @@ bool Channel::isMatteWithin(Channel *channel) {
 	if (channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastBitmap)
 		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox);
 
-	if (myMatte && yourMatte) {
-		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
-			const byte *my = (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top);
-			const byte *your = (const byte *)yourMatte->getBasePtr(intersectRect.left - yourBbox.left, i - yourBbox.top);
+	for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
+		const byte *my = myMatte ? (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top) : nullptr;
+		const byte *your = yourMatte ? (const byte *)yourMatte->getBasePtr(intersectRect.left - yourBbox.left, i - yourBbox.top) : nullptr;
 
-			for (int j = intersectRect.left; j < intersectRect.right; j++, my++, your++)
-				if (!*my && *your)
-					return false;
-		}
-
-		return true;
+		for (int j = 0; j < intersectRect.width(); j++)
+			if (my && !my[j] && (!your || your[j]))
+				return false;
 	}
 
-	return false;
+	return true;
 }
 
 bool Channel::isActiveVideo() {
