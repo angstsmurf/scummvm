@@ -181,6 +181,20 @@ bool Window::processSysEvent(Common::Event &event) {
 	return flag;
 }
 
+void Movie::dragSprite(Common::Point mouse) {
+	Common::Point pos = _draggingSpriteOffset + mouse;
+	// The edges follow at the next frame or updateStage
+	_currentDraggedChannel->keepLingoBbox();
+	_currentDraggedChannel->setPosition(pos.x, pos.y, true);
+	_currentDraggedChannel->setDirty();
+}
+
+void Movie::applyPendingDrag() {
+	if (_hasPendingDrag && _currentDraggedChannel && _currentDraggedChannel->_sprite->_moveable)
+		dragSprite(_pendingDragMouse);
+	_hasPendingDrag = false;
+}
+
 bool Movie::processSysEvent(Common::Event &event) {
 	// When in GUI message box is being shown, movie may record clicking on the message box as a movie event
 	// Make sure that these events (mouseUp, mouseDown) are not recorded in the movie
@@ -248,11 +262,12 @@ bool Movie::processSysEvent(Common::Event &event) {
 
 		if (_currentDraggedChannel) {
 			if (_currentDraggedChannel->_sprite->_moveable) {
-				pos = _draggingSpriteOffset + event.mouse;
-				// The edges follow at the next frame or updateStage
-				_currentDraggedChannel->keepLingoBbox();
-				_currentDraggedChannel->setPosition(pos.x, pos.y, true);
-				_currentDraggedChannel->setDirty();
+				// Director 7 leaves the sprite where it is while a handler
+				// runs, so a frame the handler goes to is drawn first
+				_hasPendingDrag = _vm->getVersion() >= 700 && !_lingo->_state->callstack.empty();
+				_pendingDragMouse = event.mouse;
+				if (!_hasPendingDrag)
+					dragSprite(event.mouse);
 			} else {
 				_currentDraggedChannel = nullptr;
 			}
@@ -368,6 +383,7 @@ bool Movie::processSysEvent(Common::Event &event) {
 			result = processInputEvent(ev, 0, pos);
 
 			// The drag ends once the dragged sprite got its mouseUp
+			applyPendingDrag();
 			_currentDraggedChannel = nullptr;
 
 			// D5 has special behavior here

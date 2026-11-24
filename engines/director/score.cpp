@@ -422,6 +422,7 @@ void Score::step() {
 	bool hasJump = (_nextFrame != 0) || _window->hasPendingMovieSwitch();
 
 	if (_haveInteractivity && !hasJump) {
+		_movie->applyPendingDrag();
 		if (!_window->frozenLingoStateCount())
 			WindowXObj::processEvents();
 		if (!_movie->_inputEventQueue.empty() && !_window->frozenLingoStateCount()) {

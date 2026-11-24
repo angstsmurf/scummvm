@@ -146,6 +146,7 @@ public:
 	void processEvent(LEvent event, int targetId = 0);
 	void queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	bool clickedSpriteIsGone();
+	void applyPendingDrag();
 	void queueInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	bool processInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	Channel *getDraggedChannel() const { return _currentDraggedChannel; }
@@ -154,6 +155,7 @@ public:
 	Common::String formatMovieInfo();
 
 private:
+	void dragSprite(Common::Point mouse);
 	void loadFileInfo(Common::SeekableReadStreamEndian &stream);
 
 	void queueSpriteEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId, int spriteId);
@@ -255,6 +257,8 @@ private:
 	bool _mouseDownWasInButton;
 	Channel *_currentDraggedChannel;
 	Common::Point _draggingSpriteOffset;
+	bool _hasPendingDrag;
+	Common::Point _pendingDragMouse;
 };
 
 } // End of namespace Director
