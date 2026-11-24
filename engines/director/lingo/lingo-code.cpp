@@ -2065,7 +2065,7 @@ void LC::c_hilite() {
 			src = src.u.cref->source;
 		}
 		if (src.isCastRef()) {
-			fieldId = *d.u.cast;
+			fieldId = *src.u.cast;
 		} else {
 			warning("BUILDBOT: c_hilite: bad chunk ref field type: %s", src.type2str());
 			return;
