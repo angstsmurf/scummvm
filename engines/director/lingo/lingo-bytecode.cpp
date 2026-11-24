@@ -70,6 +70,8 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x1d, LC::c_telldone,		"" },
 	{ 0x1e, LC::cb_list,		"" },
 	{ 0x1f, LC::cb_proplist,	"" },
+	{ 0x22, LC::cb_hilite,		"" },
+	{ 0x23, LC::cb_fieldnolib,	"" },
 
 	{ 0x41, LC::c_intpush,		"B" },
 	{ 0x42, LC::c_argcnoretpush,"b" },
@@ -107,6 +109,11 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x65, LC::c_stackdrop, 	"b" },
 	{ 0x66, LC::cb_v4theentitynamepush, "bN" },
 	{ 0x67, LC::cb_call,		"bN" }, // D5+ objcall
+	{ 0x68, LC::cb_v4assignnolib, "b" },
+	{ 0x69, LC::cb_v4assign2nolib, "b" },
+	{ 0x6a, LC::cb_deletenolib,	"b" },
+	{ 0x6b, LC::cb_v4theentitypushnolib, "b" },
+	{ 0x6c, LC::cb_v4theentityassignnolib, "b" },
 
 	{ 0x81, LC::c_intpush,		"W" },
 	{ 0x82, LC::c_argcnoretpush,"w" },
@@ -143,6 +150,11 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0xa5, LC::c_stackdrop, 	"w" },
 	{ 0xa6, LC::cb_v4theentitynamepush, "wN" },
 	{ 0xa7, LC::cb_call,		"wN" }, // D5+ objcall
+	{ 0xa8, LC::cb_v4assignnolib, "w" },
+	{ 0xa9, LC::cb_v4assign2nolib, "w" },
+	{ 0xaa, LC::cb_deletenolib,	"w" },
+	{ 0xab, LC::cb_v4theentitypushnolib, "w" },
+	{ 0xac, LC::cb_v4theentityassignnolib, "w" },
 	{ 0, nullptr, nullptr }
 };
 
@@ -347,7 +359,7 @@ void Lingo::initBytecode() {
 	}
 }
 
-Datum Lingo::findVarV4(int varType, const Datum &id) {
+Datum Lingo::findVarV4(int varType, const Datum &id, bool noCastLib) {
 	Datum res;
 	switch (varType) {
 	case 1: // global
@@ -390,7 +402,9 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 		}
 		break;
 	case 6: // field
-		if (g_director->getVersion() < 500) {
+		if (noCastLib) {
+			res = g_lingo->resolveFieldMember(id, Datum(0));
+		} else if (g_director->getVersion() < 500) {
 			res = g_lingo->resolveFieldMember(id, Datum());
 		} else {
 			Datum member = g_lingo->pop();
@@ -423,13 +437,30 @@ void LC::cb_unk2() {
 	warning("STUB: opcode 0x%02x (%d, %d)", opcode, arg1, arg2);
 }
 
-void LC::cb_delete() {
+static void v4Delete(bool noCastLib) {
 	int varType = g_lingo->readInt();
 	Datum varID = g_lingo->pop();
-	Datum var = g_lingo->findVarV4(varType, varID);
-	Datum chunkRef = readChunkRef(var);
+	Datum var = g_lingo->findVarV4(varType, varID, noCastLib);
+	Datum chunkRef = LC::readChunkRef(var);
 	g_lingo->push(chunkRef);
 	LC::c_delete();
+}
+
+void LC::cb_delete() {
+	v4Delete(false);
+}
+
+// Opcodes 0x22, 0x23, 0x68, 0x69 and 0x6a are hilite, field, put, put into
+// a chunk and delete in scripts D7 converted from D4: a field is a single
+// ID, without a cast library
+void LC::cb_deletenolib() {
+	v4Delete(true);
+}
+
+void LC::cb_fieldnolib() {
+	Datum res = g_lingo->resolveFieldMember(g_lingo->pop(), Datum(0));
+	res.type = FIELDREF;
+	g_lingo->push(res.eval());
 }
 
 void LC::cb_hilite() {
@@ -486,13 +517,13 @@ void LC::cb_objectcall() {
 }
 
 
-void LC::cb_v4assign() {
+static void v4Assign(bool noCastLib) {
 	int arg = g_lingo->readInt();
 	int op = (arg >> 4) & 0xF;
 	int varType = arg & 0xF;
 	Datum varId = g_lingo->pop();
 
-	Datum var = g_lingo->findVarV4(varType, varId);
+	Datum var = g_lingo->findVarV4(varType, varId, noCastLib);
 	g_lingo->push(var);
 
 	switch (op) {
@@ -513,6 +544,14 @@ void LC::cb_v4assign() {
 		g_lingo->pop();
 		break;
 	}
+}
+
+void LC::cb_v4assign() {
+	v4Assign(false);
+}
+
+void LC::cb_v4assignnolib() {
+	v4Assign(true);
 }
 
 
@@ -702,14 +741,14 @@ void LC::cb_varassign() {
 }
 
 
-void LC::cb_v4assign2() {
+static void v4Assign2(bool noCastLib) {
 	int arg = g_lingo->readInt();
 	int op = (arg >> 4) & 0xF;
 	int varType = arg & 0xF;
 	Datum varId = g_lingo->pop();
 
-	Datum var = g_lingo->findVarV4(varType, varId);
-	Datum ref = readChunkRef(var);
+	Datum var = g_lingo->findVarV4(varType, varId, noCastLib);
+	Datum ref = LC::readChunkRef(var);
 	g_lingo->push(ref);
 
 	switch (op) {
@@ -732,8 +771,16 @@ void LC::cb_v4assign2() {
 	}
 }
 
+void LC::cb_v4assign2() {
+	v4Assign2(false);
+}
 
-void LC::cb_v4theentitypush() {
+void LC::cb_v4assign2nolib() {
+	v4Assign2(true);
+}
+
+
+static void v4TheEntityPush(bool noCastLib) {
 	int bank = g_lingo->readInt();
 
 	int firstArg = g_lingo->pop().asInt();
@@ -762,9 +809,13 @@ void LC::cb_v4theentitypush() {
 				if ((entity == kTheCast || entity == kTheField) && g_director->getVersion() >= 500) {
 					// For "the member", D5 and above have a lib ID followed by a member ID
 					// Pre-resolve them here.
-					Datum member = g_lingo->pop();
+					Datum castLib(0);
+					if (!noCastLib) {
+						castLib = id;
+						id = g_lingo->pop();
+					}
 					// A field lookup prefers fields over other members of the same name
-					CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(member, id) : g_lingo->toCastMemberID(member, id);
+					CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(id, castLib) : g_lingo->toCastMemberID(id, castLib);
 					id = Datum(resolved);
 				}
 				debugC(3, kDebugLingoExec, "cb_v4theentitypush: calling getTheEntity(%s, %s, %s)", g_lingo->entity2str(entity), id.asString(true).c_str(), g_lingo->field2str(field));
@@ -832,7 +883,7 @@ void LC::cb_v4theentitypush() {
 			{
 				Datum fieldRef = g_lingo->pop().asMemberID();
 				fieldRef.type = FIELDREF;
-				Datum chunkRef = readChunkRef(fieldRef);
+				Datum chunkRef = LC::readChunkRef(fieldRef);
 				result = g_lingo->getTheEntity(entity, chunkRef, field);
 			}
 			break;
@@ -847,6 +898,15 @@ void LC::cb_v4theentitypush() {
 	g_lingo->push(result);
 }
 
+
+void LC::cb_v4theentitypush() {
+	v4TheEntityPush(false);
+}
+
+// Opcode 0x6b, in scripts D7 converted from D4: a member is a single ID
+void LC::cb_v4theentitypushnolib() {
+	v4TheEntityPush(true);
+}
 
 void LC::cb_v4theentitynamepush() {
 	Datum nargs = g_lingo->pop();
@@ -882,7 +942,7 @@ void LC::cb_v4theentitynamepush() {
 }
 
 
-void LC::cb_v4theentityassign() {
+static void v4TheEntityAssign(bool noCastLib) {
 	int bank = g_lingo->readInt();
 
 	int firstArg = g_lingo->pop().asInt();
@@ -924,9 +984,13 @@ void LC::cb_v4theentityassign() {
 			if ((entity == kTheCast || entity == kTheField) && g_director->getVersion() >= 500) {
 				// For "the member", D5 and above have a lib ID followed by a member ID
 				// Pre-resolve them here.
-				Datum member = g_lingo->pop();
+				Datum castLib(0);
+				if (!noCastLib) {
+					castLib = id;
+					id = g_lingo->pop();
+				}
 				// A field lookup prefers fields over other members of the same name
-				CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(member, id) : g_lingo->toCastMemberID(member, id);
+				CastMemberID resolved = entity == kTheField ? g_lingo->resolveFieldMember(id, castLib) : g_lingo->toCastMemberID(id, castLib);
 				id = Datum(resolved);
 			}
 			debugC(3, kDebugLingoExec, "cb_v4theentityassign: calling setTheEntity(%s, %s, %s, %s)", g_lingo->entity2str(entity), id.asString(true).c_str(), g_lingo->field2str(field), value.asString(true).c_str());
@@ -996,7 +1060,7 @@ void LC::cb_v4theentityassign() {
 				fieldRef = Datum(CastMemberID(fieldID.asInt(), castLib.asInt()));
 			}
 			fieldRef.type = FIELDREF;
-			Datum chunkRef = readChunkRef(fieldRef);
+			Datum chunkRef = LC::readChunkRef(fieldRef);
 			g_lingo->setTheEntity(entity, chunkRef, field, value);
 		}
 		break;
@@ -1004,6 +1068,15 @@ void LC::cb_v4theentityassign() {
 		warning("cb_v4theentityassign: unknown call type %d", g_lingo->_lingoV4TheEntity[key]->type);
 		break;
 	}
+}
+
+void LC::cb_v4theentityassign() {
+	v4TheEntityAssign(false);
+}
+
+// Opcode 0x6c, the counterpart of 0x6b
+void LC::cb_v4theentityassignnolib() {
+	v4TheEntityAssign(true);
 }
 
 void LC::cb_zeropush() {

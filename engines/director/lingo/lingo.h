@@ -458,7 +458,7 @@ public:
 	void varAssign(const Datum &var, const Datum &value);
 	Datum varFetch(const Datum &var, bool silent = false);
 	Common::U32String evalChunkRef(const Datum &var);
-	Datum findVarV4(int varType, const Datum &id);
+	Datum findVarV4(int varType, const Datum &id, bool noCastLib = false);
 	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib, CastType type);
 	CastMemberID toCastMemberID(const Datum &member, const Datum &castLib);
 	// The member a field reference ("field x") names. castLib is VOID before D5.

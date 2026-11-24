@@ -150,6 +150,8 @@ void cb_unk2();
 // bytecode-related instructions
 void cb_call();
 void cb_delete();
+void cb_deletenolib();
+void cb_fieldnolib();
 void cb_hilite();
 void cb_globalassign();
 void cb_globalpush();
@@ -167,10 +169,14 @@ void cb_proplist();
 void cb_varassign();
 void cb_varpush();
 void cb_v4assign();
+void cb_v4assignnolib();
 void cb_v4assign2();
+void cb_v4assign2nolib();
 void cb_v4theentitypush();
+void cb_v4theentitypushnolib();
 void cb_v4theentitynamepush();
 void cb_v4theentityassign();
+void cb_v4theentityassignnolib();
 void cb_zeropush();
 
 } // End of namespace LC
