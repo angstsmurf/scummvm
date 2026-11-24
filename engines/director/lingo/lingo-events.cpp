@@ -1119,10 +1119,30 @@ void Score::createScriptInstances(int frameNum) {
 			channel->scriptInstances().push_back(instance);
 		}
 
+		// D7 sets up the sprites of a frame channel by channel: the ones
+		// above that start here have no drawn rect yet
+		Common::Array<Channel *> undrawn;
+		if (_version >= kFileVer700) {
+			for (int j = i + 1; j < (int)_channels.size(); j++) {
+				Channel *other = _channels[j];
+				if (other->_startFrame == frameNum && other->_sprite->_castId.member && !other->_hasLingoBbox) {
+					other->_lingoBbox = Common::Rect();
+					other->_hasLingoBbox = true;
+					undrawn.push_back(other);
+				}
+			}
+		}
+
 		bool prevDis = _disableGoPlayUpdateStage;
+		bool prevSending = _sendingBeginOrPrepare;
 		_disableGoPlayUpdateStage = true;
+		_sendingBeginOrPrepare = true;
 		_movie->processEvent(kEventBeginSprite, i);
 		_disableGoPlayUpdateStage = prevDis;
+		_sendingBeginOrPrepare = prevSending;
+
+		for (auto &other : undrawn)
+			other->_hasLingoBbox = false;
 	}
 }
 

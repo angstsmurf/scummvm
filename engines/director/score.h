@@ -283,6 +283,8 @@ public:
 	Common::Array<bool> _spriteDetailAccessed;
 
 	bool _disableGoPlayUpdateStage;
+	// D7: beginSprite or prepareFrame is being sent
+	bool _sendingBeginOrPrepare;
 
 	// D6: the current frame has been loaded, but not drawn yet
 	bool _frameLoadedNotDrawn;

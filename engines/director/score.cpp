@@ -107,6 +107,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_currentFrame = nullptr;
 
 	_disableGoPlayUpdateStage = false;
+	_sendingBeginOrPrepare = false;
 	_frameLoadedNotDrawn = false;
 }
 
@@ -979,11 +980,14 @@ void Score::update() {
 
 		if (_version >= kFileVer600) {
 			bool prevDis = _disableGoPlayUpdateStage;
+			bool prevSending = _sendingBeginOrPrepare;
 			_disableGoPlayUpdateStage = true;
+			_sendingBeginOrPrepare = true;
 
 			_movie->broadcastEvent(kEventPrepareFrame);
 
 			_disableGoPlayUpdateStage = prevDis;
+			_sendingBeginOrPrepare = prevSending;
 		}
 	}
 
@@ -1064,11 +1068,10 @@ void Score::update() {
 // Before D6, the left, top, right and bottom of a sprite that Lingo moves
 // or resizes will only return the new values once the sprite is drawn again.
 // In D6, they give the new values at once, between the loading of a frame
-// and its drawing, and in D7 while beginSprite, endSprite or prepareFrame
-// are sent.
+// and its drawing, and in D7 while beginSprite or prepareFrame are sent.
 bool Score::spriteRectsFollowLingo() {
 	if (g_director->getVersion() >= 700)
-		return _disableGoPlayUpdateStage;
+		return _sendingBeginOrPrepare;
 	if (g_director->getVersion() >= 600)
 		return _frameLoadedNotDrawn;
 	return false;
