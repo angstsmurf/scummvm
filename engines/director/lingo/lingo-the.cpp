@@ -1738,6 +1738,13 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		break;
 	case kTheHeight:
 		d = channel->getHeight();
+		// Director 7 reports the height of the field's own box, unless
+		// the field adjusts to fit, and the width from the score
+		if (g_director->getVersion() >= 700 && sprite->_cast && sprite->_cast->_type == kCastText) {
+			TextCastMember *text = (TextCastMember *)sprite->_cast;
+			if (text->_textType != kTextTypeAdjustToFit)
+				d = text->_initialRect.height() + 2 * text->_borderSize + 2 * text->_gutterSize + text->_boxShadow;
+		}
 		break;
 	case kTheImmediate:
 		d = sprite->_immediate;
