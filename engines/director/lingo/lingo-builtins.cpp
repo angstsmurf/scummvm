@@ -3828,12 +3828,7 @@ void LB::b_spriteBox(int nargs) {
 		return;
 
 	channel->setDirty();
-	channel->setBbox(
-		l < r ? l : r,
-		t < b ? t : b,
-		r > l ? r : l,
-		b > t ? b : t
-	);
+	channel->setBbox(l, t, r, b);
 	if (channel->_sprite->_cast)
 		channel->_sprite->_cast->setModified(true);
 }

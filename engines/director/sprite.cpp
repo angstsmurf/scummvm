@@ -656,7 +656,7 @@ void Sprite::setBbox(int l, int t, int r, int b) {
 	_startPoint.x = (int16)(l - source.left);
 	_startPoint.y = (int16)(t - source.top);
 
-	if (_width <= 0 || _height <= 0)
+	if (_width < 0 || _height < 0)
 		_width = _height = 0;
 
 	// Based on Director in a Nutshell, page 15

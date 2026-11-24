@@ -471,11 +471,34 @@ void Channel::setHeight(int h) {
 	setNeedsDraw();
 }
 
+// The box is given as two corners, in any order
 void Channel::setBbox(int l, int t, int r, int b) {
+	uint16 version = g_director->getVersion();
+	bool setStretch = version >= 300;
+
+	// The order of the corners picks the direction of a line, except in
+	// D6. Before D7, a line that keeps its direction keeps its stretch.
+	if (version < 600 || version >= 700) {
+		bool keepsType = false;
+		if (_sprite->_spriteType == kLineTopBottomSprite) {
+			if ((l < r && t < b) || (r < l && b < t))
+				keepsType = true;
+			else
+				_sprite->_spriteType = kLineBottomTopSprite;
+		} else if (_sprite->_spriteType == kLineBottomTopSprite) {
+			if ((l < r && b < t) || (r < l && t < b))
+				keepsType = true;
+			else
+				_sprite->_spriteType = kLineTopBottomSprite;
+		}
+		if (keepsType && version < 700)
+			setStretch = false;
+	}
+
 	keepLingoBbox();
-	if (g_director->getVersion() >= 300)
+	if (setStretch)
 		_sprite->_stretch = true;
-	_sprite->setBbox(l, t, r, b);
+	_sprite->setBbox(MIN(l, r), MIN(t, b), MAX(l, r), MAX(t, b));
 	replaceWidget();
 	setNeedsDraw();
 }
