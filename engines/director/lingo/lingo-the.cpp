@@ -2272,7 +2272,14 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		break;
 	case kTheType:
 		if (d.asInt() != sprite->_spriteType) {
+			bool wasShape = sprite->isQDShape();
 			sprite->_spriteType = static_cast<SpriteType>(d.asInt());
+			if (!wasShape && sprite->isQDShape()) {
+				// A shape has a pattern where other sprites have a member
+				uint16 pattern = sprite->_castId.member;
+				channel->setCast(CastMemberID(0, 0));
+				sprite->_pattern = pattern;
+			}
 			channel->setDirty();
 		}
 		break;
