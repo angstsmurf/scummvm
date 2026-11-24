@@ -1755,8 +1755,9 @@ void Lingo::executeImmediateScripts(Frame *frame) {
 void Lingo::executePerFrameHook(int frame, int subframe, bool stepFrame) {
 	// Execute perFrameHook and actorList stepFrame, if any is available
 	// Starting D4, stepFrame of each objects in actorList is executed
-	// however the support for legacy mAtFrame is still there. (in future versions)
-	if (_perFrameHook.type == OBJECT) {
+	// however the support for legacy mAtFrame is still there, up to
+	// Director 6. Director 7 never calls it.
+	if (_perFrameHook.type == OBJECT && _vm->getVersion() < 700) {
 		Symbol method = _perFrameHook.u.obj->getMethod("mAtFrame");
 		if (method.type != VOIDSYM) {
 			debugC(1, kDebugLingoExec, "Executing perFrameHook : <%s>(mAtFrame, %d, %d)", _perFrameHook.asString(true).c_str(), frame, subframe);
