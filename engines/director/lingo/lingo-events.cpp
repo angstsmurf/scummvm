@@ -798,6 +798,14 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 	Movie *movie = _vm->getCurrentMovie();
 	Score *sc = movie->getScore();
 
+	// A handler can start events of its own, such as beginSprite for the
+	// sprites a 'set the rect' brings in. Their chain must not change
+	// whether the event of the running handler passes on to the next
+	// behavior (Bad Milk nav.dxr: most panels lost all but their first
+	// beginSprite, and with it their FlyLogic ancestor).
+	bool nested = !_state->callstack.empty();
+	bool savedPassEvent = _passEvent;
+
 	bool behavioursCompleted = false;
 
 	while (!queue.empty()) {
@@ -868,6 +876,9 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 		}
 
 	}
+
+	if (nested)
+		_passEvent = savedPassEvent;
 }
 
 bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int channelId, AbstractObject *obj) {
