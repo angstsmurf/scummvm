@@ -132,7 +132,7 @@ Datum ShapeCastMember::getField(int field) {
 		d = Datum(_lineDirection == 6 ? 1 : 0);
 		break;
 	case kTheLineSize:
-		d = Datum(_lineThickness);
+		d = Datum(_lineThickness - 1);
 		break;
 	case kThePattern:
 		d = Datum(_pattern);
@@ -180,7 +180,7 @@ void ShapeCastMember::setField(int field, const Datum &d) {
 		}
 		return;
 	case kTheLineSize:
-		_lineThickness = d.asInt();
+		_lineThickness = d.asInt() + 1;
 		return;
 	case kThePattern:
 		_pattern = d.asInt();
