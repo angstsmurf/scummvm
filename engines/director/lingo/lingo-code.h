@@ -153,6 +153,7 @@ void cb_delete();
 void cb_deletenolib();
 void cb_fieldnolib();
 void cb_hilite();
+void cb_hilitenolib();
 void cb_globalassign();
 void cb_globalpush();
 void cb_list();

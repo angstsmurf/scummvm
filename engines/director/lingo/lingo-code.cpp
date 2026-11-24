@@ -145,6 +145,7 @@ static const struct FuncDescr {
 	{ LC::cb_deletenolib,	"cb_deletenolib",	"i" },
 	{ LC::cb_fieldnolib,	"cb_fieldnolib",	"" },
 	{ LC::cb_hilite,		"cb_hilite",		"" },
+	{ LC::cb_hilitenolib,	"cb_hilitenolib",	"" },
 	{ LC::cb_globalassign,	"cb_globalassign",	"s" },
 	{ LC::cb_globalpush,	"cb_globalpush",	"s" },
 	{ LC::cb_list,			"cb_list",			"" },

@@ -70,7 +70,7 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x1d, LC::c_telldone,		"" },
 	{ 0x1e, LC::cb_list,		"" },
 	{ 0x1f, LC::cb_proplist,	"" },
-	{ 0x22, LC::cb_hilite,		"" },
+	{ 0x22, LC::cb_hilitenolib,	"" },
 	{ 0x23, LC::cb_fieldnolib,	"" },
 
 	{ 0x41, LC::c_intpush,		"B" },
@@ -463,12 +463,25 @@ void LC::cb_fieldnolib() {
 	g_lingo->push(res.eval());
 }
 
-void LC::cb_hilite() {
-	Datum fieldID = g_lingo->pop().asMemberID();
+static void v4Hilite(bool noCastLib) {
+	Datum castLib;
+	if (noCastLib)
+		castLib = Datum(0);
+	else if (g_director->getVersion() >= 500)
+		castLib = g_lingo->pop();
+	Datum fieldID = g_lingo->resolveFieldMember(g_lingo->pop(), castLib);
 	fieldID.type = FIELDREF;
-	Datum chunkRef = readChunkRef(fieldID);
+	Datum chunkRef = LC::readChunkRef(fieldID);
 	g_lingo->push(chunkRef);
 	LC::c_hilite();
+}
+
+void LC::cb_hilite() {
+	v4Hilite(false);
+}
+
+void LC::cb_hilitenolib() {
+	v4Hilite(true);
 }
 
 void LC::cb_localcall() {
