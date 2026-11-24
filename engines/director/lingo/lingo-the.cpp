@@ -1698,22 +1698,22 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = channel->getLingoBbox().bottom;
 		break;
 	case kTheMember:
-		d = sprite->_castId;
+		d = sprite->getLingoCastId();
 		break;
 	case kTheCastNum:
 		if (g_director->getVersion() >= 500) {
 			// For the castNum, D5 will multiplex the castLib ID into the result.
 			// the memberNum will just give you the member ID.
-			d = sprite->_castId.toMultiplex();
+			d = sprite->getLingoCastId().toMultiplex();
 		} else {
-			d = sprite->_castId.member;
+			d = sprite->getLingoCastId().member;
 		}
 		break;
 	case kTheCastLibNum:
-		d = sprite->_castId.castLib;
+		d = sprite->getLingoCastId().castLib;
 		break;
 	case kTheMemberNum:
-		d = sprite->_castId.member;
+		d = sprite->getLingoCastId().member;
 		break;
 	case kTheConstraint:
 		d = (int)channel->_constraint;
@@ -1984,6 +1984,15 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			} else if (field == kTheCastLibNum) {
 				castId = CastMemberID(sprite->_castId.member, d.asInt());
 			}
+			if (sprite->isQDShape()) {
+				// The member of a shape is its pattern
+				channel->setCast(CastMemberID(0, castId.castLib));
+				if (field != kTheCastLibNum)
+					sprite->_pattern = castId.member;
+				channel->setDirty();
+				break;
+			}
+
 			CastMember *castMember = movie->getCastMember(castId);
 
 			if (castMember && castMember->_type == kCastDigitalVideo) {
@@ -2284,9 +2293,13 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			sprite->_spriteType = static_cast<SpriteType>(d.asInt());
 			if (!wasShape && sprite->isQDShape()) {
 				// A shape has a pattern where other sprites have a member
-				uint16 pattern = sprite->_castId.member;
-				channel->setCast(CastMemberID(0, 0));
-				sprite->_pattern = pattern;
+				CastMemberID member = sprite->_castId;
+				channel->setCast(CastMemberID(0, member.castLib));
+				sprite->_pattern = member.member;
+			} else if (wasShape && !sprite->isQDShape() && sprite->_pattern) {
+				// and the pattern is the member again
+				channel->setCast(CastMemberID(sprite->_pattern, sprite->_castId.castLib ? sprite->_castId.castLib : DEFAULT_CAST_LIB));
+				sprite->_pattern = 0;
 			}
 			channel->setDirty();
 		}

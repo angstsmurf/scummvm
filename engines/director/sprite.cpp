@@ -524,6 +524,14 @@ bool Sprite::shouldHilite() {
 	return _ink == kInkTypeMatte;
 }
 
+// The pattern of a QuickDraw shape is stored where other sprites have
+// their member, and Lingo reads it back as the member.
+CastMemberID Sprite::getLingoCastId() {
+	if (isQDShape() && !_cast && _pattern)
+		return CastMemberID(_pattern, _castId.castLib ? _castId.castLib : DEFAULT_CAST_LIB);
+	return _castId;
+}
+
 uint16 Sprite::getPattern() {
 	if (!_cast) {
 		if (isQDShape())

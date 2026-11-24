@@ -131,6 +131,7 @@ public:
 	bool checkSpriteType();
 
 	uint16 getPattern();
+	CastMemberID getLingoCastId();
 	void setPattern(uint16 pattern);
 
 	void setCast(CastMemberID memberID);
