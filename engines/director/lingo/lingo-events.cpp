@@ -390,6 +390,17 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 					event.scriptType = kScoreScript;
 					event.scriptId = CastMemberID(); // No ID for the script channel script
 					event.scriptInstance = _score->_scriptChannelScriptInstance.u.obj;
+				} else if (event.event == kEventExitFrame && _score->_scriptChannelScriptInstance.type == OBJECT) {
+					// A converted older movie can still have a frame script
+					// of statements outside any handler; it runs at exitFrame
+					AbstractObject *instance = _score->_scriptChannelScriptInstance.u.obj;
+					if (instance->getMethod(_lingo->_eventHandlerTypes[kEventGeneric]).type != VOIDSYM &&
+							instance->getMethod(_lingo->_eventHandlerTypes[kEventEnterFrame]).type == VOIDSYM) {
+						event.event = kEventGeneric;
+						event.scriptType = kScoreScript;
+						event.scriptId = CastMemberID();
+						event.scriptInstance = instance;
+					}
 				}
 				return;
 			}
