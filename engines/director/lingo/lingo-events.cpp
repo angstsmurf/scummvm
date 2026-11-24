@@ -139,7 +139,10 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			leventType2str(event.event), event.eventId, scriptType2str(event.scriptType),
 			eventHandlerSourceType2str(event.eventHandlerSourceType), event.mousePos.x, event.mousePos.y, spriteId);
 
-		if (event.event == kEventMouseDown || event.event == kEventRightMouseDown) {
+		if (_vm->getVersion() >= 700 && event.eventHandlerSourceType != kPrimaryHandler) {
+			// Director 7 sets the clickOn once per click, whatever the
+			// handlers do to the sprites
+		} else if (event.event == kEventMouseDown || event.event == kEventRightMouseDown) {
 			_lastClickedSpriteId = spriteId; // the clickOn
 		} else 	if (event.event == kEventMouseUp || event.event == kEventRightMouseUp) {
 			// Do not override when clicked on Score
