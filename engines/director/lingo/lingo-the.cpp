@@ -2222,6 +2222,8 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 	case kTheTop:
 		// Before D7, setting an edge leaves the sprite as it is
 		if (g_director->getVersion() >= 700) {
+			// Like setting the rect, this drops a quad
+			sprite->_hasQuad = false;
 			// The other three edges are those last drawn
 			Common::Rect bbox = channel->getLingoBbox();
 			if (field == kTheBottom)
