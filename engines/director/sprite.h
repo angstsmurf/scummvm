@@ -135,6 +135,8 @@ public:
 
 	void setCast(CastMemberID memberID);
 	bool isQDShape();
+	// The type of a sprite of type 16, taken from its member
+	SpriteType getMemberType();
 	Graphics::Surface *getQDMatte();
 	void createQDMatte();
 	MacShape *getShape();

@@ -2271,6 +2271,11 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		sprite->_trails = (d.asInt() ? true : false);
 		break;
 	case kTheType:
+		// In D5 and D6, a sprite of type 16 takes only the types 0 and 16
+		if (g_director->getVersion() >= 500 && g_director->getVersion() < 700 && sprite->_spriteType == kCastMemberSprite &&
+				d.asInt() != kInactiveSprite && d.asInt() != kCastMemberSprite)
+			break;
+
 		if (d.asInt() != sprite->_spriteType) {
 			bool wasShape = sprite->isQDShape();
 			sprite->_spriteType = static_cast<SpriteType>(d.asInt());

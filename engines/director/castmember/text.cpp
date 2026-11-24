@@ -471,7 +471,7 @@ Graphics::MacText *TextCastMember::getWidget() {
 	if (toEdit) {
 		Common::Rect bbox = toEdit->getBbox();
 		if (!toEdit->_widget)
-			toEdit->_widget = createWidget(bbox, toEdit, toEdit->_sprite->_spriteType);
+			toEdit->_widget = createWidget(bbox, toEdit, toEdit->_sprite->getMemberType());
 		return (Graphics::MacText *)toEdit->_widget;
 	}
 	return (Graphics::MacText *)_widget;

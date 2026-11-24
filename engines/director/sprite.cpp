@@ -681,6 +681,34 @@ void Sprite::setPosition(int x, int y) {
 	setAutoPuppet(kAPLoc, true);
 }
 
+SpriteType Sprite::getMemberType() {
+	if (_spriteType != kCastMemberSprite || !_cast)
+		return _spriteType;
+
+	switch (_cast->_type) {
+	case kCastBitmap:
+		return kBitmapSprite;
+	case kCastText:
+		return kTextSprite;
+	case kCastButton:
+		switch (((TextCastMember *)_cast)->_buttonType) {
+		case kTypeButton:
+			return kButtonSprite;
+		case kTypeCheckBox:
+			return kCheckboxSprite;
+		case kTypeRadio:
+			return kRadioButtonSprite;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return _spriteType;
+}
+
 bool Sprite::checkSpriteType() {
 	// check whether the sprite type match the cast type
 	// if it doesn't match, then we treat it as transparent

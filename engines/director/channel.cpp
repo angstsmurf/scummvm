@@ -157,7 +157,7 @@ bool Channel::needsSrcAlpha(const Graphics::ManagedSurface *srf) const {
 
 DirectorPlotData Channel::getPlotData() {
 	int blend = (_sprite->_thickness & kTHasBlend) || _sprite->_ink == kInkTypeBlend ? _sprite->_blendAmount : 0;
-	DirectorPlotData pd(g_director, _sprite->_spriteType, _sprite->_ink, blend, _sprite->getBackColor(), _sprite->getForeColor());
+	DirectorPlotData pd(g_director, _sprite->getMemberType(), _sprite->_ink, blend, _sprite->getBackColor(), _sprite->getForeColor());
 	pd.colorWhite = g_director->getColorWhite();
 	pd.colorBlack = g_director->getColorBlack();
 	pd.dst = nullptr;
@@ -167,7 +167,7 @@ DirectorPlotData Channel::getPlotData() {
 		buildQuad(pd.srf, false);
 		pd.srf = _quadSurface;
 	}
-	if (_sprite->_spriteType == kBitmapSprite &&
+	if (_sprite->getMemberType() == kBitmapSprite &&
 		_sprite->_cast && _sprite->_cast->_type == kCastBitmap &&
 		((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 1) {
 		// Add override flag for 1-bit images
@@ -178,7 +178,7 @@ DirectorPlotData Channel::getPlotData() {
 		pd.ink = kInkTypeCopy;
 	}
 
-	if (!pd.srf && _sprite->_spriteType != kBitmapSprite) {
+	if (!pd.srf && _sprite->getMemberType() != kBitmapSprite) {
 		// Shapes come colourized from macDrawPixel
 		pd.ms = _sprite->getShape();
 		pd.applyColor = false;
@@ -233,7 +233,7 @@ Graphics::ManagedSurface *Channel::getSurface() {
 }
 
 const Graphics::Surface *Channel::getMask(bool forceMatte) {
-	if (_sprite->_hasQuad && _sprite->_cast && _sprite->_spriteType != kTextSprite) {
+	if (_sprite->_hasQuad && _sprite->_cast && _sprite->getMemberType() != kTextSprite) {
 		Graphics::ManagedSurface *srf = getSurface();
 		if (!srf)
 			return getSourceMask(forceMatte);
@@ -328,7 +328,7 @@ void Channel::buildQuad(Graphics::ManagedSurface *srf, bool forceMatte) {
 }
 
 const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
-	if (!_sprite->_cast || _sprite->_spriteType == kTextSprite)
+	if (!_sprite->_cast || _sprite->getMemberType() == kTextSprite)
 		return nullptr;
 
 	bool needsMatte = _sprite->_ink == kInkTypeMatte ||
@@ -586,13 +586,10 @@ bool Channel::isEmpty() {
 	return (_sprite->_spriteType == kInactiveSprite);
 }
 
+// A sprite of type 16 takes its type from its cast member.
+// Director 5 scores give field sprites this type.
 bool Channel::isTextSprite() {
-	if (_sprite->_spriteType == kTextSprite)
-		return true;
-
-	// A sprite of type 16 takes its type from its cast member.
-	// Director 5 scores give field sprites this type.
-	return _sprite->_spriteType == kCastMemberSprite && _sprite->_cast && _sprite->_cast->_type == kCastText;
+	return _sprite->getMemberType() == kTextSprite;
 }
 
 bool Channel::isActiveText() {
@@ -760,7 +757,8 @@ void Channel::setAutoType() {
 		return;
 
 	_sprite->_spriteType = kCastMemberSprite;
-	if (!_sprite->_cast)
+	// From D5, the type stays 16; see Sprite::getMemberType()
+	if (!_sprite->_cast || g_director->getVersion() >= 500)
 		return;
 
 	// Only bitmap, text and buttons get a more specific type
@@ -1141,7 +1139,7 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 		_sprite->_cast->setModified(false);
 		_widgetCastId = _sprite->_castId;
 
-		_widget = _sprite->_cast->createWidget(bbox, this, _sprite->_spriteType);
+		_widget = _sprite->_cast->createWidget(bbox, this, _sprite->getMemberType());
 		if (_widget) {
 			_widget->_priority = _priority;
 			_widget->draw();
