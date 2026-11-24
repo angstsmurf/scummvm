@@ -563,6 +563,32 @@ bool Channel::isDirty(Sprite *nextSprite) {
 		}
 		if (isStretched() && !hasTextCastMember(_sprite))
 			isDirtyFlag |= _sprite->_width != nextSprite->_width || _sprite->_height != nextSprite->_height;
+	} else if (_sprite && !_sprite->_puppet) {
+		// Lingo set some fields of this sprite (D6+); the score still
+		// changes the others, see Sprite::replaceFrom().
+		bool keepRect = _sprite->getAutoPuppet(kAPBbox) || _sprite->getAutoPuppet(kAPRect);
+		bool keepLoc = keepRect || _sprite->getAutoPuppet(kAPLoc) ||
+			(g_director->getVersion() >= 700 && _sprite->_moveable && nextSprite->_moveable);
+		uint32 mask = nextSprite->_copyBackMask;
+		if (!_sprite->getAutoPuppet(kAPCast) && !_sprite->getAutoPuppet(kAPMember) && (mask & kSCBCastId))
+			isDirtyFlag |= _sprite->_castId != nextSprite->_castId;
+		if (!_sprite->getAutoPuppet(kAPInk) && (mask & kSCBInk))
+			isDirtyFlag |= _sprite->_ink != nextSprite->_ink;
+		if (!_sprite->getAutoPuppet(kAPForeColor) && (mask & kSCBForeColor))
+			isDirtyFlag |= _sprite->_foreColorIndex != nextSprite->_foreColorIndex;
+		if (!_sprite->getAutoPuppet(kAPBackColor) && (mask & kSCBBackColor))
+			isDirtyFlag |= _sprite->_backColorIndex != nextSprite->_backColorIndex;
+		if (!keepLoc && !_sprite->getAutoPuppet(kAPLocH) && (mask & kSCBLocH))
+			isDirtyFlag |= _sprite->getPosition().x != nextSprite->getPosition().x;
+		if (!keepLoc && !_sprite->getAutoPuppet(kAPLocV) && (mask & kSCBLocV))
+			isDirtyFlag |= _sprite->getPosition().y != nextSprite->getPosition().y;
+		if (!keepRect && !_sprite->getAutoPuppet(kAPWidth) && (mask & (kSCBWidth | kSCBCastId)))
+			isDirtyFlag |= _sprite->_width != nextSprite->_width;
+		if (!keepRect && !_sprite->getAutoPuppet(kAPHeight) && (mask & (kSCBHeight | kSCBCastId)))
+			isDirtyFlag |= _sprite->_height != nextSprite->_height;
+		if (!_sprite->getAutoPuppet(kAPBlend) && (mask & kSCBBlendAmount))
+			isDirtyFlag |= _sprite->_blendAmount != nextSprite->_blendAmount;
+		isDirtyFlag |= _sprite->_moveable != nextSprite->_moveable;
 	}
 
 	return isDirtyFlag;
@@ -851,12 +877,29 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 	if (nextSprite) {
 		// for the non-puppet QDShape, since we won't use isDirty to check whether the QDShape is changed.
 		// so we may always keep the sprite info because we need it to draw QDShape.
-		if (_sprite->_puppet || _sprite->_autoPuppet || (!nextSprite->isQDShape() && partial)) {
+		// A sprite with fields set from Lingo (D6+) takes the others from
+		// the score, see Sprite::replaceFrom()
+		if (_sprite->_puppet || (!nextSprite->isQDShape() && partial)) {
 			// Updating scripts, etc. does not require a full re-render
 			_sprite->_scriptId = nextSprite->_scriptId;
 		} else {
 			previousCastId = _sprite->_castId;
+			// isDirty() leaves these sprites alone; see what the score
+			// changed in the fields Lingo did not set
+			bool autoPuppet = _sprite->_autoPuppet != 0;
+			Common::Point pos = _sprite->getPosition();
+			int16 width = _sprite->_width, height = _sprite->_height;
+			InkType ink = _sprite->_ink;
+			uint32 foreColor = _sprite->_foreColor, backColor = _sprite->_backColor;
+			byte blendAmount = _sprite->_blendAmount;
 			replaceSprite(nextSprite);
+			if (autoPuppet) {
+				bool sizeChanged = width != _sprite->_width || height != _sprite->_height;
+				replace |= previousCastId != _sprite->_castId || pos != _sprite->getPosition() ||
+					sizeChanged || ink != _sprite->_ink || foreColor != _sprite->_foreColor ||
+					backColor != _sprite->_backColor || blendAmount != _sprite->_blendAmount;
+				dimsChanged |= sizeChanged && !hasTextCastMember(_sprite);
+			}
 		}
 	}
 
@@ -991,7 +1034,8 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 	}
 
 	_sprite->replaceFrom(nextSprite);
-	_hasLingoBbox = false;
+	if (!_sprite->_autoPuppet)
+		_hasLingoBbox = false;
 
 	// Before D6 there is no auto-puppeting of the location, see
 	// updateDragPosition().

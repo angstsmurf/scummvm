@@ -802,7 +802,8 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 	}
 
 	// The score's rect replaces a quad set from Lingo
-	if (!getAutoPuppet(kAPBbox))
+	bool keepRect = getAutoPuppet(kAPBbox) || getAutoPuppet(kAPRect);
+	if (!keepRect)
 		_hasQuad = false;
 
 	bool editable = nextSprite->_editable;
@@ -835,7 +836,7 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		_bgColorB = nextSprite->_bgColorB;
 		_bgColorG = nextSprite->_bgColorG;
 	}
-	if (!getAutoPuppet(kAPCast)) {
+	if (!getAutoPuppet(kAPCast) && !getAutoPuppet(kAPMember)) {
 		if (nextSprite->_copyBackMask & kSCBCastId) {
 			_castId = nextSprite->_castId;
 			if (_cast)
@@ -849,18 +850,23 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 	}
 	// Separately: D4 keeps a Lingo change to the locV of a non-puppet when
 	// the next frame only moves it sideways, and vice versa (T_SPRT16)
-	if (!getAutoPuppet(kAPLoc)) {
-		if (nextSprite->_copyBackMask & kSCBLocH)
+	//
+	// Director 7 leaves a sprite where it is for as long as it is moveable,
+	// whatever the score does with it.
+	bool keepLoc = getAutoPuppet(kAPLoc) || keepRect ||
+		(g_director->getVersion() >= 700 && _moveable && nextSprite->_moveable);
+	if (!keepLoc) {
+		if (!getAutoPuppet(kAPLocH) && (nextSprite->_copyBackMask & kSCBLocH))
 			_startPoint.x = nextSprite->_startPoint.x;
-		if (nextSprite->_copyBackMask & kSCBLocV)
+		if (!getAutoPuppet(kAPLocV) && (nextSprite->_copyBackMask & kSCBLocV))
 			_startPoint.y = nextSprite->_startPoint.y;
 	}
 	// height and width seem to be copied back if the cast ID changes (e.g. intro of sabotenman)
-	if (!getAutoPuppet(kAPHeight) && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBHeight))) {
+	if (!getAutoPuppet(kAPHeight) && !keepRect && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBHeight))) {
 		_height = nextSprite->_height;
 		_reportedHeight = -1;
 	}
-	if (!getAutoPuppet(kAPWidth) && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBWidth))) {
+	if (!getAutoPuppet(kAPWidth) && !keepRect && ((nextSprite->_copyBackMask & kSCBCastId) || (nextSprite->_copyBackMask & kSCBWidth))) {
 		_width = nextSprite->_width;
 		_reportedWidth = -1;
 	}
@@ -869,9 +875,9 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		_editable = nextSprite->_editable;
 		_moveable = nextSprite->_moveable;
 	}
-	if (nextSprite->_copyBackMask & kSCBBlendAmount)
+	if (!getAutoPuppet(kAPBlend) && (nextSprite->_copyBackMask & kSCBBlendAmount))
 		_blendAmount = nextSprite->_blendAmount;
-	if (nextSprite->_copyBackMask & kSCBThickness)
+	if (!getAutoPuppet(kAPThickness) && (nextSprite->_copyBackMask & kSCBThickness))
 		_thickness = nextSprite->_thickness;
 	if (nextSprite->_copyBackMask & kSCBPattern)
 		_pattern = nextSprite->_pattern;

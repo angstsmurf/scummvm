@@ -679,8 +679,12 @@ void Score::updateCurrentFrame() {
 			}
 		}
 
-		for (uint ch = 0; ch < _channels.size(); ch++)
-			_channels[ch]->_sprite->releaseAutoPuppet(_currentFrame->_sprites[ch]->_copyBackMask);
+		// Director 7 keeps a field set by Lingo while the score changes it
+		// within the span of the sprite.
+		if (_version < kFileVer700) {
+			for (uint ch = 0; ch < _channels.size(); ch++)
+				_channels[ch]->_sprite->releaseAutoPuppet(_currentFrame->_sprites[ch]->_copyBackMask);
+		}
 
 		// Finally, update the channels and buffer any dirty rectangles.
 		// This will ignore any channel data that is overridden with the puppet flag.
