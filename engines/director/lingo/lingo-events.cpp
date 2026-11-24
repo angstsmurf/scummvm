@@ -930,6 +930,24 @@ void Score::killScriptInstances(int frameNum) {
 		}
 	}
 
+	// D6/D7 release the auto-puppet of a channel (the fields Lingo set)
+	// when its sprite span ends, so the next span is drawn from the score
+	// again (D6 FUN_100732d0, D7 DIRAPI FUN_68049129). Bad Milk's intro
+	// centers the splash video, and the next span shows the breakfast one.
+	for (int i = 0; i < (int)_channels.size(); i++) {
+		Channel *channel = _channels[i];
+		Sprite *sprite = channel->_sprite;
+
+		if (!sprite || sprite->_puppet || !sprite->_autoPuppet || channel->_startFrame <= 0)
+			continue;
+
+		if (frameNum < channel->_startFrame || frameNum > channel->_endFrame) {
+			debugC(1, kDebugLingoExec, "Score::killScriptInstances(): Released auto-puppet of channel %d. frame %d [%d-%d]",
+					i + 1, frameNum, channel->_startFrame, channel->_endFrame);
+			sprite->_autoPuppet = kAPNone;
+		}
+	}
+
 	for (int i = 0; i < (int)_channels.size(); i++) {
 		Channel *channel = _channels[i];
 
