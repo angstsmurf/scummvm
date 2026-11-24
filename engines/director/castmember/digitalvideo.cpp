@@ -355,8 +355,9 @@ static Common::Path findMPEGReference(const Common::Path &location) {
 	delete stream;
 
 	auto find = [&buf, size](const char *tag, int64 from) {
-		for (int64 i = from; i + 4 <= size; i++)
-			if (!memcmp(&buf[i], tag, 4))
+		int64 len = strlen(tag);
+		for (int64 i = from; i + len <= size; i++)
+			if (!memcmp(&buf[i], tag, len))
 				return i;
 		return (int64)-1;
 	};
