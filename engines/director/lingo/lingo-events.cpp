@@ -362,8 +362,11 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			}
 			if ((event.event == kEventKeyUp) || (event.event == kEventKeyDown))
 				targetCast = _currentKeyDownCastID;
+			// D7 takes the member under the mouse at mouseUp as well
+			bool currentMember = _vm->getVersion() >= 700 &&
+				(event.event == kEventMouseUp || event.event == kEventRightMouseUp);
 			if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown) ||
-				(event.event == kEventMouseEnter) || (event.event == kEventMouseLeave)) {
+				(event.event == kEventMouseEnter) || (event.event == kEventMouseLeave) || currentMember) {
 				if (!event.channelId)
 					return;
 				Sprite *sprite = _score->getSpriteById(event.channelId);
