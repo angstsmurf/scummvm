@@ -2024,6 +2024,7 @@ static Datum callBehaviorHandler(Datum &instance, const Common::String &msgName,
 	if (sym.type == VOIDSYM)
 		return Datum();
 
+	uint stackSize = g_lingo->_state->stack.size();
 	g_lingo->push(instance);
 	for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
 		g_lingo->push(extraArgs[j]);
@@ -2031,6 +2032,9 @@ static Datum callBehaviorHandler(Datum &instance, const Common::String &msgName,
 	int frame = g_lingo->_state->callstack.size();
 	LC::call(sym, 1 + (int)extraArgs.size(), true);
 	g_lingo->execute(frame);
+	// A handler aborted by a Lingo error leaves no return value
+	if (g_lingo->_state->stack.size() <= stackSize)
+		return Datum();
 	return g_lingo->pop();
 }
 
