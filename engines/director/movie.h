@@ -144,6 +144,7 @@ public:
 	void setPrimaryEventHandler(LEvent event, const Common::String &code);
 	void resolveScriptEvent(LingoEvent &event);
 	void processEvent(LEvent event, int targetId = 0);
+	void queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	void queueInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	bool processInputEvent(LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	Channel *getDraggedChannel() const { return _currentDraggedChannel; }
@@ -154,7 +155,6 @@ public:
 private:
 	void loadFileInfo(Common::SeekableReadStreamEndian &stream);
 
-	void queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	void queueSpriteEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId, int spriteId);
 
 public:

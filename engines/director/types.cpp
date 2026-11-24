@@ -225,10 +225,11 @@ const char *const eventHandlerSourceType[] = {
 	"CastHandler",
 	"FrameHandler",
 	"MovieHandler",
+	"UnresolvedHandler",
 };
 
 const char *eventHandlerSourceType2str(EventHandlerSourceType type) {
-	if (type <= kMovieHandler)
+	if (type <= kUnresolvedHandler)
 		return eventHandlerSourceType[type];
 
 	warning("BUILDBOT: Unknown EventHandlerSourceType: %d", type);

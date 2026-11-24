@@ -80,7 +80,8 @@ enum EventHandlerSourceType {
 	kSpriteHandler = 2,
 	kCastHandler = 3,
 	kFrameHandler = 4,
-	kMovieHandler = 5
+	kMovieHandler = 5,
+	kUnresolvedHandler = 6	// input event waiting for its handlers to be looked up
 };
 
 enum ScriptFlag {

@@ -712,6 +712,15 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 }
 
 void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
+	// D6+ look for the sprite under the mouse and its behaviors when the
+	// event is sent, which can be frames after the click
+	if (_vm->getVersion() >= 600 && targetId == 0 &&
+			(event == kEventMouseDown || event == kEventMouseUp ||
+			 event == kEventRightMouseDown || event == kEventRightMouseUp)) {
+		_inputEventQueue.push(LingoEvent(event, 0, kUnresolvedHandler, true, pos));
+		return;
+	}
+
 	queueEvent(_inputEventQueue, event, targetId, pos);
 }
 
@@ -819,11 +828,19 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 
 	bool behavioursCompleted = false;
 
-	while (!queue.empty()) {
-		LingoEvent el = queue.pop();
+	// The handlers of an event that was queued unresolved
+	Common::Queue<LingoEvent> chain;
+
+	while (!chain.empty() || !queue.empty()) {
+		LingoEvent el = chain.empty() ? queue.pop() : chain.pop();
 
 		if (sc->_playState == kPlayStopped && el.event != kEventStopMovie)
 			continue;
+
+		if (el.eventHandlerSourceType == kUnresolvedHandler) {
+			movie->queueEvent(chain, el.event, 0, el.mousePos);
+			continue;
+		}
 
 		// fetch the sprite ID, script ID to call, etc if not present.
 		// A D3-style sprite script turns the mouse event into a generic one.
@@ -886,6 +903,13 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 			break;
 		}
 
+	}
+
+	// Keep the handlers that are left for when the frozen one is done
+	if (!chain.empty()) {
+		while (!queue.empty())
+			chain.push(queue.pop());
+		queue = chain;
 	}
 
 	if (nested)
