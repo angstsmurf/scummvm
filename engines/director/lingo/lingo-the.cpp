@@ -649,7 +649,10 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		d.u.s = new Common::String(score->getFrameLabel(score->getCurrentFrameNum()));
 		break;
 	case kTheFramePalette:
-		d = score->getCurrentPalette().toMultiplex();
+		if (score->_framePaletteHold != Score::kNotHeld)
+			d = score->_heldFramePalette.toMultiplex();
+		else
+			d = score->getCurrentPalette().toMultiplex();
 		break;
 	case kTheFrameScript:
 		d = score->_currentFrame->_mainChannels.actionId.toMultiplex();

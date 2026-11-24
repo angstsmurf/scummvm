@@ -3439,6 +3439,11 @@ void LB::b_puppetPalette(int nargs) {
 	}
 
 	Score *score = movie->getScore();
+	if (g_director->getVersion() >= 700) {
+		if (score->_framePaletteHold == Score::kNotHeld)
+			score->_heldFramePalette = score->getCurrentPalette();
+		score->_framePaletteHold = palette.isNull() ? Score::kHeldUntilUpdate : Score::kHeldUntilFrame;
+	}
 	if (!palette.isNull()) {
 		g_director->setPalette(palette);
 		g_director->_lastPuppetPalette = palette;
@@ -3945,6 +3950,8 @@ void LB::b_updateStage(int nargs) {
 		return;
 	}
 
+	if (score->_framePaletteHold == Score::kHeldUntilUpdate)
+		score->_framePaletteHold = Score::kNotHeld;
 	score->updateWidgets(movie->_videoPlayback);
 	// The sprites are drawn now: Lingo reads their new rects from here on
 	for (auto &it : score->_channels)

@@ -70,6 +70,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 
 	_puppetTempo = 0;
 	_puppetPalette = false;
+	_framePaletteHold = kNotHeld;
 	_recording = false;
 	_paletteTransitionIndex = 0;
 	memset(_paletteSnapshotBuffer, 0, 768);
@@ -570,6 +571,7 @@ bool Score::isWaitingForNextFrame() {
 }
 
 void Score::updateCurrentFrame() {
+	_framePaletteHold = kNotHeld;
 	uint32 nextFrameNumberToLoad = _curFrameNumber;
 	bool jumping = _nextFrame != 0;
 

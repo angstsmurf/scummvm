@@ -248,6 +248,12 @@ public:
 	byte _puppetTempo;
 
 	bool _puppetPalette;
+	// Director 7: the framePalette goes on reporting the old palette after
+	// a puppetPalette, until the next frame (kHeldUntilFrame) or, when
+	// the puppet is turned off, the next stage update
+	enum { kNotHeld, kHeldUntilFrame, kHeldUntilUpdate };
+	int _framePaletteHold;
+	CastMemberID _heldFramePalette;
 	bool _recording; // between beginRecording and endRecording
 	int _paletteTransitionIndex;
 	byte _paletteSnapshotBuffer[768];
