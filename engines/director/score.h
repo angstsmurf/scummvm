@@ -177,6 +177,8 @@ private:
 	bool goFromIdleRestartsTimer() const { return _version >= kFileVer400; }
 	// D7 returns from the frame step while a "delay" runs, before idle
 	bool delayBlocksIdle() const { return _version >= kFileVer700; }
+	// D7 sends enterFrame again after a startMovie handler that went to a frame
+	bool startMovieGoRepeatsEnterFrame() const { return _version >= kFileVer700; }
 	// D4-D6 keep sending exitFrame on every pass while a "delay" runs
 	bool exitFrameRepeatsDuringDelay() const { return _version >= kFileVer400 && _version < kFileVer700; }
 	// D2-D5 rebuild the frame from the score on every jump, even to the
@@ -253,6 +255,7 @@ public:
 	PlayState _playState;
 	uint32 _nextFrameTime;
 	uint32 _nextFrameDelay;
+	LingoState *_startMovieState; // startMovie handler frozen by a go
 	int _lastTempo;
 	int _waitForChannel;
 	int _waitForChannelCue;

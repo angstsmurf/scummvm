@@ -82,6 +82,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_currentLabel = 0;
 	_nextFrameTime = 0;
 	_nextFrameDelay = 0;
+	_startMovieState = nullptr;
 	_lastTempo = 0;
 	_waitForChannel = 0;
 	_waitForChannelCue = 0;
@@ -217,6 +218,21 @@ bool Score::processFrozenScripts(bool recursion, int count) {
 				_playState != kPlayStopped && !_window->_playbackPaused) {
 			uint32 frozenCount = _window->frozenLingoStateCount();
 			_exitFrameCalled = false;
+			_movie->processEvent(kEventEnterFrame);
+			if (_window->frozenLingoStateCount() > frozenCount)
+				return false;
+		}
+		// Director 7 sends startMovie between drawing the first frame and
+		// its enterFrame. A go in startMovie enters the new frame at once,
+		// and when startMovie is done that frame gets the enterFrame of the
+		// first one as well.
+		bool wasStartMovie = state == _startMovieState;
+		if (wasStartMovie)
+			_startMovieState = nullptr;
+		if (wasStartMovie && startMovieGoRepeatsEnterFrame() &&
+				!_nextFrame && !_window->hasPendingMovieSwitch() &&
+				_playState != kPlayStopped && !_window->_playbackPaused) {
+			uint32 frozenCount = _window->frozenLingoStateCount();
 			_movie->processEvent(kEventEnterFrame);
 			if (_window->frozenLingoStateCount() > frozenCount)
 				return false;
@@ -386,8 +402,13 @@ void Score::startPlay() {
 	updateSprites(kRenderForceUpdate, true);
 
 	// Stage has been set up, run the StartMovie script
-	if (_haveInteractivity && _version >= kFileVer300)
+	_startMovieState = nullptr;
+	if (_haveInteractivity && _version >= kFileVer300) {
+		uint32 frozenCount = _window->frozenLingoStateCount();
 		_movie->processEvent(kEventStartMovie);
+		if (_window->frozenLingoStateCount() > frozenCount)
+			_startMovieState = _window->getLastFrozenLingoState();
+	}
 }
 
 void Score::step() {
