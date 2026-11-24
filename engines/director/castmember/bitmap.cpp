@@ -470,8 +470,9 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		// "break" means falling back to the default of rendering the image with
 		// the current 8-bit palette. The below is only about -redithering colours-;
 		// i.e. redrawing the picture to use the current palette.
-		// Only redither 8-bit images in 8-bit mode if we have the remap palette flag set, or it is external
-		if (targetBpp == 1 && !movie->_remapPalettesWhenNeeded && !_external)
+		// Only redither 8-bit images in 8-bit mode if we have the remap palette flag set, or it is external.
+		// A movie made for more colours shows each image in its own palette.
+		if (targetBpp == 1 && !movie->_remapPalettesWhenNeeded && !_external && movie->getCast()->_movieDepth <= 8)
 			break;
 		if (targetBpp != 1 && score->hasPuppetPalette() && !_external) {
 			// we're in true colour mode, rendering a paletted image, and the puppet palette has been set
