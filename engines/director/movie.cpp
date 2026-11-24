@@ -81,8 +81,9 @@ Movie::Movie(Window *window) {
 	_sharedCast = nullptr;
 	_score = new Score(this, true);
 
-	_selEnd = -1;
-	_selStart = -1;
+	// -1 selects the whole text of the field that gets the focus.
+	// Director 7 starts with the insertion point before the text.
+	_selEnd = _selStart = g_director->getVersion() >= 700 ? 0 : -1;
 
 	_checkBoxType = 0;
 	_checkBoxAccess = 0;
