@@ -311,15 +311,7 @@ Common::Error DirectorEngine::run() {
 
 	if (ConfMan.getBool("true_color") || (getGameFlags() & GF_TRUECOLOR) || debugChannelSet(-1, kDebug32bpp)) {
 		// Both 16bpp and 32bpp formats are supported, but 32bpp is always reported to the scripts.
-		// The first format can be a 16bpp one, which rounds the palette colours
-		Common::List<Graphics::PixelFormat> formats = g_system->getSupportedFormats();
-		_pixelformat = formats.front();
-		for (auto &format : formats) {
-			if (format.bytesPerPixel == 4) {
-				_pixelformat = format;
-				break;
-			}
-		}
+		_pixelformat = g_system->getSupportedFormats().front();
 		_colorDepth = _pixelformat.isCLUT8() ? 8 : 32;
 	} else {
 		_pixelformat = Graphics::PixelFormat::createFormatCLUT8();
