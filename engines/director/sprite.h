@@ -54,6 +54,7 @@ enum AutoPuppetProperty {
 	kAPRect,
 	kAPWidth,
 	kAPThickness,
+	kAPLocZ,
 };
 
 enum ColorCodeFlags {
@@ -222,6 +223,10 @@ public:
 
 	byte _volume;
 	bool _stretch;
+
+	// D7+: drawing order set by Lingo; the sprite number until then
+	bool _locZSet;
+	int _locZ;
 
 	uint32 _spriteListIdx;	 // D6+
 	SpriteInfo _spriteInfo; // D6+

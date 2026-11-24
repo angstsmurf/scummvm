@@ -1674,7 +1674,9 @@ void Score::renderCursor(Common::Point pos, bool forceUpdate) {
 	if (!_channels.empty() && _playState != kPlayStopped) {
 		uint spriteId = 0;
 
-		for (int i = _channels.size() - 1; i >= 0; i--) {
+		Common::Array<uint> order = getLayerOrder();
+		for (int n = (int)order.size() - 1; n >= 0; n--) {
+			int i = order[n];
 			CollisionTest test = _channels[i]->isMouseIn(pos);
 			if (test == kCollisionYes && !_channels[i]->_cursor.isEmpty()) {
 				spriteId = i;
@@ -1896,7 +1898,9 @@ uint16 Score::getSpriteIDOfActiveWidget() {
 }
 
 uint16 Score::getSpriteIDFromPos(Common::Point pos) {
-	for (int i = _channels.size() - 1; i >= 0; i--) {
+	Common::Array<uint> order = getLayerOrder();
+	for (int n = (int)order.size() - 1; n >= 0; n--) {
+		int i = order[n];
 		CollisionTest test = _channels[i]->isMouseIn(pos);
 		if (test == kCollisionYes)
 			return i;
@@ -1921,7 +1925,9 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 		}
 	}
 
-	for (int i = _channels.size() - 1; i >= 0; i--) {
+	Common::Array<uint> order = getLayerOrder();
+	for (int n = (int)order.size() - 1; n >= 0; n--) {
+		int i = order[n];
 		CollisionTest test = _channels[i]->isMouseIn(pos);
 		// D6+: script instances added by Lingo (add(the scriptInstanceList
 		// of sprite n, ...)) make the sprite respond like score behaviors
@@ -1937,7 +1943,9 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 }
 
 uint16 Score::getActiveSpriteIDFromPos(Common::Point pos) {
-	for (int i = _channels.size() - 1; i >= 0; i--) {
+	Common::Array<uint> order = getLayerOrder();
+	for (int n = (int)order.size() - 1; n >= 0; n--) {
+		int i = order[n];
 		CollisionTest test = _channels[i]->isMouseIn(pos);
 		if (test == kCollisionYes && _channels[i]->_sprite->isActive())
 			return i;
@@ -1955,7 +1963,9 @@ bool Score::checkSpriteRollOver(uint16 spriteId, Common::Point pos) {
 }
 
 uint16 Score::getRollOverSpriteIDFromPos(Common::Point pos) {
-	for (int i = _channels.size() - 1; i >= 0; i--) {
+	Common::Array<uint> order = getLayerOrder();
+	for (int n = (int)order.size() - 1; n >= 0; n--) {
+		int i = order[n];
 		if (_channels[i]->getRollOverBbox().contains(pos))
 			return i;
 	}
@@ -1964,11 +1974,47 @@ uint16 Score::getRollOverSpriteIDFromPos(Common::Point pos) {
 }
 
 
+// Channel numbers from back to front. D7 draws sprites in order of their
+// locZ, which is the sprite number until Lingo sets it; ties keep the
+// channel order.
+Common::Array<uint> Score::getLayerOrder() {
+	Common::Array<uint> order;
+	bool anyLocZ = false;
+
+	for (uint i = 0; i < _channels.size(); i++) {
+		order.push_back(i);
+		Sprite *sprite = _channels[i]->_sprite;
+		if (sprite && sprite->_locZSet)
+			anyLocZ = true;
+	}
+	if (!anyLocZ)
+		return order;
+
+	Common::Array<int> z(_channels.size(), 0);
+	for (uint i = 0; i < _channels.size(); i++) {
+		Sprite *sprite = _channels[i]->_sprite;
+		z[i] = sprite && sprite->_locZSet ? sprite->_locZ : (int)i;
+	}
+	// Insertion sort, stable
+	for (uint i = 1; i < order.size(); i++) {
+		uint ch = order[i];
+		int j = i - 1;
+		while (j >= 0 && z[order[j]] > z[ch]) {
+			order[j + 1] = order[j];
+			j--;
+		}
+		order[j + 1] = ch;
+	}
+	return order;
+}
+
 Common::Array<Channel *> Score::getSpriteIntersections(const Common::Rect &r) {
 	Common::Array<Channel *> intersections;
 	Common::Array<Channel *> appendix;
+	Common::Array<uint> order = getLayerOrder();
 
-	for (uint i = 0; i < _channels.size(); i++) {
+	for (uint n = 0; n < order.size(); n++) {
+		uint i = order[n];
 		if (!_channels[i]->isEmpty() && !r.findIntersectingRect(_channels[i]->getBbox()).isEmpty()) {
 			// Editable text sprites will (more or less) always be rendered in front of other sprites,
 			// regardless of their order in the channel list.

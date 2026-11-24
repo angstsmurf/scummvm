@@ -227,6 +227,7 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"loc",			kTheLoc,		400 },//				D4 p ???
 	{ kTheSprite,	"locH",			kTheLocH,		200 },// D2 p
 	{ kTheSprite,	"locV",			kTheLocV,		200 },// D2 p
+	{ kTheSprite,	"locZ",			kTheLocZ,		700 },//						D7 p
 	{ kTheSprite,	"member",		kTheMember,		500 },//					D5 p
 	{ kTheSprite,	"memberNum",	kTheMemberNum,	500 },//					D5 p
 	{ kTheSprite,	"moveableSprite",kTheMoveableSprite,400 },//			D4 p
@@ -1761,6 +1762,9 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kTheLocV:
 		d = channel->getPosition().y;
 		break;
+	case kTheLocZ:
+		d = sprite->_locZSet ? sprite->_locZ : id;
+		break;
 	case kTheMostRecentCuePoint:
 		warning("STUB: the mostRecentCuePoint");
 		d = 0;
@@ -2110,6 +2114,15 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		// Based on Director in a Nutshell, page 15
 		sprite->setAutoPuppet(kAPLocH, true);
 
+		break;
+	case kTheLocZ:
+		if (!sprite->_locZSet || sprite->_locZ != d.asInt()) {
+			sprite->_locZSet = true;
+			sprite->_locZ = d.asInt();
+			// Redrawing its area repaints the overlapping sprites in the new order
+			channel->setNeedsDraw();
+		}
+		sprite->setAutoPuppet(kAPLocZ, true);
 		break;
 	case kTheLocV:
 		if (d.asInt() != channel->getPosition().y) {

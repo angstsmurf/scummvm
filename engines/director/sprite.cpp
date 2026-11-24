@@ -71,6 +71,8 @@ void Sprite::reset() {
 	}
 
 	_thickness = 0;
+	_locZSet = false;
+	_locZ = 0;
 	_width = 0;
 	_height = 0;
 	_reportedWidth = -1;
@@ -129,6 +131,8 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_matte = nullptr;
 
 	_thickness = sprite._thickness;
+	_locZSet = sprite._locZSet;
+	_locZ = sprite._locZ;
 	_startPoint = sprite._startPoint;
 	_width = sprite._width;
 	_height = sprite._height;
@@ -798,6 +802,8 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		_thickness = nextSprite->_thickness;
 	if (nextSprite->_copyBackMask & kSCBPattern)
 		_pattern = nextSprite->_pattern;
+	if (!getAutoPuppet(kAPLocZ))
+		_locZSet = false;
 
 	// Persist the immediate flag
 	_immediate = immediate;

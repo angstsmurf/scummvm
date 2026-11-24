@@ -323,6 +323,7 @@ enum TheFieldType {
 	kTheWordWrap,
 	kTheScrollTop,
 	kTheColor,
+	kTheLocZ,
 	kTheMaxTheFieldType		// This must be always last
 };
 

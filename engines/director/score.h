@@ -127,6 +127,7 @@ public:
 	bool checkSpriteRollOver(uint16 spriteId, Common::Point pos);
 	uint16 getRollOverSpriteIDFromPos(Common::Point pos);
 	Common::Array<Channel *> getSpriteIntersections(const Common::Rect &r);
+	Common::Array<uint> getLayerOrder();
 	uint16 getSpriteIdByMemberId(CastMemberID id);
 	Common::Rect getChannelDirtyRectBounds();
 	bool refreshPointersForCastMemberID(CastMemberID id);
