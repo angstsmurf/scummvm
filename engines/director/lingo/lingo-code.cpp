@@ -338,7 +338,8 @@ void Lingo::popContext(bool aborting) {
 		if (!fp->allowRetVal) {
 			debugC(5, kDebugLingoExec, "dropping return value, storing as the result");
 			Datum res = pop();
-			if (res.type != VOID)
+			// Director 7 also takes the VOID of a "return VOID"
+			if (res.type != VOID || g_director->getVersion() >= 700)
 				g_lingo->_theResult = res;
 		}
 	} else if (_state->stack.size() == fp->stackSizeBefore) {
