@@ -317,6 +317,11 @@ MacShape *Sprite::getShape() {
 			shape->spriteType = sc->_fillType ? kOvalSprite : kOutlinedOvalSprite;
 			break;
 		case kShapeLine:
+			// Director 7 draws a line member only when it is filled
+			if (g_director->getVersion() >= 700 && !sc->_fillType) {
+				delete shape;
+				return nullptr;
+			}
 			shape->spriteType = sc->_lineDirection == 6 ? kLineBottomTopSprite : kLineTopBottomSprite;
 			break;
 		default:
