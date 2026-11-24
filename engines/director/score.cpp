@@ -2347,16 +2347,15 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 		_spriteRecordSize = _framesStream->readUint16();
 		_numChannels = _framesStream->readUint16();
 
-		if (_framesVersion > 13) {
-			_numChannelsDisplayed = _framesStream->readUint16(); // Up to 500
-		} else {
-			if (_framesVersion <= 7)    // Director5
-				_numChannelsDisplayed = 48;
-			else
-				_numChannelsDisplayed = 120;    // D6
-
-			_framesStream->readUint16(); // Skip
-		}
+		// Director 7 writes the movie's channel count here (120 for a
+		// converted older movie, 150 by default, up to 1000)
+		uint16 numChannelsDisplayed = _framesStream->readUint16();
+		if (_framesVersion >= 13 && numChannelsDisplayed)
+			_numChannelsDisplayed = numChannelsDisplayed;
+		else if (_framesVersion <= 7)    // Director5
+			_numChannelsDisplayed = 48;
+		else
+			_numChannelsDisplayed = 120;    // D6
 
 		_firstFramePosition = _framesStream->pos();
 
