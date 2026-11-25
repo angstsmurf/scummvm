@@ -832,7 +832,9 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		_inkData = nextSprite->_inkData;
 		_ink = nextSprite->_ink;
 		_trails = nextSprite->_trails;
-		_stretch = nextSprite->_stretch;
+		// A size set from Lingo stays stretched to that size
+		if (!keepRect && !getAutoPuppet(kAPWidth) && !getAutoPuppet(kAPHeight))
+			_stretch = nextSprite->_stretch;
 	}
 	if (!getAutoPuppet(kAPForeColor) && (nextSprite->_copyBackMask & kSCBForeColor)) {
 		_foreColor = nextSprite->_foreColor;
