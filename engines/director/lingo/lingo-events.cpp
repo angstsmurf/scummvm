@@ -846,6 +846,9 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 	bool behavioursCompleted = false;
 	// The event that a behavior had a handler for
 	int behaviorEventId = 0;
+	// The event and sprite of a behavior whose handler went to another frame
+	int goEventId = 0;
+	int goChannelId = 0;
 
 	// The handlers of an event that was queued unresolved
 	Common::Queue<LingoEvent> chain;
@@ -883,6 +886,12 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 			);
 			continue;
 		}
+
+		// In Director 7 a go in the handler of a behavior ends the event
+		// for the behaviors of the sprite that come after it
+		if (goEventId && el.eventHandlerSourceType == kSpriteHandler &&
+				el.eventId == goEventId && el.channelId == goChannelId)
+			continue;
 
 		// In Director 7 a behavior without a handler for the event does
 		// not stop it: a click on a sprite that only handles mouseDown
@@ -923,6 +932,12 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 
 			// We need to execute all behaviours before deciding if we pass
 			// through or not
+			if (!completed && _vm->getVersion() >= 700 && el.scriptType == kScoreScript &&
+					el.eventHandlerSourceType == kSpriteHandler) {
+				goEventId = el.eventId;
+				goChannelId = el.channelId;
+			}
+
 			if (el.scriptType == kScoreScript && el.passByDefault == true) {
 				behavioursCompleted |= completed;
 				completed = true;
