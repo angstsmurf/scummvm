@@ -285,6 +285,8 @@ public:
 	bool _disableGoPlayUpdateStage;
 	// D7: beginSprite or prepareFrame is being sent
 	bool _sendingBeginOrPrepare;
+	// D7: the current frame has had its mouseWithin
+	bool _mouseWithinSent;
 
 	// D6: the current frame has been loaded, but not drawn yet
 	bool _frameLoadedNotDrawn;

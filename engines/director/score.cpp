@@ -108,6 +108,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 
 	_disableGoPlayUpdateStage = false;
 	_sendingBeginOrPrepare = false;
+	_mouseWithinSent = false;
 	_frameLoadedNotDrawn = false;
 }
 
@@ -457,7 +458,9 @@ void Score::step() {
 			}
 
 			if (_version >= kFileVer600) {
-				if (_movie->_currentHoveredSpriteId) {
+				// D7 sends mouseWithin once for each frame, after the first idle
+				if (_movie->_currentHoveredSpriteId && !(_version >= kFileVer700 && _mouseWithinSent)) {
+					_mouseWithinSent = true;
 					_movie->processEvent(kEventMouseWithin, _movie->_currentHoveredSpriteId);
 				}
 
@@ -986,6 +989,7 @@ void Score::update() {
 			_disableGoPlayUpdateStage = true;
 			_sendingBeginOrPrepare = true;
 
+			_mouseWithinSent = false;
 			_movie->broadcastEvent(kEventPrepareFrame);
 
 			_disableGoPlayUpdateStage = prevDis;
