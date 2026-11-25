@@ -844,6 +844,8 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 	bool savedPassEvent = _passEvent;
 
 	bool behavioursCompleted = false;
+	// The event that a behavior had a handler for
+	int behaviorEventId = 0;
 
 	// The handlers of an event that was queued unresolved
 	Common::Queue<LingoEvent> chain;
@@ -880,6 +882,19 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
 				_eventHandlerTypes[el.event], scriptType2str(el.scriptType), el.scriptId.asString().c_str(), el.channelId
 			);
 			continue;
+		}
+
+		// In Director 7 a behavior without a handler for the event does
+		// not stop it: a click on a sprite that only handles mouseDown
+		// sends the mouseUp on to the frame and movie scripts. The last
+		// behavior still ends an event that an earlier one handled.
+		if (_vm->getVersion() >= 700 && el.scriptType == kScoreScript && el.scriptInstance) {
+			if (el.scriptInstance->getMethod(_eventHandlerTypes[el.event]).type != VOIDSYM)
+				behaviorEventId = el.eventId;
+			else if (el.passByDefault || behaviorEventId != el.eventId) {
+				_passEvent = true;
+				continue;
+			}
 		}
 
 		int lastEventId = movie->_lastEventId.getValOrDefault(el.event, 0);
