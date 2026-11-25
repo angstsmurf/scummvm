@@ -3739,7 +3739,9 @@ void LB::b_sendAllSprites(int nargs) {
 	Movie *movie = g_director->getCurrentMovie();
 	Score *score = movie ? movie->getScore() : nullptr;
 	if (score) {
-		score->createScriptInstances(score->getCurrentFrameNum());
+		// D7 leaves a sprite that has not begun yet without the message
+		if (g_director->getVersion() < 700)
+			score->createScriptInstances(score->getCurrentFrameNum());
 
 		bool anyHandled = false;
 		uint savedSpriteNum = movie->_currentSpriteNum;
@@ -3794,7 +3796,8 @@ void LB::b_sendSprite(int nargs) {
 	Score *score = movie ? movie->getScore() : nullptr;
 	Channel *channel = score ? score->getChannelById((uint16)spriteNum) : nullptr;
 	if (channel) {
-		if (channel->scriptInstances().empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
+		// D7 leaves a sprite that has not begun yet without the message
+		if (g_director->getVersion() < 700 && channel->scriptInstances().empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
 			score->createScriptInstances(score->getCurrentFrameNum());
 
 		bool handled = false;
