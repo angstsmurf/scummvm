@@ -545,7 +545,9 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	if (pd.ms) {
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
-		pd.inkBlitSurface(srcRect, channel->getMask());
+		const Graphics::Surface *mask = channel->getMask();
+		pd.maskColor = channel->getMaskColor();
+		pd.inkBlitSurface(srcRect, mask);
 	} else {
 		if (debugChannelSet(4, kDebugImages)) {
 			warning("Window::inkBlitFrom(): No source surface: spriteType: %d (%s), castType: %d (%s), castId: %s",

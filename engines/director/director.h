@@ -411,6 +411,8 @@ struct DirectorPlotData {
 
 	Graphics::ManagedSurface *srf = nullptr;
 	Graphics::ManagedSurface *srfMask = nullptr;
+	// Mask ink with a deeper mask: the share of the destination per colour component
+	const Graphics::Surface *maskColor = nullptr;
 	MacShape *ms = nullptr;
 
 	SpriteType sprite = kInactiveSprite;

@@ -91,6 +91,7 @@ Channel& Channel::operator=(const Channel &channel) {
 	_widget = nullptr;
 	_constraint = channel._constraint;
 	_mask = nullptr;
+	_maskColor = nullptr;
 	_quadSurface = nullptr;
 	_quadMask = nullptr;
 	_quadValid = false;
@@ -141,6 +142,7 @@ Channel::~Channel() {
 
 	if (_mask)
 		delete _mask;
+	delete _maskColor;
 	delete _quadSurface;
 	delete _quadMask;
 	if (_sprite)
@@ -241,6 +243,13 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		return _quadMask ? &_quadMask->rawSurface() : nullptr;
 	}
 	return getSourceMask(forceMatte);
+}
+
+// Valid after getMask(). A warped sprite keeps the plain mask.
+const Graphics::Surface *Channel::getMaskColor() {
+	if (_sprite->_ink != kInkTypeMask || _sprite->_hasQuad || !_maskColor)
+		return nullptr;
+	return &_maskColor->rawSurface();
 }
 
 // Warps the sprite's surface, drawn at the bbox, to its quad: each pixel of
@@ -386,19 +395,25 @@ const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
 				delete _mask;
 				_mask = nullptr;
 			}
+			delete _maskColor;
+			_maskColor = nullptr;
 			if (bitmap->_picture) {
-				// D7 movies can use a 32-bit (JPEG) mask: dark pixels let the
-				// sprite through, like the black pixels of a 1-bit mask.
+				// D7 movies can use a 32-bit (JPEG) mask. Each colour
+				// component of a mask pixel is the share of the background
+				// in that component: black shows the sprite, like the black
+				// pixels of a 1-bit mask, white the background.
 				// Bad Milk's portal (scrunch.dxr invertPortalmask).
 				const Graphics::Surface *maskSrc = &bitmap->_picture->_surface;
+				const Graphics::Surface *colorSrc = nullptr;
 				Graphics::Surface converted;
 				if (bitmap->_bitsPerPixel != 1 && maskSrc->format.bytesPerPixel > 1) {
+					colorSrc = maskSrc;
 					converted.create(maskSrc->w, maskSrc->h, Graphics::PixelFormat::createFormatCLUT8());
 					for (int y = 0; y < maskSrc->h; y++) {
 						for (int x = 0; x < maskSrc->w; x++) {
 							uint8 r, g, b;
 							maskSrc->format.colorToRGB(maskSrc->getPixel(x, y), r, g, b);
-							*(byte *)converted.getBasePtr(x, y) = (r * 30 + g * 59 + b * 11) / 100 < 128 ? 0xff : 0;
+							*(byte *)converted.getBasePtr(x, y) = (r & g & b) != 0xff ? 0xff : 0;
 						}
 					}
 					maskSrc = &converted;
@@ -425,6 +440,11 @@ const Graphics::Surface *Channel::getSourceMask(bool forceMatte, int w, int h) {
 				srcRect.translate(-destOrigin.x, -destOrigin.y);
 				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
 				_mask->copyRectToSurface(*maskSrc, destRect.left, destRect.top, srcRect);
+				if (colorSrc) {
+					_maskColor = new Graphics::ManagedSurface(bbox.width(), bbox.height(), colorSrc->format);
+					_maskColor->clear(colorSrc->format.RGBToColor(0xff, 0xff, 0xff));
+					_maskColor->copyRectToSurface(*colorSrc, destRect.left, destRect.top, srcRect);
+				}
 				converted.free();
 				return &_mask->rawSurface();
 			} else {

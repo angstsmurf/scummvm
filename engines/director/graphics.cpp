@@ -1178,6 +1178,22 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 				continue;
 
 			if (!(mask || srfMask) || (msk && (*msk++))) {
+				if (mask && maskColor && !alpha) {
+					byte rM, gM, bM, rS, gS, bS, rD, gD, bD;
+					maskColor->format.colorToRGB(maskColor->getPixel(srcPoint.x, srcPoint.y), rM, gM, bM);
+					uint32 srcColor = srf->getPixel(srcPoint.x, srcPoint.y);
+					uint32 dstColor = dst->getPixel(destRect.left + j, destRect.top + i);
+					if (d->_wm->_pixelformat.bytesPerPixel == 1) {
+						d->_wm->getPaletteEntry(srcColor, rS, gS, bS);
+						d->_wm->getPaletteEntry(dstColor, rD, gD, bD);
+					} else {
+						d->_wm->_pixelformat.colorToRGB(srcColor, rS, gS, bS);
+						d->_wm->_pixelformat.colorToRGB(dstColor, rD, gD, bD);
+					}
+					dst->setPixel(destRect.left + j, destRect.top + i,
+						d->findBlendColor(lerpByte(rS, rD, rM, 255), lerpByte(gS, gD, gM, 255), lerpByte(bS, bD, bM, 255)));
+					continue;
+				}
 				if (d->_wm->_pixelformat.bytesPerPixel == 1) {
 					primitives->drawPoint(destRect.left + j, destRect.top + i,
 										preprocessColor(*((byte *)srf->getBasePtr(srcPoint.x, srcPoint.y))), this);

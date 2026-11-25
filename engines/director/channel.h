@@ -51,6 +51,7 @@ public:
 
 	DirectorPlotData getPlotData();
 	const Graphics::Surface *getMask(bool forceMatte = false);
+	const Graphics::Surface *getMaskColor();
 
 	// The stored size, which is not always the size drawn; see getBbox().
 	// A text or button widget may resize the sprite: Lingo reads the size
@@ -133,6 +134,8 @@ public:
 	bool _hideFromStage; // Used in DT for hiding the channel from rendering
 	uint _constraint;
 	Graphics::ManagedSurface *_mask;
+	// The colours of a deeper mask ink mask, laid out like _mask
+	Graphics::ManagedSurface *_maskColor = nullptr;
 
 	int _priority;
 
